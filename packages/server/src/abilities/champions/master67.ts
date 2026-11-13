@@ -46,7 +46,8 @@ export function installMaster67Passive(world: World): void {
     const stacks = addBuff(world, source, 'master67_count', { source, duration: Number(p.duration), definition: { maxStacks: Number(p.maxStacks), fxKey: 'master67_p' } });
     if (!stacks || stacks.stacks < Number(p.maxStacks)) return;
     removeBuff(world, source, stacks.id, source.id);
-    applyDamage(world, { source, target: ctx.target, amount: Number(p.damage) + source.stats.ap * Number(p.damageAp), type: 'magic', ability: 'master67_p' });
+    // afterDamage s'exécute avant la résolution de la mort : ne pas refrapper des PV déjà à zéro.
+    if (ctx.target.hp > 0 && !ctx.target.dead) applyDamage(world, { source, target: ctx.target, amount: Number(p.damage) + source.stats.ap * Number(p.damageAp), type: 'magic', ability: 'master67_p' });
   });
   world.events.on('death', ({ target }) => lastHit.delete(target));
   world.events.on('respawn', ({ target }) => lastHit.delete(target));

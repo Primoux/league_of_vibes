@@ -70,6 +70,19 @@ describe('67 Master', () => {
     advance(world, .7); applyDamage(world, { source, target, amount: 1, type: 'true', ability: 'master67_q' });
     expect(getBuff(source, 'master67_count')?.stacks).toBe(1);
   });
+  it('un septième impact déjà létal ne cause ni dégâts négatifs ni seconde mort', () => {
+    const { world, source, target } = game('master67');
+    for (let i = 0; i < 6; i++) {
+      applyDamage(world, { source, target, amount: 1, type: 'true', ability: 'master67_q' }); advance(world, .7);
+    }
+    target.hp = 1;
+    applyDamage(world, { source, target, amount: 2, type: 'true', ability: 'master67_q' });
+    expect(target.dead).toBe(true); expect(damage(world, 'master67_p')).toBe(0);
+    expect(getBuff(source, 'master67_count')).toBeUndefined();
+    expect(source.champ!.damageToChampions).toBe(7);
+    expect(world.events.pending.filter(e => e.type === 'death' && e.target === target.id)).toHaveLength(1);
+    expect(world.events.pending.every(e => e.type !== 'damage' || e.amount >= 0)).toBe(true);
+  });
   it('une zone ne compte pas sept fois ; attaques et sbires ne comptent pas', () => {
     const { world, source, target } = game('master67');
     for (let i = 0; i < 9; i++) applyDamage(world, { source, target, amount: 1, type: 'true', ability: 'master67_w' });
