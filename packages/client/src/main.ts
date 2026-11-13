@@ -1,6 +1,6 @@
 import { render, h } from 'preact';
 import { installAudio } from './audio/AudioManager.ts';
-import { fxIndicators, installFx } from './fx/index.ts';
+import { fxIndicators, installFx, setFxQuality } from './fx/index.ts';
 import { installControls } from './input/controls.ts';
 import { net } from './net/client.ts';
 import { GameRenderer, registerIndicatorRenderer } from './render/GameRenderer.ts';
@@ -22,6 +22,12 @@ if (params.has('fxlab')) {
   installControls(renderer);
   installFx(renderer);
   if (fxIndicators.attached) registerIndicatorRenderer(fxIndicatorRenderer(fxIndicators));
+  // la qualité graphique (paramètres) pilote aussi les FX
+  let fxQuality = store.state.settings.quality;
+  setFxQuality(fxQuality);
+  store.subscribe((s) => {
+    if (s.settings.quality !== fxQuality) setFxQuality((fxQuality = s.settings.quality));
+  });
   installAudio();
   render(h(App, {}), document.getElementById('ui')!);
   // Reprise de session après rechargement de page (token en sessionStorage).
