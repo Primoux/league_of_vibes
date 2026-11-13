@@ -4,7 +4,10 @@
  * Géométries et matériaux partagés (pas d'allocation par entité au-delà des Mesh).
  */
 import * as THREE from 'three';
-import { CHAMPIONS, type EntitySnapshot } from '@lov/shared';
+import { CHAMPIONS, type DragonElement, type EntitySnapshot } from '@lov/shared';
+import { minionModel } from '../models/minions.ts';
+import { monsterModel } from '../models/monsters.ts';
+import { inhibitorModel, nexusModel, towerModel, wardModel } from '../models/structures.ts';
 import type { EntityView } from '../EntityView.ts';
 
 export const TEAM_COLOR = { blue: 0x3a7bff, red: 0xff4a4a, neutral: 0xc9a227 } as const;
@@ -110,82 +113,10 @@ export function championPlaceholder(snap: EntitySnapshot): EntityView {
   return new SimpleView(g, 1.8);
 }
 
-export function minionView(snap: EntitySnapshot): EntityView {
-  const team = TEAM_COLOR[snap.team];
-  const g = new THREE.Group();
-  switch (snap.subtype) {
-    case 'caster':
-      g.add(mesh(geo('m_caster', () => new THREE.ConeGeometry(0.28, 0.75, 6)), mat(team), 0.38));
-      g.add(mesh(geo('m_orb', () => new THREE.IcosahedronGeometry(0.12)), mat(0xfff2b0, { emissive: 0xffd35a }), 0.85));
-      break;
-    case 'cannon':
-      g.add(mesh(geo('m_cannon', () => new THREE.BoxGeometry(0.8, 0.45, 0.6)), mat(team), 0.35));
-      g.add(mesh(geo('m_barrel', () => new THREE.CylinderGeometry(0.1, 0.12, 0.6, 8).rotateZ(Math.PI / 2)), mat(0x444444), 0.6).translateX(0.35));
-      break;
-    case 'super':
-      g.add(mesh(geo('m_super', () => new THREE.BoxGeometry(0.75, 1.0, 0.75)), mat(team), 0.5));
-      break;
-    default:
-      g.add(mesh(geo('m_melee', () => new THREE.BoxGeometry(0.45, 0.55, 0.45)), mat(team), 0.28));
-  }
-  return new SimpleView(g, 1);
-}
-
-export function towerView(team: EntitySnapshot['team']): EntityView {
-  const c = TEAM_COLOR[team];
-  const g = new THREE.Group();
-  g.add(mesh(geo('t_base', () => new THREE.CylinderGeometry(0.9, 1.1, 0.6, 8)), mat(0x6b6458), 0.3));
-  g.add(mesh(geo('t_shaft', () => new THREE.CylinderGeometry(0.5, 0.75, 3.6, 8)), mat(0x8a8274), 2.4));
-  g.add(mesh(geo('t_crystal', () => new THREE.OctahedronGeometry(0.55)), mat(c, { emissive: c }), 4.8));
-  return new SimpleView(g, 5.2);
-}
-
-export function inhibitorView(team: EntitySnapshot['team']): EntityView {
-  const c = TEAM_COLOR[team];
-  const g = new THREE.Group();
-  g.add(mesh(geo('i_base', () => new THREE.CylinderGeometry(1.3, 1.5, 0.4, 10)), mat(0x5b564c), 0.2));
-  g.add(mesh(geo('i_ring', () => new THREE.TorusGeometry(0.9, 0.18, 8, 20)), mat(c, { emissive: c }), 1.4));
-  return new SimpleView(g, 2);
-}
-
-export function nexusView(team: EntitySnapshot['team']): EntityView {
-  const c = TEAM_COLOR[team];
-  const g = new THREE.Group();
-  g.add(mesh(geo('n_base', () => new THREE.CylinderGeometry(2.2, 2.6, 0.8, 10)), mat(0x5b564c), 0.4));
-  g.add(mesh(geo('n_core', () => new THREE.OctahedronGeometry(1.4)), mat(c, { emissive: c }), 2.4));
-  return new SimpleView(g, 3.4);
-}
-
-const MONSTER_SIZE: Record<string, number> = {
-  dragon: 2.2,
-  elder_dragon: 2.6,
-  leviathan: 3.2,
-  herald: 2.2,
-  blue_buff: 1.3,
-  red_buff: 1.3,
-  gromp: 1.1,
-  wolves: 0.9,
-  raptors: 0.8,
-  krugs: 1.1,
-  scuttle: 0.9,
-  grub: 0.6,
-};
-
-export function monsterView(snap: EntitySnapshot): EntityView {
-  const size = MONSTER_SIZE[snap.subtype ?? ''] ?? 0.5;
-  const color = snap.subtype === 'blue_buff' ? 0x4aa3ff : snap.subtype === 'red_buff' ? 0xff6a3a : 0x9a8a5a;
-  const g = new THREE.Group();
-  const body = mesh(geo('mon', () => new THREE.DodecahedronGeometry(0.5)), mat(color), size * 0.5);
-  body.scale.setScalar(size);
-  g.add(body);
-  return new SimpleView(g, size);
-}
-
-export function wardView(snap: EntitySnapshot): EntityView {
-  const c = TEAM_COLOR[snap.team];
-  const g = new THREE.Group();
-  g.add(mesh(geo('ward', () => new THREE.ConeGeometry(0.15, 0.6, 5)), mat(c, { emissive: c }), 0.3));
-  return new SimpleView(g, 0.6);
+/** Élément du prochain drake (mis à jour depuis l'événement objectiveSpawn). */
+let dragonElement: DragonElement | undefined;
+export function setDragonElement(e: DragonElement | undefined): void {
+  dragonElement = e;
 }
 
 /** Vue par défaut selon le type d'entité (null = pas de vue : projectiles et zones sont gérés par les FX). */
@@ -194,17 +125,17 @@ export function defaultViewFor(snap: EntitySnapshot): EntityView | null {
     case 'champion':
       return championPlaceholder(snap);
     case 'minion':
-      return minionView(snap);
+      return minionModel(snap.subtype, snap.team);
     case 'tower':
-      return towerView(snap.team);
+      return towerModel(snap.team, snap.subtype);
     case 'inhibitor':
-      return inhibitorView(snap.team);
+      return inhibitorModel(snap.team);
     case 'nexus':
-      return nexusView(snap.team);
+      return nexusModel(snap.team);
     case 'monster':
-      return monsterView(snap);
+      return monsterModel(snap.subtype, dragonElement) ?? new SimpleView(new THREE.Mesh(new THREE.DodecahedronGeometry(0.4), mat(0x9a8a5a)), 0.8);
     case 'ward':
-      return wardView(snap);
+      return wardModel(snap.team);
     default:
       return null;
   }

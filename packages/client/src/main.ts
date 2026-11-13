@@ -1,9 +1,10 @@
 import { render, h } from 'preact';
 import { installAudio } from './audio/AudioManager.ts';
-import { installFx } from './fx/index.ts';
+import { fxIndicators, installFx } from './fx/index.ts';
 import { installControls } from './input/controls.ts';
 import { net } from './net/client.ts';
-import { GameRenderer } from './render/GameRenderer.ts';
+import { GameRenderer, registerIndicatorRenderer } from './render/GameRenderer.ts';
+import { fxIndicatorRenderer } from './render/fxIndicatorsAdapter.ts';
 import { store } from './state.ts';
 import { App } from './ui/App.tsx';
 
@@ -20,6 +21,7 @@ if (params.has('fxlab')) {
   const renderer = new GameRenderer(canvas);
   installControls(renderer);
   installFx(renderer);
+  if (fxIndicators.attached) registerIndicatorRenderer(fxIndicatorRenderer(fxIndicators));
   installAudio();
   render(h(App, {}), document.getElementById('ui')!);
   // Reprise de session après rechargement de page (token en sessionStorage).
