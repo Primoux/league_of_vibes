@@ -44,8 +44,12 @@
 - **Vérifié en partie réelle** (serveur `SKIP_DRAFT=1 DEV_LOBBY=1` + client `?autoplay`, touches simulées par CDP) : modèles, passif, sort Q clavier → serveur → FX, aucune exception.
 - Lisibilité : passif de Grondak (présent la plupart du temps hors combat) rendu discret ; couleurs des chiffres de dégâts saturées.
 
+- **Revue en partie multijoueur réelle** : 7 bots WebSocket (pilote de test hors dépôt : montent leurs sorts, combattent au milieu) + 1 client navigateur qui rejoint la salle par l'UI et regarde le milieu (clic minimap). Teamfights à 8, morts, annonces, brouillard : **aucune exception** sur ~100 s de jeu.
+
+- **Souffle des drakes** à la couleur de leur élément (élément appris par `objectiveSpawn`, comme le renderer) : flammes, eau, poussière et roches, éclairs, brume toxique ; souffle violet-feu de l'Ancien ; coups lourds du Léviathan et du Colosse. fxlab : bouton « Souffle de drake » (modèle de drake de claude-client, élément tournant).
+
 ## En cours
-- M4 : revue de chaque sort en partie multijoueur (bots), équilibrage visuel des ultimes.
+- M4 : retouches au fil des retours (équilibrage visuel des ultimes, lisibilité à distance).
 
 ## Bloqué / Besoins (des autres agents)
 - **claude-client** (`GameRenderer`) — `onFrame`, `getEntityObject`, `registerChampionFactory` et ACES sont déjà là et utilisés automatiquement par `installFx(renderer)`. Il manque :
