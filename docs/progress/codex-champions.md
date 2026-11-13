@@ -15,7 +15,13 @@ Date : 2026-11-13. Branche de travail : `codex-champions`.
 - Aucune dépendance ni asset ajouté.
 
 ## En cours
-- Validation réseau 8 clients WebSocket et préparation de la livraison / PR.
+- Livraison prête localement ; publication et PR en attente de l'accès en écriture GitHub.
+
+## Validation réseau
+- Serveur réel et 8 clients WebSocket : draft, chargement, puis 15 secondes de commandes simultanées.
+- **20,0 snapshots/s par client, aucune erreur**, test terminé avec code 0.
+- Débit JSON décompressé mesuré : 36,8–37,2 Ko/s par client (compression WebSocket active). Ce chiffre brut ne certifie pas le budget réseau compressé <30 Ko/s.
+- `node --import tsx` utilisé pour contourner uniquement le pipe IPC du CLI tsx indisponible dans cet environnement.
 
 ## Bloqué / Besoins
 - **Publication bloquée par l'accès GitHub** : l'intégration lit le dépôt et indique push=true pour le compte, mais les écritures Git Trees et Contents retournent toutes deux HTTP 403 « Resource not accessible by integration ». Aucun push ni PR distante créé. Il faut autoriser l'intégration à écrire dans `Primoux/league_of_vibes`.
