@@ -1,5 +1,5 @@
 /**
- * Post-process : MSAA ×4 (cible HDR) + distorsion de chaleur + bloom modéré + sortie (tone mapping/sRGB).
+ * Post-process : MSAA ×4 (cible HDR) + distorsion de chaleur et filet anti-NaN + bloom modéré + sortie (tone mapping/sRGB).
  *
  * Bloom « sélectif » par luminance : seuls les pixels au-dessus du seuil brillent. Les FX utilisent des
  * couleurs HDR (> 1) et franchissent le seuil, la scène éclairée normalement reste en dessous.
@@ -32,7 +32,11 @@ varying vec2 vUv;
 void main() {
   vec4 d = texture2D(tDistort, vUv);
   vec2 off = (d.rg - 0.5) * 2.0 * d.a * uStrength;
-  gl_FragColor = texture2D(tDiffuse, vUv + off);
+  vec4 c = texture2D(tDiffuse, vUv + off);
+  // Filet de sécurité : un seul NaN/Inf (shader d'un autre objet, GPU qui diverge de la norme…) serait étalé
+  // par le bloom en blocs noirs. On le neutralise ici, avant le bloom, et on plafonne le HDR.
+  if (any(isnan(c)) || any(isinf(c))) c = vec4(0.0, 0.0, 0.0, 1.0);
+  gl_FragColor = vec4(min(c.rgb, vec3(64.0)), c.a);
 }`,
 };
 
