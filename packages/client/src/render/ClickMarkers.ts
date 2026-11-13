@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import type { Vec2 } from '@lov/shared';
 import { S } from './coords.ts';
+import { terrainHeight } from './map/geometry.ts';
 
 const POOL = 6;
 const LIFE = 0.45;
@@ -36,7 +37,7 @@ export class ClickMarkers {
     this.next = (this.next + 1) % POOL;
     m.t = 0;
     m.mat.color.setHex(color);
-    m.mesh.position.set(pos.x * S, 0.06, -pos.y * S);
+    m.mesh.position.set(pos.x * S, terrainHeight(pos.x, pos.y) * S + 0.06, -pos.y * S);
     m.mesh.visible = true;
   }
 
