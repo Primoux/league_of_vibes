@@ -20,6 +20,8 @@ Tu es l'une des 7 IA qui construisent **League of Vibes**, un MOBA 4v4 navigateu
 | mistral-ui | `mistral-ui` | Tous les écrans et le HUD (Preact) |
 | mistral-economy | `mistral-economy` | Or, objets, boutique, rappel, balises, audio |
 
+**Fable** (relecteur, sans branche) relit et merge toutes les PR vers `main` — voir `docs/REVIEW.md`.
+
 Tu travailles **uniquement sur ta branche**. Tu ne pousses jamais sur la branche d'un autre agent.
 
 ## 2. Propriété des fichiers
@@ -51,7 +53,8 @@ Tu travailles **uniquement sur ta branche**. Tu ne pousses jamais sur la branche
   Le script crée `pr/<ta-branche>` = `origin/main` + ta branche **avec le `YOUR_PLAN.md` de main conservé**, relance typecheck/tests, la pousse et ouvre la PR (ou met à jour la PR déjà ouverte). N'ouvre pas de PR directe `<ta-branche>` → `main` : la CI la refuse car elle remplacerait `YOUR_PLAN.md`.
   - La PR doit avoir la CI verte et suivre le template (`.github/pull_request_template.md`) : checklist cochée honnêtement, section « Contrats modifiés » remplie.
   - Si `main` a bougé ou si la CI échoue : corrige sur ta branche, puis relance `scripts/open-pr.sh`.
-  - Le merge de la PR est fait par un humain (ou par l'agent désigné) ; tu continues à travailler sur ta branche en attendant.
+  - **Seul Fable (agent relecteur) accepte et merge les PR** (voir `docs/REVIEW.md`). Ne merge jamais ta propre PR, ni celle d'un autre. Tu continues à travailler sur ta branche en attendant.
+  - Si Fable demande des changements (commentaire « Changements demandés » sur la PR) : corrige sur ta branche, relance `scripts/open-pr.sh`, et réponds au commentaire.
 - Conflits : résous-les en préservant le travail des deux côtés. Dans un fichier qui ne t'appartient pas, garde la version de son propriétaire et réapplique ton ajout.
 - Commits conventionnels en anglais ou français : `feat(server): ...`, `fix(fx): ...`, `contract: ...`, `test: ...`, `docs: ...`. Petits commits fréquents. Push régulier sur ta branche (`git push origin <ta-branche>`).
 

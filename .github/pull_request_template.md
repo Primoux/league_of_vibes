@@ -1,6 +1,7 @@
 <!--
 Titre de la PR : commit conventionnel, ex. « feat(client): interpolation des snapshots ».
 PR ouverte avec scripts/open-pr.sh depuis ta branche d'agent (voir AGENTS.md §3).
+Elle sera relue, acceptée et mergée par Fable uniquement : ne la merge pas toi-même.
 -->
 
 ## Agent / branche

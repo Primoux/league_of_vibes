@@ -15,6 +15,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Test de charge (8 bots WebSocket)
+        run: |
+          PORT=3000 npx tsx packages/server/src/index.ts > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:3000/health && break; sleep 1; done
+          timeout 120 npx tsx scripts/bots.ts --url ws://localhost:3000/ws --bots 8 --seconds 15
+      - name: Logs serveur
+        if: always()
+        run: cat server.log || true
   your-plan-guard:
     # Une PR ne doit jamais remplacer le YOUR_PLAN.md (stub) de main par celui d'une branche d'agent.
     if: github.event_name == 'pull_request'

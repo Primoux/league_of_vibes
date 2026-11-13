@@ -26,7 +26,7 @@ body="${2:-.github/pull_request_template.md}"
 body="$(realpath "$body")"
 pr_branch="pr/$branch"
 
-git fetch origin
+git fetch --prune origin
 git push origin "$branch"
 
 git checkout -q -B "$pr_branch" origin/main
