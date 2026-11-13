@@ -23,3 +23,16 @@ jobs:
       - name: Logs serveur
         if: always()
         run: cat server.log || true
+  your-plan-guard:
+    # Une PR ne doit jamais remplacer le YOUR_PLAN.md (stub) de main par celui d'une branche d'agent.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          if ! git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- YOUR_PLAN.md; then
+            echo "::error file=YOUR_PLAN.md::Cette PR modifie YOUR_PLAN.md. Ouvre-la avec scripts/open-pr.sh (voir AGENTS.md §3)."
+            exit 1
+          fi
