@@ -6,18 +6,22 @@ import * as THREE from 'three';
 import { MAP_SIZE, RIVER_HALF_WIDTH } from '@lov/shared';
 import { S } from '../coords.ts';
 import { RIVER_DEPTH } from './geometry.ts';
+import { FOG_GLSL, fogUniforms } from '../FogOfWar.ts';
 
 const vert = /* glsl */ `
+${FOG_GLSL.vertexDecl}
 varying vec2 vUv;
 varying vec3 vWorld;
 void main() {
   vUv = uv;
   vec4 w = modelMatrix * vec4(position, 1.0);
   vWorld = w.xyz;
+  ${FOG_GLSL.vertexMain('w')}
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
 
 const frag = /* glsl */ `
+${FOG_GLSL.fragmentDecl}
 uniform float uTime;
 uniform vec2 uSize; // longueur, largeur (monde)
 uniform vec3 uDeep;
@@ -48,6 +52,7 @@ void main() {
   float foamLine = smoothstep(0.80, 0.97, across + (n2 - 0.5) * 0.12);
   col = mix(col, uFoam, foamLine * 0.6);
   float alpha = 0.78 * (1.0 - smoothstep(0.96, 1.0, across)) * smoothstep(0.0, 4.0, ends);
+  ${FOG_GLSL.fragmentApply('col')}
   gl_FragColor = vec4(col, alpha);
   #include <colorspace_fragment>
 }`;
@@ -65,6 +70,7 @@ export class Water {
       transparent: true,
       depthWrite: false,
       uniforms: {
+        ...fogUniforms,
         uTime: { value: 0 },
         uSize: { value: new THREE.Vector2(len * S, width * S) },
         uDeep: { value: new THREE.Color(0x1d5a86) },

@@ -8,11 +8,13 @@ import { S } from '../coords.ts';
 import { distToLane, distToRiver, terrainHeight } from './geometry.ts';
 import { rng } from './rng.ts';
 import { GROUND_MARGIN } from './terrain.ts';
+import { applyFog } from '../FogOfWar.ts';
 
 /** Uniform de temps partagé par les shaders de végétation (vent). */
 export const windTime = { value: 0 };
 
 function addWind(mat: THREE.MeshStandardMaterial, strength: number): void {
+  mat.customProgramCacheKey = () => `wind${strength}`;
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = windTime;
     sh.vertexShader = sh.vertexShader
@@ -126,6 +128,8 @@ function buildTrees(spots: TreeSpot[], r: () => number): THREE.Group {
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3f2a, roughness: 1, flatShading: true });
   const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true });
   addWind(leafMat, 0.025);
+  applyFog(leafMat);
+  applyFog(trunkMat);
   const tm = new THREE.InstancedMesh(trunk, trunkMat, spots.length);
   const lm = new THREE.InstancedMesh(leaves, leafMat, spots.length);
   const m = new THREE.Matrix4();
@@ -159,6 +163,7 @@ function buildTrees(spots: TreeSpot[], r: () => number): THREE.Group {
 
 function buildWallBases(): THREE.Mesh {
   const mat = new THREE.MeshStandardMaterial({ color: 0x7d705c, roughness: 0.95, flatShading: true });
+  applyFog(mat);
   const geos: THREE.BufferGeometry[] = [];
   for (const poly of WALLS) {
     const shape = new THREE.Shape(poly.map((p) => new THREE.Vector2(p.x * S, p.y * S)));
@@ -197,6 +202,7 @@ function buildRocks(r: () => number): THREE.InstancedMesh {
   }
   const geo = new THREE.DodecahedronGeometry(0.22, 0);
   const mat = new THREE.MeshStandardMaterial({ color: 0x8a8174, roughness: 1, flatShading: true });
+  applyFog(mat);
   const im = new THREE.InstancedMesh(geo, mat, spots.length);
   const m = new THREE.Matrix4();
   const e = new THREE.Euler();
@@ -266,6 +272,7 @@ function buildBrushes(r: () => number): BrushView[] {
       }
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, side: THREE.DoubleSide, transparent: true, opacity: 1 });
     addWind(mat, 0.09);
+    applyFog(mat);
     const im = new THREE.InstancedMesh(geo, mat, pts.length);
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();

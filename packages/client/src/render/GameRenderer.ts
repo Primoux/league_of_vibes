@@ -20,6 +20,8 @@ import { store } from '../state.ts';
 import { CameraController } from './CameraController.ts';
 import { ClickMarkers } from './ClickMarkers.ts';
 import { HealthBars } from './HealthBars.ts';
+import { FogOfWar } from './FogOfWar.ts';
+import { Indicators, computeAim, newAimState, type AimState } from './Indicators.ts';
 import { S, toGameInto, toWorld, toGame } from './coords.ts';
 import { getChampionFactory, type EntityView } from './EntityView.ts';
 import { MapView } from './MapView.ts';
@@ -30,6 +32,7 @@ import { inhibitorModel, nexusModel, towerModel } from './models/structures.ts';
 
 export { toWorld, toGame };
 export { registerChampionFactory, type ChampionView, type EntityView } from './EntityView.ts';
+export { registerIndicatorRenderer, type AimState, type IndicatorRenderer } from './Indicators.ts';
 
 type FrameCb = (dt: number) => void;
 
@@ -73,6 +76,11 @@ export class GameRenderer {
   readonly map: MapView;
   readonly markers: ClickMarkers;
   readonly bars: HealthBars;
+  /** Brouillard de guerre ; `fog.canvas` = visibilité (blanc = visible) pour la minimap. */
+  readonly fog = new FogOfWar();
+  /** État de visée courant (mis à jour chaque frame, objet réutilisé). */
+  readonly aim: AimState = newAimState();
+  private indicators: Indicators;
   private slots = new Map<EntityId, Slot>();
   private positions = new Map<EntityId, Interpolated>();
   private staticStructures: { pos: Vec2; view: EntityView }[] = [];
@@ -85,6 +93,7 @@ export class GameRenderer {
   private vel = { x: 0, y: 0 };
   private lastFrame = performance.now();
   private lastFocusSeq = -1;
+  private fogPos = (e: EntitySnapshot) => this.positions.get(e.id) ?? null;
   private cameraInitForGame: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -103,6 +112,7 @@ export class GameRenderer {
     this.map = new MapView(this.scene, this.renderer, store.state.settings.quality);
     this.markers = new ClickMarkers(this.scene);
     this.bars = new HealthBars(this.scene);
+    this.indicators = new Indicators(this.scene);
     this.buildStaticStructures();
 
     addEventListener('resize', () => this.resize());
@@ -329,6 +339,18 @@ export class GameRenderer {
     s.cameraCenter.x = this.cam.center.x;
     s.cameraCenter.y = this.cam.center.y;
 
+    if (selfPos) {
+      const st = s.snapshot?.self;
+      const aaRange = (st?.stats.attackRange ?? 0) + 65;
+      computeAim(this.aim, s.targeting, s.selfEntity?.subtype, st?.summoners, selfPos, s.cursorGame, s.hover, aaRange);
+      if (s.hover === selfId && !this.aim.active) this.aim.attackRange = aaRange;
+    } else {
+      this.aim.active = false;
+      this.aim.attackRange = 0;
+    }
+    this.indicators.update(this.aim, dt);
+    this.fog.setEnabled(!!s.game);
+    this.fog.update(dt, snapshots.entities.values(), myTeam, this.fogPos);
     this.map.update(dt, this.camera, selfPos ?? null);
     this.markers.update(dt);
     for (const cb of this.frameCbs) cb(dt);

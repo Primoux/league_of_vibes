@@ -6,6 +6,7 @@ import { BRUSHES, FOUNTAINS, LANE_HALF_WIDTH, LANE_PATHS, MAP_SIZE, PITS, RIVER_
 import { S } from '../coords.ts';
 import { terrainHeight } from './geometry.ts';
 import { rng } from './rng.ts';
+import { applyFog } from '../FogOfWar.ts';
 
 const TEX = 2048;
 /** Le sol déborde de la carte pour remplir la vue aux bords. */
@@ -44,6 +45,8 @@ export function buildTerrain(quality: 'low' | 'high'): THREE.Mesh {
       .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail;')
       .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= 0.82 + 0.36 * texture2D(uDetail, vMapUv * 60.0).r;');
   };
+  mat.customProgramCacheKey = () => 'terrain';
+  applyFog(mat);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set((MAP_SIZE / 2) * S, 0, (-MAP_SIZE / 2) * S);
   mesh.receiveShadow = true;
