@@ -27,7 +27,7 @@ import { getChampionFactory, type EntityView } from './EntityView.ts';
 import { MapView } from './MapView.ts';
 import { terrainHeight } from './map/geometry.ts';
 import { rayCylinder, worldHitbox, type Ray3 } from './picking.ts';
-import { defaultViewFor, setDragonElement } from './views/DefaultViews.ts';
+import { defaultViewFor, getDragonElement, setDragonElement } from './views/DefaultViews.ts';
 import { inhibitorModel, nexusModel, towerModel } from './models/structures.ts';
 
 export { toWorld, toGame };
@@ -40,6 +40,8 @@ interface Slot {
   view: EntityView;
   anim: string;
   dead: boolean;
+  /** Variante visuelle avec laquelle la vue a été construite (élément des drakes). */
+  variant?: string;
 }
 
 /** La ligne droite a→b traverse-t-elle un mur ? (échantillonnage tous les 50 u) */
@@ -93,6 +95,8 @@ export class GameRenderer {
   private vel = { x: 0, y: 0 };
   private lastFrame = performance.now();
   private lastFocusSeq = -1;
+  private lastSnapshot: Snapshot | null = null;
+  private lastGame: unknown = null;
   private fogPos = (e: EntitySnapshot) => this.positions.get(e.id) ?? null;
   private readonly defaultRender = () => this.renderer.render(this.scene, this.camera);
   private renderFn: () => void = this.defaultRender;
@@ -119,7 +123,17 @@ export class GameRenderer {
 
     addEventListener('resize', () => this.resize());
     this.resize();
-    store.subscribe((s) => s.snapshot && this.applySnapshot(s.snapshot));
+    store.subscribe((s) => {
+      if (s.game !== this.lastGame) {
+        this.lastGame = s.game;
+        setDragonElement(undefined); // l'élément d'une partie précédente ne doit pas survivre
+      }
+      // le store notifie pour tout changement (survol, ciblage…) : n'appliquer que les nouveaux snapshots
+      if (s.snapshot && s.snapshot !== this.lastSnapshot) {
+        this.lastSnapshot = s.snapshot;
+        this.applySnapshot(s.snapshot);
+      }
+    });
     net.on((msg) => {
       if (msg.t === 'snapshot') this.onRawSnapshot(msg.snap);
     });
@@ -150,17 +164,26 @@ export class GameRenderer {
     const selfId = store.state.game?.entityId;
     for (const ev of snap.events) {
       if (ev.type === 'dash' && ev.source === selfId) this.predictor.suspend(ev.duration + 0.1);
-      else if (ev.type === 'objectiveSpawn' && ev.monster === 'dragon') setDragonElement(ev.element);
     }
   }
 
   private applySnapshot(snap: Snapshot): void {
+    // métadonnées d'apparition AVANT de créer les vues (le store passe avant les handlers net.on)
+    for (const ev of snap.events) if (ev.type === 'objectiveSpawn' && ev.monster === 'dragon') setDragonElement(ev.element);
+    const element = getDragonElement() ?? '';
     for (const e of snap.entities) {
       let slot = this.slots.get(e.id);
+      if (slot && e.kind === 'monster' && e.subtype === 'dragon' && slot.variant !== element) {
+        // drake construit avec un élément périmé : on reconstruit sa vue
+        slot.view.dispose();
+        slot.view.object3d.removeFromParent();
+        this.slots.delete(e.id);
+        slot = undefined;
+      }
       if (!slot) {
         const view = this.createView(e);
         if (!view) continue;
-        slot = { view, anim: '', dead: false };
+        slot = { view, anim: '', dead: false, variant: e.subtype === 'dragon' ? element : undefined };
         this.slots.set(e.id, slot);
         this.scene.add(view.object3d);
         if (e.kind === 'tower' || e.kind === 'inhibitor' || e.kind === 'nexus') this.hideStaticNear(e);

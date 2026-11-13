@@ -118,6 +118,9 @@ let dragonElement: DragonElement | undefined;
 export function setDragonElement(e: DragonElement | undefined): void {
   dragonElement = e;
 }
+export function getDragonElement(): DragonElement | undefined {
+  return dragonElement;
+}
 
 /** Vue par défaut selon le type d'entité (null = pas de vue : projectiles et zones sont gérés par les FX). */
 export function defaultViewFor(snap: EntitySnapshot): EntityView | null {
