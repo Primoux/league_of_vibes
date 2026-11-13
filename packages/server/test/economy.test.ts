@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOUNTAINS, PASSIVE_GOLD_PER_10S, TICK_RATE, scaled, PASSIVE_GOLD_START, type ClientMsg, type Stats, type Team, type Vec2 } from '@lov/shared';
+import { FOUNTAINS, PASSIVE_GOLD_PER_10S, TICK_RATE, scaled, PASSIVE_GOLD_START, type ClientMsg, type GameEvent, type Stats, type Team, type Vec2 } from '@lov/shared';
 import { applyDamage } from '../src/combat/damage.ts';
 import { economySystem, KILL_GOLD, FIRST_BLOOD_GOLD, PLATE_GOLD, STRUCTURE_TEAM_GOLD, STRUCTURE_LOCAL_GOLD, OBJECTIVE_GOLD } from '../src/systems/economy.ts';
 import { econ } from '../src/items/index.ts';
@@ -179,6 +179,17 @@ describe('economy — or', () => {
       expect(c.champ!.gold).toBeGreaterThanOrEqual(lo);
       expect(c.champ!.gold).toBeLessThanOrEqual(hi);
     }
+  });
+
+  it('n’émet pas d’announcement pour les kills (mistral-ui dérive depuis l’événement death)', () => {
+    const w = makeWorld();
+    const a = addChamp(w, 'blue', { x: 5000, y: 5000 });
+    const b = addChamp(w, 'red', { x: 5100, y: 5000 });
+    const ann: GameEvent[] = [];
+    w.events.on('announcement', (e) => ann.push(e));
+    applyDamage(w, { source: a, target: b, amount: 100000, type: 'true' });
+    expect(a.champ!.kills).toBe(1);
+    expect(ann).toHaveLength(0);
   });
 
   it('donne l’or d’équipe des objectifs', () => {

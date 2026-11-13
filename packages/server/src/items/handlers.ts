@@ -4,7 +4,7 @@
  * les actifs sont déclenchés par la commande `useItem` (useItem).
  * Les dégâts passent EXCLUSIVEMENT par applyDamage/applyHeal/applyShield (combat/damage.ts).
  */
-import { ITEMS, dist, type Stats, type Team } from '@lov/shared';
+import { ITEMS, dist, type Stats, type Team, type Vec2 } from '@lov/shared';
 import { registerStatSource } from '../combat/buffs.ts';
 import { applyHeal, applyShield, creditOf } from '../combat/damage.ts';
 import type { Entity, World } from '../world.ts';
@@ -171,14 +171,14 @@ export function tickItems(world: World, dt: number): void {
 /**
  * Commande `useItem` : active d'un objet de l'inventaire (`slot` 0..5) ou du trinket (`slot` -1).
  */
-export function useItem(world: World, ent: Entity, slot: number): void {
+export function useItem(world: World, ent: Entity, slot: number, _targetPos?: Vec2): void {
   if (!ent.champ || ent.dead) return;
   const st = econ(ent);
   // Œil du colosse donné par codex-objectives hors inventaire (data.heraldEye).
   if (slot === -1 && ent.data.heraldEye) {
     delete ent.data.heraldEye;
     st.colossusCall = { team: ent.team as Team, x: ent.pos.x, y: ent.pos.y };
-    world.events.emit({ type: 'announcement', key: 'colosse_invoque', team: ent.team as Team });
+    world.events.emit({ type: 'announcement', key: 'colosse_invoque', team: ent.team as Team, params: { text: 'Le Colosse du Rift charge !' } });
     world.events.emit({ type: 'itemUsed', target: ent.id, itemId: 'colossus_eye' });
     return;
   }
@@ -228,7 +228,7 @@ export function useItem(world: World, ent: Entity, slot: number): void {
       // L'invocation du Colosse est résolue par codex-objectives (entité invoquée).
       st.trinket = null;
       st.colossusCall = { team: ent.team as Team, x: ent.pos.x, y: ent.pos.y };
-      world.events.emit({ type: 'announcement', key: 'colosse_invoque', team: ent.team as Team });
+      world.events.emit({ type: 'announcement', key: 'colosse_invoque', team: ent.team as Team, params: { text: 'Le Colosse du Rift charge !' } });
       break;
     default:
       return;

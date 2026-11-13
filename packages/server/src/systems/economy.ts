@@ -134,7 +134,8 @@ function buyItem(world: World, ent: Entity, itemId: string): void {
       if (ch < def.maxStacks && ent.champ.gold >= def.cost) {
         ent.champ.gold -= def.cost;
         st.charges[existing] = ch + 1;
-        st.shopHistory.push({ kind: 'buy', itemId: def.id, slot: existing, gold: def.cost, paidPrice: def.cost, charges: ch });
+        st.paidPrice[existing] = (st.paidPrice[existing] ?? 0) + def.cost; // prix payé cumulé (vente à 70 %)
+        st.shopHistory.push({ kind: 'buy', itemId: def.id, slot: existing, gold: def.cost, paidPrice: st.paidPrice[existing], charges: ch });
         world.events.emit({ type: 'itemBought', target: ent.id, itemId: def.id });
       }
       return;
@@ -164,7 +165,7 @@ function buyItem(world: World, ent: Entity, itemId: string): void {
   ent.champ.items[slot] = def.id;
   st.paidPrice[slot] = cost + (consumed ?? []).reduce((s, c) => s + c.paidPrice, 0);
   if (def.maxStacks) st.charges[slot] = 1;
-  st.shopHistory.push({ kind: 'buy', itemId: def.id, slot, gold: cost, paidPrice: st.paidPrice[slot], consumed, charges: 1 });
+  st.shopHistory.push({ kind: 'buy', itemId: def.id, slot, gold: cost, paidPrice: st.paidPrice[slot], consumed, charges: 0 });
   world.events.emit({ type: 'itemBought', target: ent.id, itemId: def.id });
 }
 
@@ -194,6 +195,15 @@ function undoShop(world: World, ent: Entity): void {
     if (act.slot === -1) {
       st.trinket = null;
       st.trinketCharges = 0;
+    } else if (ITEMS[act.itemId]?.maxStacks && ent.champ.items[act.slot] === act.itemId && act.charges !== undefined) {
+      // Undo d'un achat empilé : on rend la charge, pas tout le stack.
+      if (act.charges <= 0) {
+        ent.champ.items[act.slot] = null;
+        delete st.paidPrice[act.slot];
+        delete st.charges[act.slot];
+      } else {
+        st.charges[act.slot] = act.charges;
+      }
     } else {
       ent.champ.items[act.slot] = null;
       delete st.paidPrice[act.slot];
@@ -282,15 +292,9 @@ function grantKillGold(world: World, e: { target: EntityId; killer?: EntityId; a
       if (!firstBlood.get(world)) {
         firstBlood.set(world, true);
         gold += FIRST_BLOOD_GOLD;
-        world.events.emit({ type: 'announcement', key: 'first_blood', params: { name: killer.champ.name } });
+        // Pas d'`announcement` ici : mistral-ui dérive premier sang / séries / multi-kills de l'événement `death`.
       }
-      if (wasStreak >= 3) {
-        world.events.emit({ type: 'announcement', key: 'shutdown', params: { name: killer.champ.name, victim: target.champ.name } });
-      }
-      if (kst.killStreak >= 2) {
-        const key = ['double_kill', 'triple_kill', 'quadra_kill', 'penta_kill'][Math.min(kst.killStreak, 5) - 2] ?? 'penta_kill';
-        world.events.emit({ type: 'announcement', key, params: { name: killer.champ.name } });
-      }
+      void wasStreak;
       addGold(world, killer, gold, target.pos);
     }
     const assists = (e.assists ?? []).map((id) => world.get(id)).filter((a): a is Entity => !!a?.champ);
@@ -368,6 +372,12 @@ export const economySystem: System = {
     world.events.on('structureDestroyed', (e) => grantStructureGold(world, e));
     world.events.on('objectiveTaken', (e) => grantObjectiveGold(world, e));
 
+    // mistral-ui attend `champ.items` de longueur 7 dans le snapshot (index 6 = trinket).
+    world.hooks.entitySnapshot.push((e, s) => {
+      if (!e.champ || !s.champ) return;
+      s.champ.items = [...e.champ.items, econ(e).trinket];
+    });
+
     // Complète le SelfState envoyé au client (hook ajouté par claude-server).
     world.hooks.selfState.push((e, s, w) => {
       if (!e.champ) return;
@@ -417,7 +427,7 @@ export const economySystem: System = {
           placeWard(world, ent, msg.pos);
           break;
         case 'useItem':
-          useItem(world, ent, msg.slot);
+          useItem(world, ent, msg.slot, msg.targetPos);
           break;
         case 'move':
         case 'attackMove':

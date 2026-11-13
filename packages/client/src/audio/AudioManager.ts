@@ -8,7 +8,7 @@
 import type { GameEvent, Vec2 } from '@lov/shared';
 import { fxBus } from '../fx/FxBus.ts';
 import { store } from '../state.ts';
-import { playEvent } from './sounds.ts';
+import { playEvent, resetKillAnnouncements } from './sounds.ts';
 import { music } from './music.ts';
 
 export type AudioChannel = 'master' | 'sfx' | 'voice' | 'music' | 'ui';
@@ -158,6 +158,17 @@ export class AudioManager {
 
 export const audio = new AudioManager();
 
+/** Exports nommés attendus par mistral-ui (settings) : volumes par canal 0..1. */
+export function setVolume(ch: AudioChannel, v: number): void {
+  audio.setVolume(ch, v);
+}
+export function getVolume(ch: AudioChannel): number {
+  return audio.getVolume(ch);
+}
+export function setMuted(m: boolean): void {
+  audio.setMuted(m);
+}
+
 let wasInGame = false;
 let hadResult = false;
 
@@ -175,6 +186,7 @@ export function installAudio(): void {
       hadResult = false;
       audio.unlock();
       music.start();
+      resetKillAnnouncements();
     }
     if (s.result && !hadResult) {
       hadResult = true;

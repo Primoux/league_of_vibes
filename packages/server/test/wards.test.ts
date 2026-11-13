@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FOUNTAINS, TICK_RATE, type ClientMsg, type Vec2 } from '@lov/shared';
+import { buildSnapshot } from '../src/net/snapshot.ts';
 import { hit } from '../src/systems/combat.ts';
 import { econ } from '../src/items/index.ts';
 import { WARD_CAST_RANGE, WARD_HP, WARD_LIFETIME, WARD_MAX_CHARGES, WARD_RECHARGE, WARD_SIGHT } from '../src/systems/economy.ts';
@@ -89,6 +90,17 @@ describe('balises (trinket)', () => {
     run(w, 0.1);
     expect(ward.data.revealedUntil).toBeGreaterThan(w.time - 1);
     expect(enemy.pos.x).toBeLessThanOrEqual(3000 + WARD_SIGHT);
+  });
+
+  it('snapshot : champ.items a 7 entrées, index 6 = trinket (attendu par mistral-ui)', () => {
+    const w = makeWorld();
+    const c = addChamp(w, 'blue', FOUNTAINS.blue);
+    cmd(w, c, { t: 'buy', itemId: 'stealth_ward' });
+    const snap = buildSnapshot(w, c.champ!.playerId, 'blue', []);
+    const self = snap.entities.find((e) => e.champ?.playerId === c.champ!.playerId);
+    expect(self?.champ?.items).toHaveLength(7);
+    expect(self?.champ?.items[6]).toBe('stealth_ward');
+    expect(snap.self?.wardCharges).toEqual({ charges: 2, cooldownRemaining: 0 });
   });
 
   it('est détruite en 3 auto-attaques (1 dégât par attaque)', () => {

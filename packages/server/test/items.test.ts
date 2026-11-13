@@ -128,6 +128,29 @@ describe('boutique', () => {
     expect(econ(c).charges[c.champ!.items.indexOf('health_potion')]).toBe(2);
   });
 
+  it('consommable : prix payé cumulé, undo d’empilement rend une charge, vente à 70 % du total', () => {
+    const w = makeWorld();
+    const c = addChamp(w, AT_FOUNTAIN);
+    c.champ!.gold = 1000;
+    cmd(w, c, { t: 'buy', itemId: 'health_potion' });
+    cmd(w, c, { t: 'buy', itemId: 'health_potion' });
+    const slot = c.champ!.items.indexOf('health_potion');
+    expect(econ(c).charges[slot]).toBe(2);
+    cmd(w, c, { t: 'undoShop' }); // undo du 2e achat : -1 charge, +50 or
+    expect(c.champ!.gold).toBe(950);
+    expect(econ(c).charges[slot]).toBe(1);
+    expect(c.champ!.items[slot]).toBe('health_potion');
+    cmd(w, c, { t: 'undoShop' }); // undo du 1er achat : slot vidé, +50 or
+    expect(c.champ!.gold).toBe(1000);
+    expect(c.champ!.items[slot]).toBeNull();
+    // 2 achats puis vente : remboursement = 70 % de 100 = 70
+    cmd(w, c, { t: 'buy', itemId: 'health_potion' });
+    cmd(w, c, { t: 'buy', itemId: 'health_potion' });
+    expect(c.champ!.gold).toBe(900);
+    cmd(w, c, { t: 'sell', slot });
+    expect(c.champ!.gold).toBe(970);
+  });
+
   it('inventaire plein : refuse l’achat au-delà de 6 slots', () => {
     const w = makeWorld();
     const c = addChamp(w, AT_FOUNTAIN);

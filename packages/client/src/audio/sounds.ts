@@ -53,21 +53,38 @@ const SUMMONER_RECIPES: Record<SummonerId, Recipe> = {
 };
 
 // ---------------------------------------------------------------- annonces vocales
+// mistral-ui dérive premier sang / multi-kills / séries de l'événement `death` (pas d'`announcement`
+// serveur pour ceux-là) : l'audio fait de même ici. Les `announcement` génériques passent par params.text.
 const ANNOUNCEMENTS: Record<string, (p?: Record<string, string | number>) => string> = {
-  first_blood: () => 'Premier sang !',
-  double_kill: () => 'Double élimination !',
-  triple_kill: () => 'Triple élimination !',
-  quadra_kill: () => 'Quadruple élimination !',
-  penta_kill: () => 'Pentakill !',
-  shutdown: (p) => `Fin de la série de ${p?.victim ?? ''} !`,
   colosse_invoque: () => 'Le Colosse du Rift charge !',
-  tower_destroyed: () => 'Tour détruite !',
-  inhibitor_destroyed: () => 'Inhibiteur détruit !',
-  dragon_taken: () => 'Dragon pris !',
-  elder_taken: () => 'Drake Ancien pris !',
-  leviathan_taken: () => 'Léviathan pris !',
-  soul_taken: () => 'Âme du dragon obtenue !',
 };
+
+/** Suivi des kills par tueur (fenêtre 10 s) pour les annonces de multi-kills. */
+const killTimes = new Map<number, number[]>();
+let firstBloodSpoken = false;
+export function resetKillAnnouncements(): void {
+  killTimes.clear();
+  firstBloodSpoken = false;
+}
+
+function announceKill(a: AudioManager, killerId: number | undefined): void {
+  if (killerId === undefined) return;
+  const now = performance.now() / 1000;
+  const arr = (killTimes.get(killerId) ?? []).filter((t) => now - t < 10);
+  arr.push(now);
+  killTimes.set(killerId, arr);
+  const voice = a.getVolume('voice');
+  if (!firstBloodSpoken) {
+    firstBloodSpoken = true;
+    speak('Premier sang !', voice);
+    return;
+  }
+  const n = arr.length;
+  if (n === 2) speak('Double élimination !', voice);
+  else if (n === 3) speak('Triple élimination !', voice);
+  else if (n === 4) speak('Quadruple élimination !', voice);
+  else if (n >= 5) speak('Pentakill !', voice);
+}
 
 function speak(text: string, voiceVol: number): void {
   try {
@@ -113,6 +130,7 @@ export function playEvent(a: AudioManager, e: GameEvent): void {
         noise(ctx, d, { dur: 0.5, vol: 0.3, filter: 800, slideFilter: 120 });
         tone(ctx, d, { type: 'sawtooth', freq: 160, slide: 50, dur: 0.5, vol: 0.25, filter: 600 });
       }, { pos: a.entityPos(e.target) });
+      announceKill(a, e.killer);
       break;
 
     case 'respawn':
@@ -209,7 +227,7 @@ export function playEvent(a: AudioManager, e: GameEvent): void {
       break;
 
     case 'announcement': {
-      const text = ANNOUNCEMENTS[e.key]?.(e.params);
+      const text = typeof e.params?.text === 'string' ? e.params.text : ANNOUNCEMENTS[e.key]?.(e.params);
       a.sfx((ctx, d) => {
         tone(ctx, d, { type: 'triangle', freq: 660, dur: 0.12, vol: 0.2 });
         tone(ctx, d, { type: 'triangle', freq: 880, dur: 0.2, vol: 0.2, delay: 0.12 });
