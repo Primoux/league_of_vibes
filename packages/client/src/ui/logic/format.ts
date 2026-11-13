@@ -65,11 +65,12 @@ export const DRAGON_COLOR: Record<DragonElement, string> = {
   chemtech: '#9fe03a',
 };
 
-export const MONSTER_LABEL: Partial<Record<MonsterType, string>> = {
+export const MONSTER_LABEL: Partial<Record<MonsterType | 'grubs', string>> = {
   dragon: 'Drake',
   elder_dragon: 'Drake Ancien',
   grub: 'Larve',
   herald: 'Colosse du Rift',
+  grubs: 'Larves',
   leviathan: 'Léviathan',
   blue_buff: 'Gardien d’azur',
   red_buff: 'Bête écarlate',
@@ -127,10 +128,24 @@ const EXTRA_BUFF_NAMES: Record<string, string> = {
   recall: 'Rappel',
 };
 
-/** Nom lisible d'un buff : registre partagé `BUFFS`, puis table locale, puis id reformaté. */
+/** Adjectif de l'âme du drake (« Âme infernale »). */
+export const SOUL_LABEL: Record<DragonElement, string> = {
+  infernal: 'infernale',
+  ocean: 'océanique',
+  mountain: 'des montagnes',
+  cloud: 'des nuages',
+  hextech: 'électrique',
+  chemtech: 'toxique',
+};
+
+const isElement = (s: string): s is DragonElement => s in DRAGON_LABEL;
+
+/** Nom lisible d'un buff : registre partagé `BUFFS`, puis table locale, drakes/âmes, puis id reformaté. */
 export function buffName(id: string): string {
   const known = BUFFS[id]?.name ?? EXTRA_BUFF_NAMES[id];
   if (known) return known;
+  const m = /^(dragon|soul)_(\w+)$/.exec(id);
+  if (m && isElement(m[2]!)) return m[1] === 'dragon' ? DRAGON_LABEL[m[2]] : `Âme ${SOUL_LABEL[m[2]]}`;
   const s = id.replace(/_/g, ' ');
   return s.charAt(0).toUpperCase() + s.slice(1);
 }

@@ -53,14 +53,16 @@ registerFx('grondak_p', {
   buff(rt, e, c) {
     const plates: THREE.Vector3[] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
     let acc = 0;
+    // État fréquent (présent dès 8 s hors combat) : coque discrète, liseré fin, peu de bandes.
     shieldShell(rt, e.target, e.duration > 0 ? e.duration : 30, `grondak_p:${e.target}`, {
-      color: new THREE.Color(1.3, 0.8, 0.3),
+      color: new THREE.Color(0.75, 0.45, 0.16),
       radius: 1.15,
       height: 1.05,
-      bands: 0.25,
+      bands: 0.08,
+      power: 3.2,
       onStep(center, t, dt) {
         acc += dt;
-        if (acc < 0.06) return;
+        if (acc < 0.12) return;
         acc = 0;
         // éclats de roche lumineux en orbite (particules courtes = traînée)
         plates.forEach((p, i) => {

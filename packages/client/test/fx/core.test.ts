@@ -84,6 +84,14 @@ describe('RingAllocator', () => {
     expect([r.rangeStart[0], r.rangeCount[0], r.rangeStart[1], r.rangeCount[1]]).toEqual([6, 2, 0, 2]);
   });
 
+  it('reset repart de l’emplacement 0 sans plage en attente', () => {
+    const r = new RingAllocator(8);
+    for (let i = 0; i < 5; i++) r.next();
+    r.reset();
+    expect(r.flush()).toBe(0);
+    expect(r.next()).toBe(0);
+  });
+
   it('plage complète si plus de capacity écritures', () => {
     const r = new RingAllocator(4);
     for (let i = 0; i < 10; i++) r.next();
