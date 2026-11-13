@@ -2,17 +2,10 @@
  * Clips procéduraux génériques (humanoïde). Les champions peuvent remplacer n'importe quel clip.
  * Voir les conventions d'axes dans pose.ts (avant = +x, membre +z = vers l'avant).
  */
+import { clamp01, easeOut, easeIn, bell } from './ease.ts';
 import { J, addRot, setOffset, setRot, type Clip, type ClipCtx, type ClipSet, type Pose } from './pose.ts';
 
 const TAU = Math.PI * 2;
-const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t);
-/** Cloche 0 → 1 → 0 sur [a, b]. */
-const bell = (t: number, a: number, b: number): number => {
-  const k = clamp01((t - a) / (b - a));
-  return Math.sin(k * Math.PI);
-};
-const easeOut = (t: number): number => 1 - (1 - clamp01(t)) ** 3;
-const easeIn = (t: number): number => clamp01(t) ** 2;
 
 /** Bras légèrement écartés, coudes un peu pliés : posture de base. */
 function rest(p: Pose, spread = 0.12): void {
