@@ -57,7 +57,19 @@ export interface RoomOptions {
   systems?: () => System[];
   /** Générateur aléatoire (auto-pick). */
   random?: () => number;
+  /** Durées (s) du draft / de la finalisation / du chargement. Défaut : valeurs officielles, raccourcies en mode dev. */
+  timings?: Partial<DraftTimings>;
+  /** Lancer directement la partie (picks automatiques) sans draft — tests manuels (env SKIP_DRAFT=1). */
+  skipDraft?: boolean;
 }
+
+export interface DraftTimings {
+  turn: number;
+  finalize: number;
+  loading: number;
+}
+
+export const DEV_TIMINGS: DraftTimings = { turn: 10, finalize: 3, loading: 2 };
 
 export interface RoomPlayer extends LobbyPlayer {
   conn: Conn | null;
@@ -88,6 +100,7 @@ export class Room {
   private clock: Clock;
   private random: () => number;
   private snapAcc = 0;
+  private timings: DraftTimings;
 
   constructor(
     public code: string,
@@ -96,6 +109,8 @@ export class Room {
   ) {
     this.clock = opts.clock ?? Date;
     this.random = opts.random ?? Math.random;
+    const base = devMode ? DEV_TIMINGS : { turn: DRAFT_TURN_SECONDS, finalize: FINALIZE_SECONDS, loading: LOADING_SECONDS };
+    this.timings = { ...base, ...opts.timings };
   }
 
   get empty(): boolean {
@@ -197,7 +212,10 @@ export class Room {
         return;
       case 'startGame':
         if (this.phase !== 'lobby') return;
-        if (p.isHost && this.canStart()) this.startDraft();
+        if (p.isHost && this.canStart()) {
+          if (this.opts.skipDraft) this.startGame();
+          else this.startDraft();
+        }
         else this.send(p.conn, { t: 'error', message: 'Impossible de lancer : 8 joueurs prêts requis (ou mode dev).' });
         return;
       case 'draftHover':
@@ -247,7 +265,7 @@ export class Room {
         summoners: p.role === 'jungle' ? ['flash', 'smite'] : ['flash', 'ignite'],
       });
     }
-    this.draft = { turns, currentTurn: 0, turnEndsAt: this.now() + DRAFT_TURN_SECONDS * 1000, picks };
+    this.draft = { turns, currentTurn: 0, turnEndsAt: this.now() + this.timings.turn * 1000, picks };
     this.phase = 'draft';
     this.broadcastLobby();
     this.broadcastDraft();
@@ -296,10 +314,10 @@ export class Room {
     if (!turn.every((id) => d.picks.get(id)!.locked)) return;
     d.currentTurn++;
     if (d.currentTurn >= d.turns.length) {
-      d.finalizeEndsAt = this.now() + FINALIZE_SECONDS * 1000;
+      d.finalizeEndsAt = this.now() + this.timings.finalize * 1000;
       d.turnEndsAt = d.finalizeEndsAt;
     } else {
-      d.turnEndsAt = this.now() + DRAFT_TURN_SECONDS * 1000;
+      d.turnEndsAt = this.now() + this.timings.turn * 1000;
     }
   }
 
@@ -371,7 +389,7 @@ export class Room {
 
   private startLoading(): void {
     this.phase = 'loading';
-    this.loadingEndsAt = this.now() + LOADING_SECONDS * 1000;
+    this.loadingEndsAt = this.now() + this.timings.loading * 1000;
     this.broadcastLobby();
     this.broadcastDraft();
     this.broadcast({ t: 'loading', endsAt: this.loadingEndsAt });

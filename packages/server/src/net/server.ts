@@ -40,6 +40,8 @@ interface Session {
 export interface GameServerOptions {
   port: number;
   devLobby?: boolean;
+  /** Partie lancée sans draft (picks automatiques). */
+  skipDraft?: boolean;
   clientDist?: string;
   log?: (msg: string) => void;
 }
@@ -149,7 +151,7 @@ export function createGameServer(opts: GameServerOptions): Promise<GameServer> {
       switch (msg.t) {
         case 'createRoom': {
           s.room?.leave(s.playerId);
-          const room = new Room(newCode(), !!opts.devLobby || !!msg.devMode);
+          const room = new Room(newCode(), !!opts.devLobby || !!msg.devMode, { skipDraft: opts.skipDraft });
           rooms.set(room.code, room);
           room.join(s.playerId, s.name, conn);
           s.room = room;
@@ -175,7 +177,12 @@ export function createGameServer(opts: GameServerOptions): Promise<GameServer> {
     });
 
     ws.on('close', () => {
-      if (!session?.room) return;
+      if (!session) return;
+      if (!session.room) {
+        // Session hors salle : rien à reprendre, on libère le token.
+        if (token) sessions.delete(token);
+        return;
+      }
       // On ne quitte la salle que si cette connexion est toujours celle du joueur (pas d'onglet plus récent).
       const p = session.room.players.get(session.playerId);
       if (p && p.conn === conn) session.room.leave(session.playerId);
