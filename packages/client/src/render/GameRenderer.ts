@@ -20,6 +20,8 @@ import { store } from '../state.ts';
 import { CameraController } from './CameraController.ts';
 import { ClickMarkers } from './ClickMarkers.ts';
 import { HealthBars } from './HealthBars.ts';
+import { MeshBatcher, type BatchHandle } from './MeshBatcher.ts';
+import { StatsOverlay } from './StatsOverlay.ts';
 import { FogOfWar } from './FogOfWar.ts';
 import { Indicators, computeAim, newAimState, type AimState } from './Indicators.ts';
 import { S, toGameInto, toWorld, toGame } from './coords.ts';
@@ -27,7 +29,7 @@ import { getChampionFactory, type EntityView } from './EntityView.ts';
 import { MapView } from './MapView.ts';
 import { terrainHeight } from './map/geometry.ts';
 import { rayCylinder, worldHitbox, type Ray3 } from './picking.ts';
-import { defaultViewFor, setDragonElement } from './views/DefaultViews.ts';
+import { defaultViewFor, getDragonElement, setDragonElement } from './views/DefaultViews.ts';
 import { inhibitorModel, nexusModel, towerModel } from './models/structures.ts';
 
 export { toWorld, toGame };
@@ -40,6 +42,10 @@ interface Slot {
   view: EntityView;
   anim: string;
   dead: boolean;
+  /** Variante visuelle avec laquelle la vue a été construite (élément des drakes). */
+  variant?: string;
+  /** Meshes regroupés par le MeshBatcher (vues procédurales de claude-client). */
+  batch?: BatchHandle;
 }
 
 /** La ligne droite a→b traverse-t-elle un mur ? (échantillonnage tous les 50 u) */
@@ -84,6 +90,8 @@ export class GameRenderer {
   private slots = new Map<EntityId, Slot>();
   private positions = new Map<EntityId, Interpolated>();
   private staticStructures: { pos: Vec2; view: EntityView }[] = [];
+  /** Regroupe les meshes des vues procédurales en InstancedMesh (perf). */
+  readonly batcher: MeshBatcher;
   private frameCbs = new Set<FrameCb>();
   private raycaster = new THREE.Raycaster();
   private ndc = new THREE.Vector2();
@@ -93,9 +101,13 @@ export class GameRenderer {
   private vel = { x: 0, y: 0 };
   private lastFrame = performance.now();
   private lastFocusSeq = -1;
+  private lastSnapshot: Snapshot | null = null;
+  private lastGame: unknown = null;
+  private quality: 'low' | 'high' | null = null;
   private fogPos = (e: EntitySnapshot) => this.positions.get(e.id) ?? null;
   private readonly defaultRender = () => this.renderer.render(this.scene, this.camera);
   private renderFn: () => void = this.defaultRender;
+  private stats: StatsOverlay | null = typeof location !== 'undefined' && new URLSearchParams(location.search).has('stats') ? new StatsOverlay() : null;
   private cameraInitForGame: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -103,7 +115,7 @@ export class GameRenderer {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -113,13 +125,26 @@ export class GameRenderer {
 
     this.map = new MapView(this.scene, this.renderer, store.state.settings.quality);
     this.markers = new ClickMarkers(this.scene);
+    this.batcher = new MeshBatcher(this.scene);
     this.bars = new HealthBars(this.scene);
     this.indicators = new Indicators(this.scene);
     this.buildStaticStructures();
 
     addEventListener('resize', () => this.resize());
     this.resize();
-    store.subscribe((s) => s.snapshot && this.applySnapshot(s.snapshot));
+    this.applyQuality(store.state.settings.quality);
+    store.subscribe((s) => {
+      if (s.settings.quality !== this.quality) this.applyQuality(s.settings.quality);
+      if (s.game !== this.lastGame) {
+        this.lastGame = s.game;
+        setDragonElement(undefined); // l'élément d'une partie précédente ne doit pas survivre
+      }
+      // le store notifie pour tout changement (survol, ciblage…) : n'appliquer que les nouveaux snapshots
+      if (s.snapshot && s.snapshot !== this.lastSnapshot) {
+        this.lastSnapshot = s.snapshot;
+        this.applySnapshot(s.snapshot);
+      }
+    });
     net.on((msg) => {
       if (msg.t === 'snapshot') this.onRawSnapshot(msg.snap);
     });
@@ -131,6 +156,7 @@ export class GameRenderer {
     const add = (pos: Vec2, view: EntityView) => {
       view.object3d.position.copy(toWorld(pos, terrainHeight(pos.x, pos.y) * S));
       this.scene.add(view.object3d);
+      this.batcher.adopt(view.object3d);
       this.staticStructures.push({ pos, view });
     };
     for (const t of TOWERS) add(t.pos, towerModel(t.team, t.tier));
@@ -150,17 +176,26 @@ export class GameRenderer {
     const selfId = store.state.game?.entityId;
     for (const ev of snap.events) {
       if (ev.type === 'dash' && ev.source === selfId) this.predictor.suspend(ev.duration + 0.1);
-      else if (ev.type === 'objectiveSpawn' && ev.monster === 'dragon') setDragonElement(ev.element);
     }
   }
 
   private applySnapshot(snap: Snapshot): void {
+    // métadonnées d'apparition AVANT de créer les vues (le store passe avant les handlers net.on)
+    for (const ev of snap.events) if (ev.type === 'objectiveSpawn' && ev.monster === 'dragon') setDragonElement(ev.element);
+    const element = getDragonElement() ?? '';
     for (const e of snap.entities) {
       let slot = this.slots.get(e.id);
+      if (slot && e.kind === 'monster' && e.subtype === 'dragon' && slot.variant !== element) {
+        // drake construit avec un élément périmé : on reconstruit sa vue
+        this.removeSlot(e.id, slot);
+        slot = undefined;
+      }
       if (!slot) {
-        const view = this.createView(e);
-        if (!view) continue;
-        slot = { view, anim: '', dead: false };
+        const created = this.createView(e);
+        if (!created) continue;
+        const view = created.view;
+        slot = { view, anim: '', dead: false, variant: e.subtype === 'dragon' ? element : undefined };
+        if (created.batchable) slot.batch = this.batcher.adopt(view.object3d);
         this.slots.set(e.id, slot);
         this.scene.add(view.object3d);
         if (e.kind === 'tower' || e.kind === 'inhibitor' || e.kind === 'nexus') this.hideStaticNear(e);
@@ -175,22 +210,28 @@ export class GameRenderer {
     // entités disparues (snapshot delta ou complet : le buffer fait foi)
     for (const [id, slot] of this.slots) {
       if (!snapshots.entities.has(id)) {
-        slot.view.dispose();
-        slot.view.object3d.removeFromParent();
-        this.slots.delete(id);
+        this.removeSlot(id, slot);
         this.positions.delete(id);
         this.bars.remove(id);
       }
     }
   }
 
-  private createView(e: EntitySnapshot): EntityView | null {
+  /** Vue d'une entité ; `batchable` = vue procédurale de claude-client (les champions de claude-fx restent intacts). */
+  private createView(e: EntitySnapshot): { view: EntityView; batchable: boolean } | null {
     if (e.kind === 'champion') {
-      const f = getChampionFactory();
-      const v = f?.(e);
-      if (v) return v;
+      const v = getChampionFactory()?.(e);
+      if (v) return { view: v, batchable: false };
     }
-    return defaultViewFor(e);
+    const v = defaultViewFor(e);
+    return v ? { view: v, batchable: true } : null;
+  }
+
+  private removeSlot(id: EntityId, slot: Slot): void {
+    if (slot.batch) this.batcher.release(slot.batch);
+    slot.view.dispose();
+    slot.view.object3d.removeFromParent();
+    this.slots.delete(id);
   }
 
   // ------------------------------------------------------------------ API publique
@@ -201,6 +242,17 @@ export class GameRenderer {
 
   interpolatedEntity(id: EntityId): Readonly<Interpolated> | null {
     return this.positions.get(id) ?? null;
+  }
+
+  /**
+   * Qualité graphique (store.settings.quality), appliquée à chaud : résolution (pixel ratio), ombres,
+   * décor de fond. Les FX suivent via setFxQuality (main.ts).
+   */
+  applyQuality(q: 'low' | 'high'): void {
+    this.quality = q;
+    this.renderer.setPixelRatio(q === 'high' ? Math.min(devicePixelRatio, 2) : 1);
+    this.renderer.setSize(innerWidth, innerHeight, false);
+    this.map.setQuality(q);
   }
 
   /** claude-fx (PostFx) : remplace le rendu final (bloom, FXAA…). `null` = rendu direct. */
@@ -361,7 +413,10 @@ export class GameRenderer {
     this.map.update(dt, this.camera, selfPos ?? null);
     this.markers.update(dt);
     for (const cb of this.frameCbs) cb(dt);
+    this.scene.updateMatrixWorld();
+    this.batcher.sync();
     this.renderFn();
+    this.stats?.frame(dt, this.renderer, this.slots.size);
   }
 
   private resize(): void {

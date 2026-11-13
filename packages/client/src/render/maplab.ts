@@ -40,6 +40,8 @@ export function startMapLab(canvas: HTMLCanvasElement): void {
   const lag = Number(params.get('lag') ?? 80);
   const jitter = Number(params.get('jitter') ?? 20);
 
+  const q = params.get('quality');
+  if (q === 'low' || q === 'high') store.set({ settings: { ...store.state.settings, quality: q } });
   const renderer = new GameRenderer(canvas);
   installControls(renderer);
 
@@ -79,6 +81,24 @@ export function startMapLab(canvas: HTMLCanvasElement): void {
       const big = row >= 5;
       add({ kind, subtype, team, x: big ? 3700 + col * 650 : 1500 + col * 330, y: big ? 3700 + col * 650 : 3300 - row * 330, speed: 0, anim: i % 3 === 0 ? 'run' : 'idle', facing: -Math.PI / 2 + 0.6 });
     });
+  }
+
+  if (params.has('bench')) {
+    // scénario PLAN §11 : 8 champions + 60 sbires dans le champ de la caméra (mid), en mouvement
+    const ids = ['grondak', 'tharox', 'kaelen', 'vrenna', 'ilyra', 'zephyr', 'sable', 'corvin'];
+    ids.forEach((subtype, i) => {
+      const team: Team = i < 4 ? 'blue' : 'red';
+      add({ kind: 'champion', team, subtype, x: 5300 + (i % 4) * 250, y: 5000 + (i < 4 ? 0 : 700) + (i % 4) * 120, speed: 335, level: 9, anim: 'run', mana: 300, maxMana: 500 });
+    });
+    for (let i = 0; i < 60; i++) {
+      const team: Team = i % 2 ? 'blue' : 'red';
+      const sub = (['melee', 'caster', 'cannon', 'super'] as const)[i % 7 === 0 ? 2 : i % 11 === 0 ? 3 : i % 3 === 0 ? 1 : 0];
+      add({ kind: 'minion', team, subtype: sub, x: 4800 + (i % 10) * 140, y: 4800 + Math.floor(i / 10) * 160, speed: 300, anim: i % 2 ? 'run' : 'attack', hp: 300 + (i % 5) * 50, maxHp: 500 });
+    }
+    // les champions tournent en rond pour solliciter interpolation et animations
+    setInterval(() => {
+      for (const e of ents.values()) if (e.kind === 'champion' && e !== me && !e.target) e.target = { x: 5000 + Math.random() * 1500, y: 5000 + Math.random() * 1500 };
+    }, 500);
   }
 
   const spawnWave = () => {
