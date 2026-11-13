@@ -47,6 +47,7 @@ export class AudioManager {
   /** Crée/reprend le contexte audio (obligatoirement appelé depuis un geste utilisateur). */
   unlock(): void {
     if (!this.ctx) {
+      // Cast justifié : Safari < 14.1 n'expose que webkitAudioContext (pas de `any`).
       const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AC) return;
       this.ctx = new AC();
