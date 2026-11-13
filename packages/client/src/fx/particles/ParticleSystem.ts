@@ -123,7 +123,8 @@ void main() {
     mv.xy += mat2(c, s, -s, c) * corner * size;
   }
   gl_Position = projectionMatrix * mv;
-  vUv = (uv + vec2(mod(tex, 4.0), 3.0 - floor(tex / 4.0))) * 0.25;
+  // UV rentrés de ~2 px dans la cellule : le filtrage ne lit jamais la cellule voisine
+  vUv = (uv * 0.97 + 0.015 + vec2(mod(tex, 4.0), 3.0 - floor(tex / 4.0))) * 0.25;
   vColor = vec4(col.rgb * aTint.rgb, col.a);
 }
 `;

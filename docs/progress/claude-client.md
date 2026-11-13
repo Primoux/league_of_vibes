@@ -45,8 +45,15 @@
 
 - **mistral-ui** : touches 1 2 3 5 6 7 → `useItem` (slots 0 à 5, `targetPos` = curseur), 4 → balise, par position physique (`e.code`).
 
+### Diagnostic réseau (`packages/client/tools/netcheck.ts`)
+- Fait tourner le vrai pipeline client (SnapshotBuffer, ServerClock, MovePredictor) à 60 Hz contre le vrai serveur, avec N joueurs et latence/gigue simulées. Mesure marge du tampon, extrapolation, saccades, erreur et recalages de prédiction, cadence/débit des snapshots.
+  `SKIP_DRAFT=1 npm run dev:server` puis `npx tsx packages/client/tools/netcheck.ts --players 8 --seconds 40 --lag 60 --jitter 30`.
+- **Bug trouvé et corrigé** : l'horloge ajoutait RTT/2 à l'offset, le rendu visait le temps serveur réel et rognait le délai d'interpolation → 44,5 % de frames extrapolées (marge p50 4 ms). Après : **0,1 %**, marge p50 62 ms, 0 saccade, erreur de prédiction p95 34 u (8 joueurs, 60 ms ± 15).
+- Débit mesuré : ~38 Ko/s par client (JSON décompressé) — au-dessus de la cible PLAN de 30 Ko/s (domaine claude-server ; la compression permessage-deflate le réduit déjà sur le fil).
+- `fix(server)` séparé : `useItem` manquait dans `server/src/net/validate.ts` (retour de revue PR #15), ajout additif + test `server/test/validate-useitem.test.ts`.
+
 ## En cours
-- Rien de bloquant. Pistes : LOD des modèles si besoin (non nécessaire après le batching), mesures fps sur machine réelle.
+- Mesures netcheck sur parties longues (sbires, combats) et plus de latence. Pistes : LOD des modèles si besoin (non nécessaire après le batching), mesures fps sur machine réelle.
 
 ### Intégrations
 - `GameRenderer.setRenderPipeline(fn)` pour PostFx (claude-fx) ; indicateurs de claude-fx branchés via `registerIndicatorRenderer(fxIndicatorRenderer(fxIndicators))` dans `main.ts`.

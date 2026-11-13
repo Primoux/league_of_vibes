@@ -32,6 +32,7 @@ import {
   type Vec2,
 } from '@lov/shared';
 import { createChampionView, type AnimatedChampionView } from '../../render/champions/index.ts';
+import { monsterModel } from '../../render/models/monsters.ts';
 import { store } from '../../state.ts';
 import { fxBus } from '../FxBus.ts';
 import type { FxHost } from '../core/host.ts';
@@ -113,7 +114,9 @@ export function startFxLab(): void {
 
   // ------------------------------------------------------------ simulation + modèles
   const dummies = new Map<number, Dummy>();
-  const host: FxHost = { scene, camera, renderer, getEntityObject: (id) => dummies.get(id)?.view.object3d };
+  /** Entités hors simulation (drake de démonstration) : objet 3D + snapshot publié dans le store. */
+  const extras = new Map<number, { obj: THREE.Object3D; snap: EntitySnapshot }>();
+  const host: FxHost = { scene, camera, renderer, getEntityObject: (id) => dummies.get(id)?.view.object3d ?? extras.get(id)?.obj };
   const fx = installFx(host, { manualUpdate: true, ownPost: true });
   const sim = new LabSim((e) => fxBus.dispatch(e));
   // debug : inspection du runtime depuis la console (lab uniquement)
@@ -177,7 +180,7 @@ export function startFxLab(): void {
   const autoAttack = (champ: ChampionDef): void => {
     useChampion(champ);
     sim.attack(caster.actor.id, main.actor.id);
-    attackUntil = clock + 1.6;
+    attackUntil = clock + 4;
   };
   const castSummoner = (spell: SummonerId): void => {
     sim.summoner(caster.actor.id, spell, spell === 'teleport' ? ally.actor : main.actor, mainPos());
@@ -188,8 +191,26 @@ export function startFxLab(): void {
     recalling = !recalling;
     fxBus.dispatch(recalling ? { type: 'recallStart', target: caster.actor.id } : { type: 'recallEnd', target: caster.actor.id, completed: false });
   };
+  // drake de démonstration (modèle de claude-client) pour le souffle élémentaire
+  const DRAKE_ID = 9001;
+  const ELEMENTS = ['infernal', 'ocean', 'mountain', 'cloud', 'hextech', 'chemtech'] as const;
+  let elementIdx = 0;
+  const breathe = (): void => {
+    const element = ELEMENTS[elementIdx++ % ELEMENTS.length]!;
+    const pos = { x: 5450, y: 4150 };
+    extras.get(DRAKE_ID)?.obj.removeFromParent();
+    const view = monsterModel('dragon', element);
+    const obj = view?.object3d ?? new THREE.Object3D();
+    obj.position.copy(toW(pos));
+    obj.rotation.y = Math.atan2(P.main.y - pos.y, P.main.x - pos.x);
+    scene.add(obj);
+    extras.set(DRAKE_ID, { obj, snap: { id: DRAKE_ID, kind: 'monster', team: 'neutral', subtype: 'dragon', x: pos.x, y: pos.y, facing: 0, hp: 1, maxHp: 1 } });
+    fxBus.dispatch({ type: 'objectiveSpawn', monster: 'dragon', element, pos });
+    fx.runtime.after(0.6, () => fxBus.dispatch({ type: 'autoAttack', source: DRAKE_ID, target: main.actor.id, ranged: true }));
+  };
   /** Événements du monde que la simulation du lab n'inclut pas (économie, objectifs, structures). */
   const WORLD: Record<string, [string, () => void]> = {
+    BREATH: ['Souffle de drake', breathe],
     LEVEL: ['Niveau', () => fxBus.dispatch({ type: 'levelUp', target: caster.actor.id, level: 6 })],
     GOLD: ['Or', () => fxBus.dispatch({ type: 'goldGain', target: caster.actor.id, amount: 300 })],
     TOWER: ['Tour', () => fxBus.dispatch({ type: 'structureDestroyed', target: targets[2]!.actor.id, kind: 'tower', team: 'red' })],
@@ -336,6 +357,8 @@ export function startFxLab(): void {
 
   let spamAcc = 0;
   let stressAcc = 0;
+  let walkFlip = -1;
+  const walk = params.get('walk') === '1';
   const stress = params.get('stress') === '1';
   let moveFlip = 0;
   const simulate = (dt: number): void => {
@@ -343,6 +366,11 @@ export function startFxLab(): void {
     if (attackUntil > 0 && clock > attackUntil) {
       attackUntil = -1;
       sim.stop(caster.actor.id);
+    }
+    // &walk=1 : le lanceur fait des allers-retours (revue de la course et des demi-tours)
+    if (walk && Math.floor(clock / 2.2) !== walkFlip) {
+      walkFlip = Math.floor(clock / 2.2);
+      sim.moveTo(caster.actor.id, walkFlip % 2 ? { x: P.caster.x + 650, y: P.caster.y - 120 } : { ...P.caster });
     }
     if (moving && Math.floor(clock / 1.5) !== moveFlip) {
       moveFlip = Math.floor(clock / 1.5);
@@ -387,6 +415,7 @@ export function startFxLab(): void {
       }
       d.view.update(snap, dt);
     }
+    for (const x of extras.values()) snaps.push(x.snap);
     store.set({ snapshot: { tick: 0, time: clock, serverTime: 0, events: [], entities: snaps, score: EMPTY_SCORE } });
     showcase?.update(dt);
     fx.update(dt);
