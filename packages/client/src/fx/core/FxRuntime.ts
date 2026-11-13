@@ -59,6 +59,8 @@ export interface BurstSystems {
   iceDebris: MeshBurstSystem;
 }
 
+const ENEMY_TINT = new THREE.Color(2.4, 0.25, 0.2);
+
 export class FxRuntime {
   readonly root = new THREE.Group();
   readonly ps: ParticleSystem;
@@ -66,6 +68,12 @@ export class FxRuntime {
   readonly entities: EntityTracker;
   readonly scheduler = new Scheduler();
   time = 0;
+  /**
+   * Vrai pendant l'exécution d'un handler dont l'auteur est un ennemi du joueur local (posé par le dispatcher).
+   * Les primitives au sol (télégraphies, zones) teintent alors leur couleur vers le rouge : en teamfight,
+   * on distingue d'un coup d'œil les zones dangereuses.
+   */
+  enemyContext = false;
 
   private readonly effects: Effect[] = [];
   private readonly colorCache = new Map<string, FxColors>();
@@ -205,6 +213,24 @@ export class FxRuntime {
       this.colorCache.set(key, c);
     }
     return c;
+  }
+
+  /**
+   * Tremblement de caméra pour un impact en `at` (monde), atténué avec la distance à la caméra :
+   * une explosion hors écran ne secoue pas la vue. `intensity` en unités de jeu (15 léger, 40 fort).
+   */
+  shake(at: THREE.Vector3, intensity: number, duration: number): void {
+    if (!this.host.shake) return;
+    const cam = this.host.camera.position;
+    // point visé ≈ projection de la caméra au sol (vue plongeante)
+    const d = Math.hypot(at.x - cam.x, at.z - (cam.z - cam.y * 0.6));
+    const k = 1 - d / 30;
+    if (k > 0) this.host.shake(intensity * k, duration);
+  }
+
+  /** Couleur de zone au sol : teintée vers le rouge si l'auteur est ennemi (voir `enemyContext`). */
+  groundColor(c: THREE.Color): THREE.Color {
+    return this.enemyContext ? c.clone().lerp(ENEMY_TINT, 0.45) : c;
   }
 
   /** Coordonnées de jeu → monde (dans `out`). */

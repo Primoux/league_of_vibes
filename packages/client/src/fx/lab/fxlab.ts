@@ -116,6 +116,8 @@ export function startFxLab(): void {
   const host: FxHost = { scene, camera, renderer, getEntityObject: (id) => dummies.get(id)?.view.object3d };
   const fx = installFx(host, { manualUpdate: true, ownPost: true });
   const sim = new LabSim((e) => fxBus.dispatch(e));
+  // debug : inspection du runtime depuis la console (lab uniquement)
+  (globalThis as { __fxlab?: unknown }).__fxlab = { fx, sim, scene };
   let eventLog: GameEvent[] = [];
   fxBus.subscribe((e) => {
     if (e.type !== 'damage' && e.type !== 'autoAttack') eventLog.push(e);
@@ -313,6 +315,9 @@ export function startFxLab(): void {
   const [aimChamp, aimSlot] = (params.get('aim') ?? '').split(':');
   const aimDef = aimChamp ? CHAMPIONS[aimChamp]?.abilities[aimSlot as AbilitySlot] : undefined;
   if (aimDef) fxIndicators.showAbility(aimDef, P.caster, P.main);
+  if (params.get('quality') === 'low') setFxQuality('low');
+  // &as=red : on regarde la scène comme un joueur rouge → le lanceur bleu est un ennemi (teinte des zones)
+  if (params.get('as') === 'red') store.set({ game: { you: 'lab', team: 'red', entityId: -1, players: [], serverTime: 0 } });
   const showcase = params.get('showcase') === '1' ? createShowcase(fx.runtime, toW({ x: 4400, y: 3950 })) : null;
 
   // ------------------------------------------------------------ boucle
