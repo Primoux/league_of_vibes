@@ -19,9 +19,11 @@ import type { Interpolated } from '../net/snapshots.ts';
 import { store } from '../state.ts';
 import { CameraController } from './CameraController.ts';
 import { ClickMarkers } from './ClickMarkers.ts';
+import { HealthBars } from './HealthBars.ts';
 import { S, toGameInto, toWorld, toGame } from './coords.ts';
 import { getChampionFactory, type EntityView } from './EntityView.ts';
 import { MapView } from './MapView.ts';
+import { terrainHeight } from './map/geometry.ts';
 import { rayCylinder, worldHitbox, type Ray3 } from './picking.ts';
 import { defaultViewFor, inhibitorView, nexusView, towerView } from './views/DefaultViews.ts';
 
@@ -69,6 +71,7 @@ export class GameRenderer {
   readonly predictor = new MovePredictor(segmentBlocked);
   readonly map: MapView;
   readonly markers: ClickMarkers;
+  readonly bars: HealthBars;
   private slots = new Map<EntityId, Slot>();
   private positions = new Map<EntityId, Interpolated>();
   private staticStructures: { pos: Vec2; view: EntityView }[] = [];
@@ -96,8 +99,9 @@ export class GameRenderer {
     this.camera = this.cam.camera;
     this.scene.add(this.camera); // permet d'attacher des objets à la caméra (FX écran)
 
-    this.map = new MapView(this.scene, this.renderer);
+    this.map = new MapView(this.scene, this.renderer, store.state.settings.quality);
     this.markers = new ClickMarkers(this.scene);
+    this.bars = new HealthBars(this.scene);
     this.buildStaticStructures();
 
     addEventListener('resize', () => this.resize());
@@ -112,7 +116,7 @@ export class GameRenderer {
   /** Structures issues de map.ts, visibles tant que le serveur n'envoie pas l'entité correspondante. */
   private buildStaticStructures(): void {
     const add = (pos: Vec2, view: EntityView) => {
-      view.object3d.position.copy(toWorld(pos));
+      view.object3d.position.copy(toWorld(pos, terrainHeight(pos.x, pos.y) * S));
       this.scene.add(view.object3d);
       this.staticStructures.push({ pos, view });
     };
@@ -162,6 +166,7 @@ export class GameRenderer {
         slot.view.object3d.removeFromParent();
         this.slots.delete(id);
         this.positions.delete(id);
+        this.bars.remove(id);
       }
     }
   }
@@ -199,7 +204,13 @@ export class GameRenderer {
   /** Position au sol sous le curseur (coordonnées jeu), ou null. */
   pickGround(clientX: number, clientY: number, out: Vec2 = { x: 0, y: 0 }): Vec2 | null {
     this.setRay(clientX, clientY);
-    const hit = this.raycaster.ray.intersectPlane(this.groundPlane, this.tmpV);
+    // intersection avec le plan y = 0 puis 2 raffinements sur la hauteur réelle du terrain (rivière creusée)
+    this.groundPlane.constant = 0;
+    let hit = this.raycaster.ray.intersectPlane(this.groundPlane, this.tmpV);
+    for (let i = 0; hit && i < 2; i++) {
+      this.groundPlane.constant = -terrainHeight(hit.x / S, -hit.z / S) * S;
+      hit = this.raycaster.ray.intersectPlane(this.groundPlane, this.tmpV);
+    }
     return hit ? toGameInto(out, hit) : null;
   }
 
@@ -286,32 +297,38 @@ export class GameRenderer {
 
     this.updatePositions(dt);
 
+    const myTeam = s.game?.team;
+    const selfId = s.game?.entityId;
+    this.bars.begin();
     for (const [id, slot] of this.slots) {
       const p = this.positions.get(id);
       const e = snapshots.entities.get(id);
       if (!p || !e) continue;
       const o = slot.view.object3d;
-      o.position.set(p.x * S, 0, -p.y * S);
+      o.position.set(p.x * S, terrainHeight(p.x, p.y) * S, -p.y * S);
       o.rotation.y = p.facing;
       slot.view.update(e, dt);
+      if (o.visible) this.bars.push(e, o.position.x, o.position.y, o.position.z, myTeam, id === selfId);
     }
+    this.bars.end();
 
     // caméra
     const selfPos = s.game ? this.positions.get(s.game.entityId) : undefined;
-    if (s.game && this.cameraInitForGame !== s.game.entityId && selfPos && (selfPos.x || selfPos.y)) {
-      this.cameraInitForGame = s.game.entityId;
-      this.cam.jumpTo(selfPos);
-    }
     if (s.cameraFocus && s.cameraFocus.seq !== this.lastFocusSeq) {
       this.lastFocusSeq = s.cameraFocus.seq;
       this.cam.jumpTo(s.cameraFocus.pos);
+      if (s.game) this.cameraInitForGame = s.game.entityId; // un focus explicite remplace le centrage initial
       if (s.cameraLocked) store.set({ cameraLocked: false });
+    }
+    if (s.game && this.cameraInitForGame !== s.game.entityId && selfPos && (selfPos.x || selfPos.y)) {
+      this.cameraInitForGame = s.game.entityId;
+      this.cam.jumpTo(selfPos);
     }
     this.cam.update(dt, selfPos ?? null, s.cameraLocked, s.settings.edgePan, s.settings.cameraSpeed, innerWidth, innerHeight);
     s.cameraCenter.x = this.cam.center.x;
     s.cameraCenter.y = this.cam.center.y;
 
-    this.map.update(dt, this.camera);
+    this.map.update(dt, this.camera, selfPos ?? null);
     this.markers.update(dt);
     for (const cb of this.frameCbs) cb(dt);
     this.renderer.render(this.scene, this.camera);
@@ -320,5 +337,7 @@ export class GameRenderer {
   private resize(): void {
     this.renderer.setSize(innerWidth, innerHeight, false);
     this.cam.resize(innerWidth / innerHeight);
+    this.bars.setViewport(innerWidth, innerHeight);
+    this.bars.updateLabelScale(innerHeight, this.camera.fov);
   }
 }

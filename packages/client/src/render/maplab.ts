@@ -95,6 +95,10 @@ export function startMapLab(canvas: HTMLCanvasElement): void {
     start: { you: 'lab', team: 'blue', entityId: me.id, serverTime: Date.now(), players: [{ id: 'lab', name: 'Labo', team: 'blue', championId: 'ilyra', summoners: ['flash', 'ignite'] }] },
   });
   store.set({ cameraLocked: false });
+  if (params.has('cx')) {
+    const pos = { x: Number(params.get('cx')), y: Number(params.get('cy') ?? params.get('cx')) };
+    store.set({ cameraFocus: { pos, seq: 1 } });
+  }
 
   let tick = 0;
   const start = performance.now();

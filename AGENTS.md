@@ -35,23 +35,23 @@ Tu travailles **uniquement sur ta branche**. Tu ne pousses jamais sur la branche
 - Une API dont tu dépends n'existe pas encore ? Mocke-la localement dans tes fichiers, ou crée-la avec la signature exacte du PLAN dans le fichier prévu avec une implémentation minimale, et signale-le.
 
 ## 3. Git
-- Configuration à faire une fois : `chmod +x scripts/safe-merge.sh`.
+- Configuration à faire une fois : `chmod +x scripts/safe-merge.sh scripts/open-pr.sh`, et `gh auth login`.
 - **Synchronise-toi souvent avec `main`** (au moins à chaque début de session) :
   ```bash
   git fetch origin
   scripts/safe-merge.sh origin/main   # merge en conservant TON YOUR_PLAN.md
   ```
   N'utilise pas `git merge`/`git pull` bruts depuis main : ils peuvent écraser ton `YOUR_PLAN.md`.
-- **Intègre ton travail sur `main`** à chaque jalon (et dès qu'un morceau utile aux autres est stable) :
+- **Tout passe par une Pull Request vers `main`.** Ne pousse **jamais** directement sur `main` (ni merge local + push). À chaque jalon (et dès qu'un morceau utile aux autres est stable) :
   ```bash
-  npm run typecheck && npm test          # obligatoire, vert
-  git checkout main && git pull --ff-only origin main
-  scripts/safe-merge.sh <ta-branche>     # sur main : conserve le YOUR_PLAN.md (stub) de main
-  npm run typecheck && npm test          # re-vérifier après merge
-  git push origin main
-  git checkout <ta-branche>
+  npm run typecheck && npm test && npm run build      # obligatoire, vert
+  cp .github/pull_request_template.md /tmp/pr-body.md # remplis-le (résumé, contrats, tests…)
+  scripts/open-pr.sh "feat(<domaine>): ..." /tmp/pr-body.md
   ```
-  Si le push est refusé (quelqu'un a poussé avant toi), recommence depuis `git pull --ff-only`. Ne force **jamais** un push sur `main`.
+  Le script crée `pr/<ta-branche>` = `origin/main` + ta branche **avec le `YOUR_PLAN.md` de main conservé**, relance typecheck/tests, la pousse et ouvre la PR (ou met à jour la PR déjà ouverte). N'ouvre pas de PR directe `<ta-branche>` → `main` : la CI la refuse car elle remplacerait `YOUR_PLAN.md`.
+  - La PR doit avoir la CI verte et suivre le template (`.github/pull_request_template.md`) : checklist cochée honnêtement, section « Contrats modifiés » remplie.
+  - Si `main` a bougé ou si la CI échoue : corrige sur ta branche, puis relance `scripts/open-pr.sh`.
+  - Le merge de la PR est fait par un humain (ou par l'agent désigné) ; tu continues à travailler sur ta branche en attendant.
 - Conflits : résous-les en préservant le travail des deux côtés. Dans un fichier qui ne t'appartient pas, garde la version de son propriétaire et réapplique ton ajout.
 - Commits conventionnels en anglais ou français : `feat(server): ...`, `fix(fx): ...`, `contract: ...`, `test: ...`, `docs: ...`. Petits commits fréquents. Push régulier sur ta branche (`git push origin <ta-branche>`).
 
