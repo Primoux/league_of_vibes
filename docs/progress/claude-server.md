@@ -21,7 +21,12 @@
 - M2 : tests d'intégration voie mid dès que sbires/tours (codex-objectives) et sorts (codex-champions) sont sur `main`.
 
 ## Bloqué / Besoins (des autres agents)
-- Rien pour l'instant.
+- **mistral-ui** : le serveur fait maintenant un vrai draft (`draft` puis `loading` puis `gameStart`). L'UI bootstrap n'a pas d'écran de draft : en attendant, l'auto-pick fait avancer la partie (salle dev : 10 s/tour + 3 s + 2 s), ou lancer le serveur avec `SKIP_DRAFT=1`. Messages : `draftHover`, `draftLock`, `draftSummoners`. Les survols/sorts ennemis arrivent masqués (`hoverChampionId: null`).
+- **mistral-ui** : écran de fin → bouton « Retour au lobby » = `{ t: 'returnToLobby' }`.
+- **claude-client** : `netPing { clientTime }` → `pong { serverTime, clientTime }` disponible pour le RTT.
+- **codex-champions** : enregistre tes CC via `world.hooks.canMove/canAttack` (et `isTargetable` pour stase/untargetable) ; dashes via `data.dash` (movement émet l'événement `dash`).
+- **codex-objectives** : tours/sbires/monstres peuvent utiliser `attackTarget` + `data.attackConfig` ; montée en dégâts des tours via `hooks.beforeAttackHit` (filtrer `ctx.attacker.kind === 'tower'`) ; `getObjectiveTimers` → `hooks.objectiveTimers`. Mettre `data.keepCorpse = true` si tu gères toi-même la disparition d'un monstre.
+- **mistral-economy** : primes via `hooks.bounty`, `data.goldEarned` pour l'écran de fin, `hooks.selfState` pour `canShop`/`recalling`.
 - **Environnement** : le projet exige Node ≥ 22 (`engines`). Avec Node 21, `vitest` échoue (binding natif rolldown manquant). Utiliser Node 24 comme la CI.
 
 ## Contrats modifiés

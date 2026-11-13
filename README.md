@@ -26,7 +26,8 @@ Production : `npm run build && npm start` puis http://localhost:3000.
 | `npm run typecheck` | TypeScript sur les 3 paquets |
 | `npm test` | tests vitest (simulation headless) |
 | `npm run build` | build du client dans `packages/client/dist` |
-| `DEV_LOBBY=1 npm run dev:server` | toutes les salles en mode dev |
+| `DEV_LOBBY=1 npm run dev:server` | toutes les salles en mode dev (draft accéléré : 10 s / tour, 3 s de finalisation, 2 s de chargement) |
+| `SKIP_DRAFT=1 npm run dev:server` | pas de draft : la partie démarre directement (champions attribués automatiquement) |
 | `npx tsx scripts/bots.ts --url ws://localhost:3000/ws --bots 8 --seconds 30` | test de charge : 8 bots WebSocket (CI uniquement) |
 
 ## Déploiement

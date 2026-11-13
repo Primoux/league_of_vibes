@@ -20,7 +20,7 @@ class FakeConn {
 function setup(n = 8) {
   let now = 1_000_000;
   const clock = { now: () => now };
-  const room = new Room('ABCDE', false, { clock, manual: true, random: () => 0, systems: () => [inputSystem, movementSystem, combatSystem, visionSystem] });
+  const room = new Room('ABCDE', false, { clock, manual: true, random: () => 0, timings: { turn: DRAFT_TURN_SECONDS, finalize: FINALIZE_SECONDS, loading: LOADING_SECONDS }, systems: () => [inputSystem, movementSystem, combatSystem, visionSystem] });
   const conns = new Map<string, FakeConn>();
   for (let i = 0; i < n; i++) {
     const c = new FakeConn();
