@@ -25,7 +25,8 @@ import { getChampionFactory, type EntityView } from './EntityView.ts';
 import { MapView } from './MapView.ts';
 import { terrainHeight } from './map/geometry.ts';
 import { rayCylinder, worldHitbox, type Ray3 } from './picking.ts';
-import { defaultViewFor, inhibitorView, nexusView, towerView } from './views/DefaultViews.ts';
+import { defaultViewFor, setDragonElement } from './views/DefaultViews.ts';
+import { inhibitorModel, nexusModel, towerModel } from './models/structures.ts';
 
 export { toWorld, toGame };
 export { registerChampionFactory, type ChampionView, type EntityView } from './EntityView.ts';
@@ -120,9 +121,9 @@ export class GameRenderer {
       this.scene.add(view.object3d);
       this.staticStructures.push({ pos, view });
     };
-    for (const t of TOWERS) add(t.pos, towerView(t.team));
-    for (const i of INHIBITORS) add(i.pos, inhibitorView(i.team));
-    for (const team of ['blue', 'red'] as const) add(NEXUS[team], nexusView(team));
+    for (const t of TOWERS) add(t.pos, towerModel(t.team, t.tier));
+    for (const i of INHIBITORS) add(i.pos, inhibitorModel(i.team));
+    for (const team of ['blue', 'red'] as const) add(NEXUS[team], nexusModel(team));
   }
 
   private hideStaticNear(e: EntitySnapshot): void {
@@ -135,9 +136,9 @@ export class GameRenderer {
 
   private onRawSnapshot(snap: Snapshot): void {
     const selfId = store.state.game?.entityId;
-    if (selfId === undefined) return;
     for (const ev of snap.events) {
       if (ev.type === 'dash' && ev.source === selfId) this.predictor.suspend(ev.duration + 0.1);
+      else if (ev.type === 'objectiveSpawn' && ev.monster === 'dragon') setDragonElement(ev.element);
     }
   }
 
