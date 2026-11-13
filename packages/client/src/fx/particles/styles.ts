@@ -25,6 +25,7 @@ export interface StdStyles {
   swirl: ParticleStyle;
   sparkles: ParticleStyle;
   darkWisp: ParticleStyle;
+  blood: ParticleStyle;
 }
 
 export function createStdStyles(ps: ParticleSystem): StdStyles {
@@ -71,5 +72,7 @@ export function createStdStyles(ps: ParticleSystem): StdStyles {
       alpha: [[0, 0], [0.2, 0.75], [1, 0]],
       size: CURVES.smokeGrow,
     }),
+    // gouttes opaques (mélange normal) : un rouge sombre additif serait invisible sur l'herbe
+    blood: ps.defineStyle({ texture: 'dot', blend: 'normal', color: [[0, 0.55, 0.02, 0.04], [1, 0.3, 0.01, 0.02]], alpha: [[0, 1], [0.7, 1], [1, 0]], size: CURVES.shrink }),
   };
 }

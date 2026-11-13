@@ -31,14 +31,21 @@
 - **Événements du monde** (`fx/world/events.ts`) : chiffres flottants GPU (dégâts physiques/magiques/bruts, crits, dégâts subis en rouge, soins, or — seulement ce qui concerne le joueur local), level-up, âme à la mort, réapparition, canal de rappel (réussi / annulé), destruction de tour / plaque / inhibiteur / nexus, objectifs pris/apparus (couleur d'élément), auras de buffs (bleu, rouge, Léviathan, Ancien), brûlures.
 - **9 sorts d'invocateur** (`fx/summoners.ts`).
 
+- **Les 10 champions ont leur modèle et leurs FX dédiés** : Tharox (sanglier, charges et piétinement), Kaelen (chevalier solaire, tailles, parade, lame de lumière), Vrenna (lancière, saignement, bonds), Zephyr (arcaniste, orbe boomerang, brèche, chaîne, rayons), Sable (pistolera, tir explosif, volée, balle visée au laser), Corvin (archer corbeau, marques, pièges, nuée), Nyx (assassin, entailles, pas de l'ombre, marque explosive), Solenne (prêtresse, rayon, bénédiction, colonne d'aube). Tous alignés sur les événements réels de leurs kits.
+- `onAbilityHit(abilityId, fn)` : FX à l'instant exact des dégâts serveur d'un sort (sorts ciblés/instantanés).
+- **Tremblement de caméra** (API `shake` de claude-client) sur les gros impacts, atténué selon la distance à la caméra.
+- Correctif important : `pow()` d'une base légèrement négative (arrondi) dans les shaders ruban / fresnel / givre produisait un NaN que le bloom étalait en grande tache. Toutes les bases sont bornées.
+
+### M4 — en cours
+- **Teinte ennemie** : les télégraphies et zones au sol posées par un ennemi du joueur local tirent vers le rouge (le dispatcher marque `rt.enemyContext` pendant le handler ; `rt.groundColor()`), sans perdre l'identité du sort. fxlab : `&as=red` pour voir la scène côté rouge.
+
 ## En cours
-- M3 : modèles et FX dédiés des 8 autres champions.
+- M4 : budget de particules et perf (60 fps avec 8 champions + 60 sbires), revue de chaque sort en partie réelle.
 
 ## Bloqué / Besoins (des autres agents)
 - **claude-client** (`GameRenderer`) — `onFrame`, `getEntityObject`, `registerChampionFactory` et ACES sont déjà là et utilisés automatiquement par `installFx(renderer)`. Il manque :
   - `setRenderPipeline(render: () => void)` : laisse `PostFx` remplacer `this.renderer.render(this.scene, this.camera)` dans `frame()`. **Sans lui, pas de bloom ni de FXAA en jeu** (le fxlab les a déjà). Implémentation suggérée : un champ `private renderFn = () => this.renderer.render(this.scene, this.camera)` remplaçable, et `PostFx.setSize` appelé sur resize (déjà géré côté FX via `resize`).
   - Indicateurs : appeler `fxIndicators.showAbility(def, casterPos, cursorPos)` en mode visée, `showRange(pos, range)` au survol, `hide()` (export de `client/src/fx/index.ts`).
-- **claude-client** — optionnel : une API `shake(intensité, durée)` sur la caméra (impacts de R, explosions de structures).
 - **codex-champions** :
   - `shared/src/data/buffs.ts` avec `fxKey` par buff (en attendant, la fxKey d'un buff = son id ; `setBuffFxResolver` permet de brancher la table).
   - Événements attendus par type de ciblage : voir `fx/lab/synth.ts` (c'est la référence de ce que les FX consomment). En particulier : zones retardées → `areaEffect` avec `duration` = délai ; zones persistantes → `areaEffect` avec `duration` = durée de vie ; skillshots → `projectileSpawn` puis `projectileHit` (même `id`, y compris en fin de portée sans cible) ; passifs déclenchés → `buffApplied` avec `buffId` = fxKey du passif.
