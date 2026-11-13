@@ -146,16 +146,16 @@ export type GameEvent =
   | { type: 'shield'; source: EntityId; target: EntityId; amount: number }
   | { type: 'death'; target: EntityId; killer?: EntityId; assists?: EntityId[]; bounty?: number }
   | { type: 'respawn'; target: EntityId; pos: Vec2 }
-  | { type: 'autoAttack'; source: EntityId; target: EntityId; ranged: boolean; /** vitesse du projectile (distance) */ speed?: number; crit?: boolean }
-  | { type: 'abilityCast'; source: EntityId; championId: string; slot: AbilitySlot; abilityId: string; targetPos?: Vec2; targetId?: EntityId }
-  | { type: 'summonerCast'; source: EntityId; spell: SummonerId; from: Vec2; to?: Vec2; targetId?: EntityId }
+  | { type: 'autoAttack'; source: EntityId; target: EntityId; ranged: boolean; speed?: number; crit?: boolean }
+  | { type: 'abilityCast'; source: EntityId; championId: string; slot: AbilitySlot; abilityId: string; targetPos?: Vec2; targetId?: EntityId; fxKey?: string }
+  | { type: 'summonerCast'; source: EntityId; spell: SummonerId; from: Vec2; to?: Vec2; targetId?: EntityId; fxKey?: string }
   | { type: 'projectileSpawn'; id: EntityId; source: EntityId; fxKey: string; from: Vec2; to: Vec2; speed: number; width: number }
   | { type: 'projectileHit'; id: EntityId; target?: EntityId; pos: Vec2; fxKey: string }
   | { type: 'dash'; source: EntityId; from: Vec2; to: Vec2; duration: number; fxKey?: string }
   | { type: 'areaEffect'; source: EntityId; fxKey: string; pos: Vec2; radius: number; duration: number }
-  | { type: 'buffApplied'; target: EntityId; buffId: string; duration: number; source?: EntityId }
-  | { type: 'buffRemoved'; target: EntityId; buffId: string }
-  | { type: 'levelUp'; target: EntityId; level: number }
+  | { type: 'buffApplied'; target: EntityId; buffId: string; duration: number; source?: EntityId; fxKey?: string; stacks?: number }
+  | { type: 'buffRemoved'; target: EntityId; buffId: string; fxKey?: string }
+  | { type: 'levelUp'; target: EntityId; level: number; fxKey?: string }
   | { type: 'goldGain'; target: EntityId; amount: number; pos?: Vec2 }
   | { type: 'recallStart'; target: EntityId }
   | { type: 'recallEnd'; target: EntityId; completed: boolean }

@@ -1,0 +1,13 @@
+import type { AbilitySlot } from '@lov/shared';
+import type { AbilityHandler } from './context.ts';
+import { grondak } from './champions/grondak.ts';
+import { ilyra } from './champions/ilyra.ts';
+import { tharox } from './champions/tharox.ts';
+import { kaelen } from './champions/kaelen.ts';
+import { vrenna } from './champions/vrenna.ts';
+import { zephyr } from './champions/zephyr.ts';
+import { sable } from './champions/sable.ts';
+import { corvin } from './champions/corvin.ts';
+import { nyx } from './champions/nyx.ts';
+import { solenne } from './champions/solenne.ts';
+export const CHAMPION_ABILITIES: Record<string, Record<AbilitySlot, AbilityHandler>> = { grondak, ilyra, tharox, kaelen, vrenna, zephyr, sable, corvin, nyx, solenne };
