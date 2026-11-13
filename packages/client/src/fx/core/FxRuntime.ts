@@ -232,6 +232,7 @@ export class FxRuntime {
     r.mesh.visible = true;
     r.width = 0.3;
     r.life = 0.35;
+    r.minDist = 0.08;
     r.mode = 'billboard';
     if (!r.mesh.parent) this.root.add(r.mesh);
     this.activeRibbons.add(r);
