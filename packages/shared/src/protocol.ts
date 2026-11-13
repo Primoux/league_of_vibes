@@ -70,7 +70,11 @@ export interface Snapshot {
   time: number; // secondes de jeu depuis le début
   serverTime: number; // ms epoch, pour l'interpolation
   entities: EntitySnapshot[];
-  /** Ids d'entités qui n'existent plus ou ne sont plus visibles (snapshots delta). */
+  /**
+   * Snapshots delta : si `removed` est défini, le snapshot est un DELTA (seules les entités modifiées sont
+   * présentes, les absentes sont conservées telles quelles ; `removed` liste celles qui disparaissent ou ne sont
+   * plus visibles). Sinon le snapshot est COMPLET (toute entité absente est supprimée).
+   */
   removed?: EntityId[];
   events: GameEvent[];
   self?: SelfState;
@@ -124,7 +128,12 @@ export type ClientMsg =
   | { t: 'recall' }
   | { t: 'placeWard'; pos: Vec2 }
   | { t: 'ping'; pos: Vec2; kind: string }
-  | { t: 'chat'; text: string; teamOnly: boolean };
+  | { t: 'chat'; text: string; teamOnly: boolean }
+  // --- divers
+  /** Mesure de latence : le serveur répond `pong` avec le même clientTime. */
+  | { t: 'netPing'; clientTime: number }
+  /** Après la fin de partie : retour au lobby de la même salle. */
+  | { t: 'returnToLobby' };
 
 export type ClientMsgType = ClientMsg['t'];
 
@@ -138,7 +147,7 @@ export type ServerMsg =
   | { t: 'gameStart'; start: GameStart }
   | { t: 'snapshot'; snap: Snapshot }
   | { t: 'gameOver'; result: GameOver }
-  | { t: 'pong'; serverTime: number };
+  | { t: 'pong'; serverTime: number; clientTime?: number };
 
 export type ServerMsgType = ServerMsg['t'];
 

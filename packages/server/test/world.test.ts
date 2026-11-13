@@ -16,6 +16,15 @@ describe('World', () => {
     expect(ent.moveTarget).toBeUndefined();
   });
 
+  it('spawn copie la position (pas de Vec2 partagé avec les données de la carte)', () => {
+    const world = new World(createSystems());
+    const shared = { x: 100, y: 100 };
+    const e = world.spawn({ kind: 'minion', team: 'blue', pos: shared, radius: 40, hp: 1, mana: 0, stats: createChampion(world, { playerId: 'x', name: 'x', team: 'blue', championId: 'nyx', summoners: ['flash', 'ignite'], pos: shared }).stats });
+    e.moveTarget = { x: 500, y: 100 };
+    world.step();
+    expect(shared).toEqual({ x: 100, y: 100 });
+  });
+
   it("relaie les événements via l'EventBus", () => {
     const world = new World([]);
     let seen = 0;

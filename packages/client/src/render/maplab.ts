@@ -63,6 +63,24 @@ export function startMapLab(canvas: HTMLCanvasElement): void {
   add({ kind: 'monster', team: 'neutral', subtype: 'dragon', x: 7900, y: 4100, speed: 0, hp: 4000, maxHp: 4000 });
   add({ kind: 'monster', team: 'neutral', subtype: 'leviathan', x: 4100, y: 7900, speed: 0, hp: 9000, maxHp: 9000 });
 
+  if (params.has('zoo')) {
+    // vitrine de tous les modèles, en ligne dans la base bleue
+    const kinds: [EntitySnapshot['kind'], string, Team | 'neutral'][] = [
+      ['minion', 'melee', 'blue'], ['minion', 'caster', 'blue'], ['minion', 'cannon', 'blue'], ['minion', 'super', 'blue'],
+      ['minion', 'melee', 'red'], ['minion', 'caster', 'red'], ['minion', 'cannon', 'red'], ['minion', 'super', 'red'],
+      ['monster', 'wolves', 'neutral'], ['monster', 'wolf_small', 'neutral'], ['monster', 'raptors', 'neutral'], ['monster', 'raptor_small', 'neutral'],
+      ['monster', 'krugs', 'neutral'], ['monster', 'krug_small', 'neutral'], ['monster', 'gromp', 'neutral'], ['monster', 'scuttle', 'neutral'],
+      ['monster', 'blue_buff', 'neutral'], ['monster', 'red_buff', 'neutral'], ['monster', 'grub', 'neutral'], ['ward', '', 'blue'],
+      ['monster', 'dragon', 'neutral'], ['monster', 'elder_dragon', 'neutral'], ['monster', 'herald', 'neutral'], ['monster', 'leviathan', 'neutral'],
+    ];
+    kinds.forEach(([kind, subtype, team], i) => {
+      const col = i % 4;
+      const row = Math.floor(i / 4);
+      const big = row >= 5;
+      add({ kind, subtype, team, x: big ? 3700 + col * 650 : 1500 + col * 330, y: big ? 3700 + col * 650 : 3300 - row * 330, speed: 0, anim: i % 3 === 0 ? 'run' : 'idle', facing: -Math.PI / 2 + 0.6 });
+    });
+  }
+
   const spawnWave = () => {
     for (const team of ['blue', 'red'] as Team[]) {
       for (const lane of ['top', 'mid', 'bot'] as Lane[]) {
@@ -95,6 +113,12 @@ export function startMapLab(canvas: HTMLCanvasElement): void {
     start: { you: 'lab', team: 'blue', entityId: me.id, serverTime: Date.now(), players: [{ id: 'lab', name: 'Labo', team: 'blue', championId: 'ilyra', summoners: ['flash', 'ignite'] }] },
   });
   store.set({ cameraLocked: false });
+  const aimSlot = params.get('aim');
+  if (aimSlot === 'Q' || aimSlot === 'W' || aimSlot === 'E' || aimSlot === 'R') setTimeout(() => store.set({ targeting: { kind: 'ability', slot: aimSlot } }), 500);
+  if (params.has('cx')) {
+    const pos = { x: Number(params.get('cx')), y: Number(params.get('cy') ?? params.get('cx')) };
+    store.set({ cameraFocus: { pos, seq: 1 } });
+  }
 
   let tick = 0;
   const start = performance.now();

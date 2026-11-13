@@ -62,13 +62,14 @@ describe('auto-attaques', () => {
 
   it('attaque-déplacement : engage la première cible rencontrée puis reprend', () => {
     const w = coreWorld();
-    const a = champ(w, 'blue', { x: 5000, y: 3000 });
-    const t = dummy(w, 'red', { x: 6000, y: 3050 }, { maxHp: 50 });
+    // le long de la voie mid (toujours dégagée, cf. shared/test/map.test.ts)
+    const a = champ(w, 'blue', { x: 4000, y: 4000 });
+    const t = dummy(w, 'red', { x: 5000, y: 5050 }, { maxHp: 50 });
     t.hp = 50;
-    w.commands.push({ playerId: a.champ!.playerId, msg: { t: 'attackMove', pos: { x: 7500, y: 2700 } } });
-    run(w, 12);
+    w.commands.push({ playerId: a.champ!.playerId, msg: { t: 'attackMove', pos: { x: 6500, y: 6500 } } });
+    run(w, 16);
     expect(t.dead).toBe(true);
-    expect(a.pos).toEqual({ x: 7500, y: 2700 });
+    expect(a.pos).toEqual({ x: 6500, y: 6500 });
   });
 
   it('crits : x1.75 et hooks beforeAttackHit', () => {
