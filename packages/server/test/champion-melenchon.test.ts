@@ -42,6 +42,25 @@ describe('Mélenchon, le Tribun indigné', () => {
     const { world, source, target } = game('melenchon'); cast(world, source, 'R'); addBuff(world, source, 'stun', { duration: 1 });
     advance(world, 1); expect(damage(world, 'melenchon_r')).toBe(0); expect(source.shield).toBe(0); expect(hasCC(target, 'taunt')).toBe(false);
   });
+  it('R excludes allies and enemies outside its radius', () => {
+    const { world, source, target } = game('melenchon');
+    const outside = dummy(world, source, { x: 1700, y: 1000 });
+    const ally = dummy(world, source, { x: 1100, y: 1000 }); ally.team = source.team;
+    cast(world, source, 'R'); advance(world, .7);
+    expect(damage(world, 'melenchon_r', target)).toBeGreaterThan(0);
+    expect(damage(world, 'melenchon_r', outside)).toBe(0);
+    expect(damage(world, 'melenchon_r', ally)).toBe(0);
+    expect(hasCC(ally, 'taunt')).toBe(false);
+  });
+  it('Indignation expires rather than keeping old arguments forever', () => {
+    const { world, source, target } = game('melenchon');
+    applyDamage(world, { source, target, amount: 1, type: 'true', ability: 'melenchon_q' });
+    advance(world, 6.1);
+    expect(getBuff(source, 'melenchon_indignation')).toBeUndefined();
+    applyDamage(world, { source, target, amount: 1, type: 'true', ability: 'melenchon_q' });
+    expect(getBuff(source, 'melenchon_indignation')?.stacks).toBe(1);
+    expect(source.shield).toBe(0);
+  });
   it('requires three spaced champion spell hits to trigger Indignation', () => {
     const { world, source, target } = game('melenchon');
     for (let i = 0; i < 3; i++) {
@@ -51,6 +70,9 @@ describe('Mélenchon, le Tribun indigné', () => {
     expect(getBuff(source, 'melenchon_indignation')).toBeUndefined();
     expect(source.shield).toBeCloseTo(35 + source.champ!.level * 5);
     expect(source.stats.moveSpeed).toBeCloseTo(325 * 1.18);
+    advance(world, 2.1);
+    expect(source.shield).toBe(0);
+    expect(source.stats.moveSpeed).toBe(325);
   });
   it('does not stack its passive from one AoE, autos or minions', () => {
     const { world, source, target } = game('melenchon');

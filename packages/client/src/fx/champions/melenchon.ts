@@ -54,10 +54,22 @@ export function installMelenchonFx(): void {
   installed = true;
   registerFx('melenchon_q', {
     projectile(rt, e, c) {
+      const mic = new THREE.Group();
+      const handleGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.35, 8);
+      const headGeo = new THREE.SphereGeometry(0.12, 8, 6);
+      const handleMat = new THREE.MeshStandardMaterial({ color: 0xced8df, metalness: 0.5, roughness: 0.4 });
+      const headMat = new THREE.MeshStandardMaterial({ color: 0x26364a, roughness: 0.9 });
+      mic.add(new THREE.Mesh(handleGeo, handleMat));
+      const head = new THREE.Mesh(headGeo, headMat); head.position.y = 0.22; mic.add(head);
+      rt.root.add(mic);
+      const axis = new THREE.Vector3(0, 1, 0);
       const fx = new ProjectileFx(rt, rt.world(e.from), rt.world(e.to), rt.scale(e.speed), {
         color: COLORS[2]!, core: COLORS[1]!, size: 0.38, height: 1.3,
         ribbonWidth: 0.14, trailStyle: rt.s.spark, trailDensity: 5,
+        onStep(pos, dir) { mic.position.copy(pos); mic.quaternion.setFromUnitVectors(axis, dir); },
+        onEnd() { mic.removeFromParent(); handleGeo.dispose(); headGeo.dispose(); handleMat.dispose(); headMat.dispose(); },
       });
+      mic.position.copy(fx.head);
       rt.add(fx); return fx;
     },
     hit(rt, e) { papers(rt, rt.world(e.pos), 6); flash(rt, rt.world(e.pos, 1), 1.1, COLORS[2]!); },

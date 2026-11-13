@@ -18,9 +18,11 @@ export class MelenchonView implements EntityView {
   private anim = 'idle';
   private age = 0;
   private time = 0;
+  private deathTime = 0;
+  private recalling = false;
   private disposed = false;
 
-  constructor(readonly hologram = false) {
+  constructor(readonly hologram = false, team: EntitySnapshot['team'] = 'blue') {
     this.object3d.name = hologram ? 'melenchon-hologramme' : 'melenchon';
     this.rig.rotation.y = Math.PI / 2; // Le visage regarde +x, comme les autres champions.
     this.object3d.add(this.rig);
@@ -36,6 +38,7 @@ export class MelenchonView implements EntityView {
     const skin = material(0xdcae93), warm = material(0xc28b75), white = material(0xf1eee6);
     const red = material(0xce263b), hair = material(0xaaa9a5), hairLight = material(0xc2c1bc), silver = material(0xd5d3cb, 0.65);
     const dark = material(0x302e30), black = material(0x18202a), blue = material(0x195dce);
+    const teamMat = material(team === 'red' ? 0xff4a4a : team === 'blue' ? 0x3a7bff : 0xc9a227);
     const geo = (kind: 'sphere' | 'box' | 'cylinder' | 'torus'): THREE.BufferGeometry => {
       let g = this.geometries.get(kind);
       if (!g) {
@@ -58,6 +61,8 @@ export class MelenchonView implements EntityView {
       return m;
     };
     this.rig.add(this.torso, ...this.legs, this.republic);
+    const teamRing = mesh(this.rig, 'anneau-equipe', 'torus', teamMat, [0, 0.035, 0], [0.57, 0.57, 0.57]);
+    teamRing.rotation.x = Math.PI / 2;
     this.torso.position.y = 0.92;
     mesh(this.torso, 'veste-croisee', 'sphere', navy, [0, 0.36, 0], [0.42, 0.58, 0.26]);
     mesh(this.torso, 'chemise', 'box', white, [0, 0.65, 0.242], [0.25, 0.46, 0.04]);
@@ -138,9 +143,17 @@ export class MelenchonView implements EntityView {
     if (name !== this.anim || name.startsWith('cast_') || name === 'attack') { this.anim = name; this.age = 0; }
   }
 
+  get height(): number { return 2.65; }
+  strike(): void { this.playAnim('attack'); }
+  cast(slot: string): void { this.playAnim(`cast_${slot}`); }
+  setRecalling(on: boolean): void { this.recalling = on; }
+
   update(snap: EntitySnapshot, dt: number): void {
     if (this.disposed) return;
     this.time += dt; this.age += dt;
+    this.deathTime = snap.dead ? this.deathTime + dt : 0;
+    this.rig.visible = this.deathTime < 1.4;
+    if (snap.dead || this.anim === 'run') this.recalling = false;
     const ult = snap.buffs?.some((b) => b.id === 'melenchon_r') ?? false;
     const declaim = !snap.dead && (ult || (this.anim === 'cast_R' && this.age < 1.3));
     const point = !snap.dead && ((this.anim === 'cast_Q' || this.anim === 'attack') && this.age < 0.85);
@@ -149,7 +162,7 @@ export class MelenchonView implements EntityView {
     this.legs[0]!.rotation.x = gait; this.legs[1]!.rotation.x = -gait;
     this.arms[0]!.rotation.set(declaim ? -2.45 : -gait * 0.6, 0, declaim ? -0.45 : 0.09);
     this.arms[1]!.rotation.set(declaim ? -2.8 : point ? -1.85 : gait * 0.6, 0, declaim ? 0.35 : -0.1);
-    this.head.rotation.set(declaim ? -0.16 : 0.02 * Math.sin(this.time * 1.5), point ? -0.1 : 0, 0);
+    this.head.rotation.set(declaim ? -0.16 : this.recalling ? 0.15 : 0.02 * Math.sin(this.time * 1.5), point ? -0.1 : 0, 0);
     this.torso.position.y = 0.92 + (run ? Math.abs(gait) * 0.05 : Math.sin(this.time * 2) * 0.012);
     this.torso.rotation.x = snap.dead ? -1.2 : this.anim === 'cast_W' && this.age < 0.7 ? 0.15 : 0;
     this.rig.position.y = snap.dead ? -0.6 : 0;

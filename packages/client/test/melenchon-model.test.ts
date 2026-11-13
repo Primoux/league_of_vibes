@@ -3,10 +3,19 @@ import * as THREE from 'three';
 import type { EntitySnapshot } from '@lov/shared';
 import { MelenchonView } from '../src/render/champions/melenchon.ts';
 import { defaultViewFor } from '../src/render/views/DefaultViews.ts';
+import { createChampionView, getChampionView } from '../src/render/champions/index.ts';
 
 const snap: EntitySnapshot = { id: 1, kind: 'champion', subtype: 'melenchon', team: 'blue', x: 0, y: 0, facing: 0, hp: 1000, maxHp: 1000 };
 
 describe('caricature de Mélenchon', () => {
+  it('passe par la fabrique commune et reçoit les gestes du bus sans modèle générique', () => {
+    const view = createChampionView(snap)!;
+    expect(view).toBeInstanceOf(MelenchonView);
+    expect(getChampionView(snap.id)).toBe(view);
+    view.cast('R'); view.update(snap, 0.1);
+    expect(view.object3d.getObjectByName('bouche')!.scale.y).toBeGreaterThan(0.04);
+    view.dispose(); expect(getChampionView(snap.id)).toBeUndefined();
+  });
   it('est utilisée en partie et conserve une silhouette lisible dans le budget géométrique', () => {
     const model = defaultViewFor(snap)!;
     expect(model).toBeInstanceOf(MelenchonView);
@@ -14,7 +23,7 @@ describe('caricature de Mélenchon', () => {
     for (const name of ['index-accusateur', 'cravate-rouge', 'lunettes-monture', 'meche-coiffee-en-arriere', 'nez']) expect(root.getObjectByName(name)).toBeDefined();
     let triangles = 0;
     root.traverse((o) => { if (o instanceof THREE.Mesh) triangles += (o.geometry.index?.count ?? o.geometry.getAttribute('position').count) / 3; });
-    expect(triangles).toBeLessThan(22000);
+    expect(triangles).toBeLessThan(14000);
     root.updateMatrixWorld(true);
     const bounds = new THREE.Box3().setFromObject(root);
     expect(bounds.max.y).toBeGreaterThan(2.4);
