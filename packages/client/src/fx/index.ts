@@ -9,6 +9,7 @@
  *  - `setFxQuality('high' | 'low')` : qualité (store/paramètres) ;
  *  - `registerFx` / `onWorldEvent` : extension des FX.
  */
+import { installChampionModels } from '../render/champions/index.ts';
 import { fxBus } from './FxBus.ts';
 import { FxRuntime } from './core/FxRuntime.ts';
 import type { FxHost } from './core/host.ts';
@@ -16,6 +17,10 @@ import { defaultFx } from './defaults.ts';
 import { FxDispatcher } from './dispatcher.ts';
 import { PostFx, type FxQuality } from './post/PostFx.ts';
 import { fxIndicators } from './telegraph/indicators.ts';
+import { installAutoAttackFx } from './world/autoAttacks.ts';
+import './champions/index.ts';
+
+let worldFxInstalled = false;
 
 export { fxBus } from './FxBus.ts';
 export { fxIndicators } from './telegraph/indicators.ts';
@@ -43,6 +48,11 @@ let current: FxInstance | null = null;
 
 export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
   current?.dispose();
+  installChampionModels();
+  if (!worldFxInstalled) {
+    worldFxInstalled = true;
+    installAutoAttackFx();
+  }
   const runtime = new FxRuntime(host);
   const dispatcher = new FxDispatcher(runtime, defaultFx);
   fxIndicators.attach(runtime.root);
