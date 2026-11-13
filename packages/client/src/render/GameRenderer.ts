@@ -94,6 +94,8 @@ export class GameRenderer {
   private lastFrame = performance.now();
   private lastFocusSeq = -1;
   private fogPos = (e: EntitySnapshot) => this.positions.get(e.id) ?? null;
+  private readonly defaultRender = () => this.renderer.render(this.scene, this.camera);
+  private renderFn: () => void = this.defaultRender;
   private cameraInitForGame: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -199,6 +201,11 @@ export class GameRenderer {
 
   interpolatedEntity(id: EntityId): Readonly<Interpolated> | null {
     return this.positions.get(id) ?? null;
+  }
+
+  /** claude-fx (PostFx) : remplace le rendu final (bloom, FXAA…). `null` = rendu direct. */
+  setRenderPipeline(render: (() => void) | null): void {
+    this.renderFn = render ?? this.defaultRender;
   }
 
   onFrame(cb: FrameCb): () => void {
@@ -354,7 +361,7 @@ export class GameRenderer {
     this.map.update(dt, this.camera, selfPos ?? null);
     this.markers.update(dt);
     for (const cb of this.frameCbs) cb(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.renderFn();
   }
 
   private resize(): void {

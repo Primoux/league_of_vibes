@@ -5,7 +5,7 @@
  * l'état de visée (`AimState`, objet réutilisé) à chaque frame ; le renderer enregistré l'affiche.
  */
 import * as THREE from 'three';
-import { CHAMPIONS, SUMMONERS, type AbilitySlot, type EntityId, type SummonerSlot, type Targeting, type Vec2 } from '@lov/shared';
+import { CHAMPIONS, SUMMONERS, type AbilityDef, type AbilitySlot, type EntityId, type SummonerDef, type SummonerSlot, type Targeting, type Vec2 } from '@lov/shared';
 import type { Targeting as TargetingState } from '../state.ts';
 import { S } from './coords.ts';
 import { terrainHeight } from './map/geometry.ts';
@@ -20,6 +20,8 @@ export interface AimState {
   /** Identifiant du sort (abilityId / summonerId) et clé FX, pour un visuel spécifique. */
   abilityId: string | null;
   fxKey: string | null;
+  /** Définition complète du sort (champion ou invocateur), null sinon. */
+  def: AbilityDef | SummonerDef | null;
   /** Position du lanceur (affichée/prédite) et du curseur, coordonnées jeu. */
   origin: Vec2;
   cursor: Vec2;
@@ -45,7 +47,7 @@ export function registerIndicatorRenderer(r: IndicatorRenderer): void {
 }
 
 export function newAimState(): AimState {
-  return { active: false, kind: null, slot: null, targeting: null, abilityId: null, fxKey: null, origin: { x: 0, y: 0 }, cursor: { x: 0, y: 0 }, clamped: { x: 0, y: 0 }, range: 0, radius: 0, width: 0, hover: null, attackRange: 0 };
+  return { active: false, kind: null, slot: null, targeting: null, abilityId: null, fxKey: null, def: null, origin: { x: 0, y: 0 }, cursor: { x: 0, y: 0 }, clamped: { x: 0, y: 0 }, range: 0, radius: 0, width: 0, hover: null, attackRange: 0 };
 }
 
 /** Remplit `aim` à partir de l'état de ciblage (fonction pure, testable). */
@@ -56,6 +58,7 @@ export function computeAim(aim: AimState, t: TargetingState, championId: string 
   aim.targeting = null;
   aim.abilityId = null;
   aim.fxKey = null;
+  aim.def = null;
   aim.range = 0;
   aim.radius = 0;
   aim.width = 0;
@@ -70,6 +73,7 @@ export function computeAim(aim: AimState, t: TargetingState, championId: string 
   if (t?.kind === 'ability' && championId) {
     const a = CHAMPIONS[championId]?.abilities[t.slot];
     if (a) {
+      aim.def = a;
       aim.targeting = a.targeting;
       aim.abilityId = a.id;
       aim.fxKey = a.fxKey;
@@ -80,6 +84,7 @@ export function computeAim(aim: AimState, t: TargetingState, championId: string 
   } else if (t?.kind === 'summoner' && summoners) {
     const def = SUMMONERS[summoners[t.slot] as keyof typeof SUMMONERS];
     if (def) {
+      aim.def = def;
       aim.targeting = def.targeting;
       aim.abilityId = def.id;
       aim.fxKey = def.fxKey;
