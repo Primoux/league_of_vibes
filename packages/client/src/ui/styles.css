@@ -1,26 +1,230 @@
-/* Propriétaire : mistral-ui. Styles provisoires du bootstrap. */
+/* Propriétaire : mistral-ui. Base, jetons de design et composants communs.
+   Polices : Cinzel et Inter (Google Fonts, licence SIL OFL). */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap');
+
 :root {
-  --bg: #0b1020;
-  --panel: rgba(12, 18, 36, 0.92);
-  --text: #e8ecf5;
-  --gold: #c9a227;
-  --blue: #3a7bff;
-  --red: #ff4a4a;
+  --bg: #070914;
+  --bg-2: #0d1022;
+  --panel: rgba(9, 12, 24, 0.9);
+  --panel-2: rgba(16, 20, 38, 0.92);
+  --line: rgba(217, 178, 95, 0.28);
+  --text: #ece7da;
+  --muted: #9b98a9;
+  --gold: #d9b25f;
+  --gold-hi: #f6dc94;
+  --gold-lo: #7d6331;
+  --teal: #3ee6c8;
+  --violet: #b072ff;
+  --blue: #4ea2ff;
+  --blue-deep: #12305f;
+  --red: #ff5a5a;
+  --red-deep: #5f1620;
+  --green: #4fdc7c;
+  --hp: #3fcf6a;
+  --mana: #3d8bff;
+  --energy: #ffd84a;
+  --shield: #e9eef8;
+  --danger: #ff6b6b;
+  --font-display: 'Cinzel', 'Times New Roman', serif;
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --radius: 6px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --hud-scale: 1;
 }
+
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; }
-#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-#ui { position: fixed; inset: 0; pointer-events: none; }
-#ui .panel, #ui button, #ui input { pointer-events: auto; }
-.panel { background: var(--panel); border: 1px solid var(--gold); padding: 24px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px; min-width: 320px; }
-.center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-.row { display: flex; gap: 8px; }
-.teams { display: flex; gap: 16px; }
-.team { flex: 1; padding: 12px; border-radius: 6px; min-width: 180px; }
-.team.blue { border: 1px solid var(--blue); }
-.team.red { border: 1px solid var(--red); }
-button { background: var(--gold); border: 0; padding: 8px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; }
-input { padding: 8px; border-radius: 4px; border: 1px solid #445; background: #111827; color: var(--text); }
-.error { color: var(--red); }
-.hud { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--panel); padding: 6px 14px; border-radius: 6px; text-align: center; }
-.hint { font-size: 12px; opacity: 0.7; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; transition: filter 0.6s ease; }
+#ui { position: fixed; inset: 0; pointer-events: none; font-size: 15px; user-select: none; }
+#ui input, #ui textarea { user-select: text; }
+#ui button, #ui input, #ui a, #ui [data-interactive] { pointer-events: auto; }
+body.lov-dead #game { filter: grayscale(0.9) brightness(0.62) contrast(1.05); }
+.lov-reduce-motion *, .lov-reduce-motion *::before, .lov-reduce-motion *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+
+/* ------------------------------------------------------------ typographie & utilitaires */
+.lov-title { font-family: var(--font-display); font-weight: 800; letter-spacing: 0.06em; margin: 0; color: var(--gold-hi); text-shadow: 0 2px 18px rgba(217, 178, 95, 0.25); }
+.lov-muted { color: var(--muted); font-size: 0.9em; }
+.center { text-align: center; }
+.lov-error { color: var(--danger); background: rgba(255, 80, 80, 0.08); border: 1px solid rgba(255, 80, 80, 0.3); padding: 8px 12px; border-radius: var(--radius); margin: 0; font-size: 0.9em; }
+.lov-error.center { position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); }
+kbd { font-family: var(--font); font-size: 0.72em; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: rgba(0, 0, 0, 0.7); border: 1px solid rgba(217, 178, 95, 0.45); color: var(--gold-hi); line-height: 1.3; }
+.lov-badge { display: inline-block; font-size: 0.68em; font-weight: 800; letter-spacing: 0.1em; padding: 2px 7px; border-radius: 99px; margin-left: 8px; vertical-align: middle; }
+.lov-badge.dev { background: rgba(176, 114, 255, 0.18); color: var(--violet); border: 1px solid rgba(176, 114, 255, 0.5); }
+.lov-badge.mvp { background: linear-gradient(90deg, var(--gold), var(--gold-hi)); color: #2a1b00; }
+
+/* ------------------------------------------------------------ cadre doré original : double filet + losanges aux coins */
+.lov-frame {
+  position: relative;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(62, 230, 200, 0.05), transparent 60%),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 3px rgba(0, 0, 0, 0.35), inset 0 0 0 4px rgba(217, 178, 95, 0.12), 0 18px 60px rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+}
+.lov-frame::before, .lov-frame::after {
+  content: '';
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: linear-gradient(135deg, var(--gold-hi), var(--gold-lo));
+  transform: rotate(45deg);
+  box-shadow: 0 0 10px rgba(246, 220, 148, 0.6);
+  pointer-events: none;
+}
+.lov-frame::before { top: -5px; left: calc(50% - 4.5px); }
+.lov-frame::after { bottom: -5px; left: calc(50% - 4.5px); }
+
+/* ------------------------------------------------------------ boutons & champs */
+.lov-btn {
+  --b: var(--gold);
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 0.92em;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(40, 44, 66, 0.95), rgba(18, 20, 34, 0.95));
+  border: 1px solid rgba(217, 178, 95, 0.45);
+  padding: 9px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.12s var(--ease), box-shadow 0.2s, border-color 0.2s, filter 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.lov-btn:hover:not(:disabled) { border-color: var(--gold-hi); box-shadow: 0 0 0 1px rgba(246, 220, 148, 0.25), 0 0 18px rgba(217, 178, 95, 0.2); transform: translateY(-1px); }
+.lov-btn:active:not(:disabled) { transform: translateY(0); filter: brightness(0.9); }
+.lov-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.lov-btn.primary { color: #1d1303; background: linear-gradient(180deg, #f6dc94 0%, #d9b25f 45%, #a67c32 100%); border-color: #f9e7b5; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35); }
+.lov-btn.primary:hover:not(:disabled) { box-shadow: 0 0 0 1px rgba(255, 240, 200, 0.6), 0 0 26px rgba(246, 220, 148, 0.45); }
+.lov-btn.ready { color: #04170c; background: linear-gradient(180deg, #8af2b0, #3fcf6a 50%, #23924a); border-color: #b5ffd0; }
+.lov-btn.ghost { background: transparent; border-color: rgba(255, 255, 255, 0.18); }
+.lov-btn.danger { border-color: rgba(255, 107, 107, 0.6); color: #ffc4c4; }
+.lov-btn.big { padding: 13px 26px; font-size: 1em; text-transform: uppercase; letter-spacing: 0.12em; }
+.lov-btn.small { padding: 6px 11px; font-size: 0.82em; }
+.lov-btn.glow:not(:disabled) { animation: lov-glow 2.4s ease-in-out infinite; }
+@keyframes lov-glow { 50% { box-shadow: 0 0 0 1px rgba(255, 240, 200, 0.6), 0 0 34px rgba(246, 220, 148, 0.55), 0 0 60px rgba(62, 230, 200, 0.18); } }
+
+.lov-icon-btn { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: rgba(0, 0, 0, 0.55); border: 1px solid var(--line); color: var(--gold-hi); cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
+.lov-icon-btn:hover { transform: rotate(20deg) scale(1.06); border-color: var(--gold-hi); }
+
+.lov-input { width: 100%; font: inherit; font-size: 1em; color: var(--text); background: rgba(3, 5, 12, 0.75); border: 1px solid rgba(217, 178, 95, 0.3); border-radius: 4px; padding: 11px 13px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+.lov-input:focus { border-color: var(--gold-hi); box-shadow: 0 0 0 3px rgba(217, 178, 95, 0.15); }
+.lov-input.code { text-transform: uppercase; letter-spacing: 0.45em; font-weight: 800; font-family: var(--font-display); text-align: center; }
+.lov-field { display: flex; flex-direction: column; gap: 6px; }
+.lov-field > span { font-size: 0.75em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.lov-check { display: flex; align-items: center; gap: 8px; font-size: 0.85em; color: var(--muted); cursor: pointer; pointer-events: auto; }
+.lov-check input { accent-color: var(--gold); }
+
+.lov-chip { font: inherit; font-size: 0.82em; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 99px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.lov-chip:hover { color: var(--text); border-color: var(--line); }
+.lov-chip.on { color: #1d1303; background: var(--gold); border-color: var(--gold-hi); }
+.lov-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 0.78em; padding: 3px 9px; border-radius: 3px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); }
+.lov-tag.diff { color: var(--gold-hi); letter-spacing: 2px; }
+.lov-tag.diff i { color: rgba(255, 255, 255, 0.15); font-style: normal; }
+
+.lov-progress { height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 99px; overflow: hidden; }
+.lov-progress > i { display: block; height: 100%; background: linear-gradient(90deg, var(--teal), var(--gold-hi)); border-radius: inherit; box-shadow: 0 0 12px rgba(62, 230, 200, 0.6); transition: width 0.12s linear; }
+
+/* ------------------------------------------------------------ fond aurore animé (identité « Vibes ») */
+.lov-screen { position: absolute; inset: 0; pointer-events: auto; overflow: hidden; background: radial-gradient(140% 100% at 50% 110%, #15112b 0%, var(--bg) 60%); }
+.lov-aurora { position: absolute; inset: -20%; pointer-events: none; opacity: 0.85; filter: blur(60px) saturate(1.2);
+  background:
+    radial-gradient(30% 25% at 20% 30%, rgba(62, 230, 200, 0.28), transparent 70%),
+    radial-gradient(35% 30% at 80% 25%, rgba(176, 114, 255, 0.3), transparent 70%),
+    radial-gradient(40% 30% at 60% 85%, rgba(217, 178, 95, 0.2), transparent 70%),
+    radial-gradient(25% 20% at 35% 75%, rgba(78, 162, 255, 0.18), transparent 70%);
+  animation: lov-aurora 22s ease-in-out infinite alternate; }
+.lov-aurora.dim { opacity: 0.45; }
+@keyframes lov-aurora { 0% { transform: translate3d(-3%, 0, 0) rotate(0deg) scale(1); } 50% { transform: translate3d(3%, -2%, 0) rotate(6deg) scale(1.08); } 100% { transform: translate3d(-1%, 3%, 0) rotate(-4deg) scale(1.02); } }
+.lov-screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px); background-size: 3px 3px; mix-blend-mode: overlay; opacity: 0.4; }
+
+/* ------------------------------------------------------------ portraits & icônes */
+.lov-portrait { display: block; flex: none; }
+.lov-portrait.round { border-radius: 50%; }
+.lov-portrait.gray { filter: grayscale(1) brightness(0.55); }
+.lov-portrait.ghost { opacity: 0.45; filter: saturate(0.5); }
+.lov-item-icon, .lov-ability-icon, .lov-summoner-icon { display: block; flex: none; }
+.lov-item-empty { display: block; background: rgba(0, 0, 0, 0.45); box-shadow: inset 0 0 0 1px rgba(217, 178, 95, 0.12); }
+.lov-glyph { display: inline-block; vertical-align: -0.15em; flex: none; }
+
+/* ------------------------------------------------------------ infobulle & fiches */
+.lov-tooltip { position: fixed; z-index: 1000; pointer-events: none; max-width: 340px; animation: lov-pop 0.12s var(--ease); }
+@keyframes lov-pop { from { opacity: 0; transform: translateY(4px) scale(0.98); } }
+.lov-tooltip > span { display: block; background: rgba(6, 8, 16, 0.96); border: 1px solid var(--line); padding: 6px 10px; border-radius: 4px; font-size: 0.82em; }
+.lov-card { background: linear-gradient(180deg, rgba(14, 17, 32, 0.98), rgba(6, 8, 16, 0.98)); border: 1px solid var(--line); border-top: 2px solid var(--gold); border-radius: 4px; padding: 11px 13px; font-size: 13px; line-height: 1.45; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6); }
+.lov-card-head { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; }
+.lov-card-head svg { border-radius: 4px; box-shadow: 0 0 0 1px rgba(217, 178, 95, 0.4); }
+.lov-card-title { font-weight: 800; font-size: 1.06em; color: var(--gold-hi); display: flex; gap: 8px; align-items: center; }
+.lov-card-sub { font-size: 0.82em; color: var(--muted); }
+.lov-card-sub.gold b { color: var(--gold-hi); }
+.lov-card-sub s { opacity: 0.6; margin-left: 4px; }
+.lov-card-desc, .lov-card-line { margin: 6px 0 0; color: #d7d3c8; }
+.lov-card-stats { list-style: none; padding: 0; margin: 6px 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; font-size: 0.92em; }
+.lov-card-stats b { color: var(--teal); }
+.lov-card-line .pas { color: var(--gold-hi); }
+.lov-card-line .act { color: var(--teal); }
+.lov-card-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.07); font-size: 0.86em; }
+.lov-card-foot .mana { color: #7fb2ff; }
+.lov-card-foot .cd { color: var(--muted); }
+.sc-base { color: #fff; font-weight: 700; }
+.sc-ad { color: #ffaa5c; }
+.sc-ap { color: #c48bff; }
+.sc-hp { color: #6ee59a; }
+.sc-armor { color: #f1d37f; }
+.sc-total { color: var(--muted); }
+
+/* ------------------------------------------------------------ anneau de chrono */
+.lov-timer-ring { position: relative; flex: none; }
+.lov-timer-ring svg { display: block; }
+.lov-timer-ring .track { fill: rgba(0, 0, 0, 0.45); stroke: rgba(255, 255, 255, 0.08); stroke-width: 7; }
+.lov-timer-ring .bar { fill: none; stroke: var(--gold-hi); stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset 0.12s linear; filter: drop-shadow(0 0 6px rgba(246, 220, 148, 0.6)); }
+.lov-timer-ring.warn .bar { stroke: var(--red); filter: drop-shadow(0 0 8px rgba(255, 90, 90, 0.8)); }
+.lov-timer-ring-text { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; line-height: 1; }
+.lov-timer-ring-text b { font-family: var(--font-display); font-size: 1.7em; color: var(--gold-hi); }
+.lov-timer-ring.warn .lov-timer-ring-text b { color: #ffb0b0; animation: lov-beat 1s infinite; }
+@keyframes lov-beat { 50% { transform: scale(1.15); } }
+
+/* ------------------------------------------------------------ modales communes */
+.lov-modal-backdrop { position: absolute; inset: 0; background: rgba(2, 3, 8, 0.55); backdrop-filter: blur(2px); display: grid; place-items: center; pointer-events: auto; z-index: 50; animation: lov-fade 0.15s ease; }
+@keyframes lov-fade { from { opacity: 0; } }
+.lov-settings { width: min(560px, 94vw); padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; animation: lov-pop 0.18s var(--ease); font-size: 14px; }
+.lov-settings header, .lov-settings footer { display: flex; justify-content: space-between; align-items: center; }
+.lov-settings h2 { font-family: var(--font-display); color: var(--gold-hi); margin: 0; letter-spacing: 0.08em; }
+.lov-set-body { min-height: 260px; display: flex; flex-direction: column; gap: 10px; }
+.lov-set-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 7px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); pointer-events: auto; }
+.lov-range { display: flex; align-items: center; gap: 10px; }
+.lov-range input { width: 180px; accent-color: var(--gold); pointer-events: auto; }
+.lov-range b { width: 44px; text-align: right; color: var(--gold-hi); font-variant-numeric: tabular-nums; }
+.lov-switch { appearance: none; width: 38px; height: 21px; border-radius: 99px; background: rgba(255, 255, 255, 0.12); position: relative; cursor: pointer; transition: background 0.2s; pointer-events: auto; }
+.lov-switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 15px; height: 15px; border-radius: 50%; background: #ddd; transition: transform 0.2s var(--ease); }
+.lov-switch:checked { background: var(--gold); }
+.lov-switch:checked::after { transform: translateX(17px); background: #fff; }
+.lov-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.lov-seg button { font: inherit; font-size: 0.85em; padding: 6px 12px; background: transparent; color: var(--muted); border: 0; cursor: pointer; }
+.lov-seg button.on { background: var(--gold); color: #1d1303; font-weight: 700; }
+.lov-qc { display: flex; gap: 6px; }
+.lov-keys { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.lov-keys td { padding: 5px 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.lov-keys td:first-child { width: 42%; }
+
+/* ------------------------------------------------------------ onglets (boutique, paramètres) */
+.lov-shop-tabs { display: flex; gap: 2px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.lov-shop-tabs button { font: inherit; font-size: 0.82em; font-weight: 600; padding: 7px 12px; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; letter-spacing: 0.03em; }
+.lov-shop-tabs button:hover { color: var(--text); }
+.lov-shop-tabs button.on { color: var(--gold-hi); border-bottom-color: var(--gold); }
+
+/* ------------------------------------------------------------ UI Lab */
+.lov-lab { position: fixed; top: 10px; left: 10px; z-index: 2000; pointer-events: auto; font-size: 12px; }
+.lov-lab-toggle { font: inherit; font-weight: 800; background: var(--violet); color: #fff; border: 0; border-radius: 4px; padding: 5px 10px; cursor: pointer; box-shadow: 0 4px 18px rgba(176, 114, 255, 0.5); }
+.lov-lab-body { margin-top: 6px; width: 250px; background: rgba(8, 6, 20, 0.94); border: 1px solid rgba(176, 114, 255, 0.5); border-radius: 6px; padding: 8px 10px; }
+.lov-lab-body h4 { margin: 6px 0 4px; color: var(--violet); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.1em; }
+.lov-lab-body p { color: var(--muted); margin: 8px 0 2px; }
+.lov-lab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.lov-lab-grid button { font: inherit; font-size: 0.92em; padding: 4px 6px; background: rgba(255, 255, 255, 0.06); color: var(--text); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 3px; cursor: pointer; text-align: left; }
+.lov-lab-grid button:hover { border-color: var(--violet); }
+body.lov-uilab #game { opacity: 0.35; }
+body.lov-lab-hidden .lov-lab { display: none; }
+.lov-still *, .lov-still *::before, .lov-still *::after { animation: none !important; transition: none !important; }
