@@ -143,6 +143,7 @@ export type GameEvent =
   | { type: 'heal'; source: EntityId; target: EntityId; amount: number }
   | { type: 'shield'; source: EntityId; target: EntityId; amount: number }
   | { type: 'death'; target: EntityId; killer?: EntityId; assists?: EntityId[]; bounty?: number }
+  | { type: 'respawn'; target: EntityId; pos: Vec2 }
   | { type: 'autoAttack'; source: EntityId; target: EntityId; ranged: boolean }
   | { type: 'abilityCast'; source: EntityId; championId: string; slot: AbilitySlot; abilityId: string; targetPos?: Vec2; targetId?: EntityId }
   | { type: 'summonerCast'; source: EntityId; spell: SummonerId; from: Vec2; to?: Vec2; targetId?: EntityId }
