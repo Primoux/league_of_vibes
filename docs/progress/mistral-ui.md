@@ -1,10 +1,32 @@
 # Progress — mistral-ui
 
 ## Fait
+- **M1** : Accueil (nom, créer/rejoindre, mode dev, état de connexion), Lobby (2 × 4 places, rejoindre une équipe en cliquant une place libre, rôle préféré, prêt, lancer, code de salle copiable, hôte, joueurs hors ligne), **Draft** (grille des 10 champions avec filtre par rôle, tour en cours + piste des 5 tours, anneau de chrono, survol des alliés visible, champions pris grisés/verrouillés, double-clic = verrouiller, fiche complète du champion : classe, rôles, difficulté, lore, barres de profil, kit P/Q/W/E/R avec valeurs par rang, choix des 2 sorts d'invocateur avec permutation automatique), **Chargement** (8 cartes, progression, astuces).
+- **M2** : HUD bas (portrait + anneau d'XP + niveau + points dispo, PV avec bouclier et graduations, mana/énergie, régénération, 4 sorts avec rangs, recharge circulaire + secondes, grisé sans mana, bouton + → `levelAbility`, passif, D/F avec recharge, 6 objets + balise, or cliquable → boutique, buffs/debuffs, barre de rappel), infobulles détaillées (dégâts, ratios, valeur calculée selon les stats, coût, recharge avec accélération), score haut (kills, tours, drakes colorés, larves, chrono), KDA/CS perso, **kill feed**, **annonces** (premier sang, double/triple/quadra, série, « ennemi légendaire », arrêt de série, équipe anéantie, exécution, tours, inhibiteurs, drakes par élément, Léviathan, Colosse + clés `announcement` du serveur), cadres des alliés, **minimap** canvas (terrain, voies, rivière, murs, brousses depuis `map.ts`, structures, champions, sbires, monstres, balises, pings, cadre caméra, timers d'objectifs ; clic/glisser = caméra, clic droit = déplacement, Alt+clic = ping).
+- **M3** : Boutique (P ou clic sur l'or : onglets dont « Conseillés » selon la classe, recherche sans accents, arbre de recette, « utilisé dans », prix réduit par les composants possédés, achat double-clic/clic droit, vente, annuler, désactivée hors fontaine sauf mort), tableau des scores (Tab maintenu), stats détaillées (C), écran de mort (désaturation du canvas + compte à rebours), écran de fin (Victoire/Défaite, tableaux, barres de dégâts, MVP, retour au salon), paramètres (Échap ou roue dentée : volumes, lancement rapide par touche, bords d'écran, caméra, timers, taille de l'interface, animations réduites, qualité graphique, raccourcis) persistés en localStorage.
+- **M4 (partiel)** : animations CSS partout, HUD en `em` (720p → 4K + curseur de taille), sélecteurs fins (`useSelect`, `useMini`, `useWorld`) pour éviter de re-rendre tout l'arbre à 20 Hz, minimap redessinée seulement quand un snapshot arrive.
+- Icônes **100 % générées en SVG** : portraits procéduraux par champion (palette + emblème de classe + motif), sorts, objets (déduits de `icon`/stats/catégorie, marchent pour les futurs objets), sorts d'invocateur, rôles.
+- `?uilab` : faux serveur complet (lobby, draft qui avance, partie simulée avec sbires, sorts qui partent en recharge, achat/vente/annuler, rappel) + panneau d'événements. Paramètres d'URL pour les démos et captures : `?uilab=home|lobby|draft|draft3|final|loading|game|end|endlose`, `&panel=shop|scores|stats|settings`, `&ev=multi,tower,drake,...`, `&hidelab`, `&still` (coupe les animations).
+- Tests : `packages/client/test/ui-logic.test.ts` (formatage, prix de recette récursif, verdicts d'achat, filtre, rangs de sorts, tri du tableau, kill feed et annonces).
 
-## En cours
+## En cours / à faire
+- Brancher les vrais contrats dès qu'ils existent (voir Besoins), polish après les premiers tests en vrai.
+- Chat d'équipe (le protocole a `chat`) et roue de pings.
 
 ## Bloqué / Besoins (des autres agents)
+- **claude-client** :
+  - Caméra depuis la minimap : abonne-toi à `uiBridge.onCamera((pos) => …)` (`client/src/ui/game/world.ts`) et renseigne `uiBridge.cameraView = { x, y, w, h }` (rectangle visible, coordonnées jeu) pour que la minimap dessine le cadre exact (sinon cadre approximatif centré sur le joueur).
+  - Réglages joueur : lis `settings.state` / `settings.subscribe()` (`client/src/ui/settings.ts`) : `quickCast`, `graphics`, `edgePan`, `cameraLock`.
+  - P / Tab / C / Échap sont gérés par l'UI (écoute `keydown` sur window, ignorés dans les champs texte). Si tu les mets dans le store, préviens-moi et je retire mon handler. Échap ouvre les paramètres : si tu l'utilises pour annuler un sort, fais `e.stopPropagation()` ou dis-le moi.
+  - Snapshots delta : l'UI tient son propre cache d'entités (`entities` dans `ui/game/world.ts`, fusion + `removed`). Si tu exposes un cache fusionné, je le réutiliserai.
+- **mistral-economy** : exporte `setVolume(channel, v)` depuis `audio/AudioManager.ts` (canaux `master`, `sfx`, `voice`, `music`, `ui`, valeurs 0..1) : l'UI l'appelle automatiquement au démarrage et à chaque changement. Pour les items : un champ `icon` parlant (`sword`, `tome`, `boots`, `hourglass`, `shield`…) suffit pour l'icône générée. Inventaire attendu : `champ.items` de longueur 7, index 6 = trinket.
+- **claude-server** : pas de message pour **utiliser un objet actif** (sablier, Œil du colosse, potions) → touches 1-7 sans effet pour l'instant. Proposition : `{ t: 'useItem'; slot: number; targetPos?: Vec2 }`. Les noms de joueurs viennent de `game.players` / `lobby.players`.
+- **codex-champions** : les buffs sont affichés par `id` ; un registre `BUFFS` (nom FR, kind) exporté par `@lov/shared` permettrait de jolies infobulles (en attendant : table locale + heuristique buff/debuff).
+- Annonces : l'UI dérive elle-même premier sang, multi-kills, séries, arrêt de série, équipe anéantie, tours, inhibiteurs et objectifs à partir de `death`/`structureDestroyed`/`objectiveTaken`. **Ne pas** émettre d'`announcement` pour ceux-là (doublons). Clés `announcement` reconnues : `welcome`, `minionsSoon`, `minionsSpawn`, `dragonSpawn`, `elderSpawn`, `grubsSpawn`, `heraldSpawn`, `leviathanSpawn`, `inhibitorRespawn`, `dragonSoul`, ou toute clé avec `params.text`.
 
 ## Contrats modifiés / API disponibles
+- Aucun fichier partagé modifié.
+- API exposées par l'UI : `uiBridge` (caméra minimap), `settings` (réglages persistés), `ui` (panneaux ouverts : `shopOpen`, `scoreboard`, `stats`, `settings` ; d'autres modules peuvent par ex. bloquer l'input quand la boutique est ouverte).
 
+## Environnement
+- La machine de dev avait Node 12 : Node 22 installé dans `~/.local/node22` (`export PATH=~/.local/node22/bin:$PATH`). Le lockfile ne contient pas le binding Linux de rolldown : `npm install --no-save @rolldown/binding-linux-x64-gnu@1.2.19` (sans modifier le lockfile).
