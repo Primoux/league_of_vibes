@@ -67,6 +67,8 @@ const castR: Clip = {
 
 export const solenneModel: ChampionModelDef = {
   rig: { hipY: 0.9, hipW: 0.11, thigh: 0.45, shin: 0.43, spine: 0.55, shoulderW: 0.23, upperArm: 0.3, forearm: 0.29, neck: 0.16 },
+  dropAngle: -Math.PI / 2,
+  carry: 0,
   ctx: { energy: 0.85, hand: 1 },
   clips: { idle, cast, strike, cast_R: castR },
   build(b, c) {
