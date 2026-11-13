@@ -82,6 +82,12 @@ export class MapView {
     }
   }
 
+  /** Bascule de qualité à chaud : ombres et décor de fond. */
+  setQuality(q: 'low' | 'high'): void {
+    this.sun.castShadow = q === 'high';
+    this.vegetation.setQuality(q);
+  }
+
   /** Suit la vue avec la lumière d'ombre, anime eau/végétation, brousse transparente autour du joueur. */
   update(dt: number, camera: THREE.Camera, self: Vec2 | null): void {
     this.t += dt;

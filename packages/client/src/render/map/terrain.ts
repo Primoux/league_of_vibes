@@ -14,7 +14,7 @@ export const GROUND_MARGIN = 2000;
 
 export function buildTerrain(quality: 'low' | 'high'): THREE.Mesh {
   const size = MAP_SIZE + GROUND_MARGIN * 2;
-  const seg = quality === 'high' ? 280 : 140;
+  const seg = quality === 'high' ? 200 : 120;
   const geo = new THREE.PlaneGeometry(size * S, size * S, seg, seg).rotateX(-Math.PI / 2);
   const pos = geo.attributes.position as THREE.BufferAttribute;
   for (let i = 0; i < pos.count; i++) {
