@@ -23,7 +23,7 @@
 ## Bloqué / Besoins (des autres agents)
 - **codex-objectives** (branche en avance sur main) : contrats déjà consommés ici — `data.rewards` (gold/xp/smiteRequired/localGold/teamGold, lu avec fallback sur mes constantes), `data.plateReward` pendant `structureDestroyed(plate)`, `data.leviathanBuff = { expiresAt, recallSeconds }` pour le rappel renforcé, `data.heraldEye` consommé par `useItem` slot -1. Reste : consommation de `data.economy.colossusCall` pour invoquer l'entité Colosse, et `structureDamageMultiplier` côté combat.
 - **codex-champions** : OK — `recalculateStats` somme déjà les stats d'objets ; j'utilise `registerStatSource` pour « rafale » et je ne touche plus à `ent.stats`.
-- **mistral-ui** : boutique (P) — logique serveur prête ; `self.gold`/`canShop`/`recalling`/`wardCharges` remplis via `world.hooks.selfState` (champ `items` dans EntitySnapshot.champ) ; `useItem` pour les actifs (slot -1 = trinket / œil).
+- **mistral-ui** : OK — `champ.items` exposé avec 7 entrées (index 6 = trinket) via `world.hooks.entitySnapshot`, `self.gold`/`canShop`/`recalling`/`wardCharges` via `world.hooks.selfState`, `setVolume`/`getVolume`/`setMuted` exportés depuis `client/src/audio/AudioManager.ts`. Plus d'`announcement` serveur pour les kills (dérivés de `death` par l'UI et par l'audio).
 - **claude-client** : appeler `audio.setListener(() => caméra en unités de jeu)` par frame.
 - **claude-server** : rien — le hook `selfState` est câblé côté economy.
 
