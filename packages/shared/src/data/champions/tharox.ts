@@ -14,7 +14,7 @@ export default defineChampion({
   attackWindup: 0.28,
   palette: { primary: '#5b3a29', secondary: '#c9a66b', accent: '#ff5533' },
   lore: "Sanglier cuirassé des forêts profondes. Quand Tharox prend de l'élan, rien ne l'arrête.",
-  passive: ability({ id: 'tharox_p', slot: 'P', name: 'Élan', description: "Se déplacer accumule de l'élan (jusqu'à 100). À 100, la prochaine attaque inflige 8 % des PV max de la cible et ralentit de 50 %.", targeting: 'self', range: 0, fxKey: 'tharox_p', params: { perUnit: 0.03, bonusTargetMaxHp: 0.08, slow: 0.5 } }),
+  passive: ability({ id: 'tharox_p', slot: 'P', name: 'Élan', description: "Se déplacer accumule de l'élan (jusqu'à 100). À 100, la prochaine attaque inflige 8 % des PV max de la cible et ralentit de 50 %.", targeting: 'self', range: 0, fxKey: 'tharox_p', params: { perUnit: 0.03, bonusTargetMaxHp: 0.08, slow: 0.5, slowDuration: 1.5 } }),
   abilities: {
     Q: ability({ id: 'tharox_q', slot: 'Q', name: 'Défenses', description: "Fonce sur une courte distance ; le premier ennemi touché subit des dégâts et est repoussé.", targeting: 'dash', range: 450, speed: 1200, width: 140, cooldown: [10, 9.5, 9, 8.5, 8], cost: [50], damage: { type: 'physical', base: [60, 100, 140, 180, 220], bonusAd: 0.7 }, fxKey: 'tharox_q', params: { knockback: 250 } }),
     W: ability({ id: 'tharox_w', slot: 'W', name: 'Écorce de fer', description: "Gagne armure et résistance magique pendant 4 s et inflige des dégâts magiques autour de lui chaque seconde.", targeting: 'self', range: 0, radius: 300, cooldown: [14], cost: [40], damage: { type: 'magic', base: [15, 25, 35, 45, 55], bonusHp: 0.01 }, fxKey: 'tharox_w', params: { resists: [15, 20, 25, 30, 35], duration: 4 } }),
