@@ -18,6 +18,7 @@ import { FxDispatcher } from './dispatcher.ts';
 import { PostFx, type FxQuality } from './post/PostFx.ts';
 import { fxIndicators } from './telegraph/indicators.ts';
 import { installAutoAttackFx } from './world/autoAttacks.ts';
+import { installStatusFx } from './world/status.ts';
 import './champions/index.ts';
 
 let worldFxInstalled = false;
@@ -52,6 +53,7 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
   if (!worldFxInstalled) {
     worldFxInstalled = true;
     installAutoAttackFx();
+    installStatusFx();
   }
   const runtime = new FxRuntime(host);
   const dispatcher = new FxDispatcher(runtime, defaultFx);

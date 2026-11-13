@@ -73,6 +73,10 @@ export class ProceduralChampionView implements ChampionView {
   private readonly lastPos = new THREE.Vector3();
   private hasLastPos = false;
   private speed = 0;
+  /** Projection en cours : début (temps local) et durée totale, pour la parabole. */
+  private liftStart = -1;
+  private liftDur = 0;
+  private invisible = false;
 
   constructor(
     readonly entityId: number,
@@ -138,7 +142,16 @@ export class ProceduralChampionView implements ChampionView {
     this.hasLastPos = true;
     const moving = this.state.moving ? this.speed > 0.35 : this.speed > 0.8;
     let stunned = false;
-    if (snap.buffs) for (const b of snap.buffs) if (STUN_BUFFS.has(b.id)) stunned = true;
+    let knockup = -1;
+    let invisible = false;
+    if (snap.buffs)
+      for (const b of snap.buffs) {
+        if (STUN_BUFFS.has(b.id)) stunned = true;
+        if (b.id === 'knockup') knockup = Math.max(knockup, b.remaining);
+        if (b.id === 'invisible') invisible = true;
+      }
+    this.updateLift(knockup);
+    if (invisible !== this.invisible) this.setInvisible(invisible);
     if (moving !== this.state.moving || stunned !== this.stunned) {
       this.state.moving = moving;
       this.stunned = stunned;
@@ -175,6 +188,34 @@ export class ProceduralChampionView implements ChampionView {
   }
 
   // ------------------------------------------------------------ interne
+  /** Projection : le modèle décrit une parabole pendant la durée du knockup (la simulation reste au sol). */
+  private updateLift(remaining: number): void {
+    if (remaining > 0 && this.liftStart < 0) {
+      this.liftStart = this.state.time;
+      this.liftDur = Math.max(0.2, remaining);
+    }
+    if (this.liftStart < 0) return;
+    const k = (this.state.time - this.liftStart) / this.liftDur;
+    if (k >= 1 || (remaining <= 0 && k > 0.95)) {
+      this.liftStart = -1;
+      this.model.position.y = 0;
+      return;
+    }
+    this.model.position.y = 4 * Math.min(1.1, 0.35 + this.liftDur * 0.6) * k * (1 - k);
+  }
+
+  /** Invisibilité (visible seulement des alliés) : modèle translucide. */
+  private setInvisible(on: boolean): void {
+    this.invisible = on;
+    for (const m of [this.built.material, this.built.glowMaterial]) {
+      if (!m) continue;
+      m.transparent = on;
+      m.opacity = on ? 0.3 : 1;
+      m.depthWrite = !on;
+    }
+    for (const o of this.built.outlines) o.visible = !on && !this.state.dead;
+  }
+
   private refreshBase(): void {
     if (this.state.dead) return;
     let base: string;
