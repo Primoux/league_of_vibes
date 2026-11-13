@@ -5,7 +5,9 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { CHAMPION_LIST, RENDER_SCALE, SUMMONERS, SUMMONER_IDS, type AbilitySlot, type ChampionDef, type GameEvent, type Vec2 } from '@lov/shared';
+import { CHAMPION_LIST, RENDER_SCALE, SUMMONERS, SUMMONER_IDS, type AbilitySlot, type ChampionDef, type EntitySnapshot, type GameEvent, type Team, type Vec2 } from '@lov/shared';
+import { createChampionView, type ProceduralChampionView } from '../../render/champions/index.ts';
+import { store } from '../../state.ts';
 import { fxBus } from '../FxBus.ts';
 import type { FxHost } from '../core/host.ts';
 import { fxIndicators, installFx, setFxQuality } from '../index.ts';
@@ -17,8 +19,13 @@ const CASTER_ID = 1;
 const TARGET_IDS = [2, 3, 4];
 
 interface Dummy extends LabActor {
+  view: ProceduralChampionView;
   mesh: THREE.Object3D;
+  snap: EntitySnapshot;
+  anim: string;
   home: Vec2;
+  /** Point regardé quand il ne bouge pas. */
+  lookAt: Vec2;
   dash: { from: Vec2; to: Vec2; t: number; duration: number } | null;
 }
 
@@ -67,30 +74,53 @@ export function startFxLab(): void {
   grid.position.set(center.x, 0.005, center.z);
   scene.add(grid);
 
-  // ------------------------------------------------------------ mannequins
+  // ------------------------------------------------------------ mannequins (vrais modèles de champions)
   const dummies = new Map<number, Dummy>();
-  const makeDummy = (id: number, pos: Vec2, color: number): Dummy => {
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.9, 4, 12), new THREE.MeshStandardMaterial({ color, roughness: 0.6 }));
-    body.position.y = 0.9;
-    body.castShadow = true;
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.65, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6 }));
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.02;
-    g.add(body, ring);
-    g.position.set(pos.x * RENDER_SCALE, 0, -pos.y * RENDER_SCALE);
-    scene.add(g);
-    const d: Dummy = { id, pos: { ...pos }, home: { ...pos }, mesh: g, dash: null };
+  const snapFor = (id: number, champ: string, team: Team): EntitySnapshot => ({
+    id, kind: 'champion', team, subtype: champ, x: 0, y: 0, facing: 0, hp: 1000, maxHp: 1000, anim: 'idle',
+  });
+  /** Les FX lisent l'équipe et le champion des entités dans le store (comme en jeu) : on y publie les mannequins. */
+  const publishSnapshot = (): void => {
+    store.set({
+      snapshot: {
+        tick: 0, time: 0, serverTime: 0, events: [],
+        entities: [...dummies.values()].map((d) => d.snap),
+        score: { blue: { kills: 0, towers: 0, dragons: [], grubs: 0 }, red: { kills: 0, towers: 0, dragons: [], grubs: 0 } },
+      },
+    });
+  };
+  const mountView = (d: Dummy, champ: string): void => {
+    d.view?.dispose();
+    d.snap = { ...d.snap, subtype: champ };
+    d.view = createChampionView(d.snap)!;
+    d.mesh = d.view.object3d;
+    d.anim = '';
+    scene.add(d.mesh);
+    if (dummies.has(d.id)) publishSnapshot();
+  };
+  const makeDummy = (id: number, pos: Vec2, champ: string, team: Team, lookAt: Vec2): Dummy => {
+    const d = { id, pos: { ...pos }, home: { ...pos }, lookAt, dash: null, snap: snapFor(id, champ, team), anim: '' } as unknown as Dummy;
+    mountView(d, champ);
     dummies.set(id, d);
+    publishSnapshot();
     return d;
   };
-  const caster = makeDummy(CASTER_ID, { x: 1000, y: 1050 }, 0x3a7bff);
+  const params0 = new URLSearchParams(location.search);
+  const casterPos = { x: 1000, y: 1050 };
+  const caster = makeDummy(CASTER_ID, casterPos, params0.get('champ') ?? 'grondak', 'blue', { x: 1650, y: 1050 });
   const targets = [
-    makeDummy(TARGET_IDS[0]!, { x: 1650, y: 1050 }, 0xff4a4a),
-    makeDummy(TARGET_IDS[1]!, { x: 1500, y: 1300 }, 0xff4a4a),
-    makeDummy(TARGET_IDS[2]!, { x: 1550, y: 820 }, 0xff4a4a),
+    makeDummy(TARGET_IDS[0]!, { x: 1650, y: 1050 }, 'kaelen', 'red', casterPos),
+    makeDummy(TARGET_IDS[1]!, { x: 1500, y: 1300 }, 'sable', 'red', casterPos),
+    makeDummy(TARGET_IDS[2]!, { x: 1550, y: 820 }, 'nyx', 'red', casterPos),
   ];
   const mainTarget = targets[0]!;
+  // &close=1 : caméra rapprochée sur le lanceur (inspection des modèles) ; &close=2 : sur les cibles
+  const close = params0.get('close');
+  if (close) {
+    const focus = close === '2' ? new THREE.Vector3(15.6, 1, -10.5) : new THREE.Vector3(casterPos.x * RENDER_SCALE, 1, -casterPos.y * RENDER_SCALE);
+    controls.target.copy(focus);
+    camera.position.set(focus.x + 1.6, focus.y + 2.2, focus.z + (close === '2' ? 7 : 4.2));
+  }
 
   const host: FxHost = { scene, camera, renderer, getEntityObject: (id) => dummies.get(id)?.mesh };
   const fx = installFx(host, { manualUpdate: true, ownPost: true });
@@ -115,9 +145,22 @@ export function startFxLab(): void {
       d.mesh.position.set(d.pos.x * RENDER_SCALE, 0, -d.pos.y * RENDER_SCALE);
     }
   };
+  const useChampion = (champ: ChampionDef): void => {
+    if (caster.snap.subtype !== champ.id) mountView(caster, champ.id);
+  };
   const castAbility = (champ: ChampionDef, slot: AbilitySlot | 'P'): void => {
+    useChampion(champ);
     if (Math.hypot(caster.pos.x - caster.home.x, caster.pos.y - caster.home.y) > 50) resetPositions();
     play(synthAbility(champ, slot, caster, mainTarget, nextId));
+  };
+  const autoAttack = (champ: ChampionDef): void => {
+    useChampion(champ);
+    caster.snap.anim = 'attack';
+    const windup = champ.attackWindup / champ.baseStats.attackSpeed;
+    fx.runtime.after(windup, () => {
+      fxBus.dispatch({ type: 'autoAttack', source: caster.id, target: mainTarget.id, ranged: champ.ranged });
+      fx.runtime.after(0.5, () => (caster.snap.anim = 'idle'));
+    });
   };
 
   // ------------------------------------------------------------ interface
@@ -167,7 +210,22 @@ export function startFxLab(): void {
   const bloom = el('input', { type: 'range', min: '0', max: '2', step: '0.05', value: '0.55' });
   bloom.addEventListener('input', () => fx.post?.setBloom(Number(bloom.value)));
   panel.append(el('label', {}, 'Bloom', bloom));
-  panel.append(el('div', { className: 'row' }, el('button', { onclick: resetPositions }, 'Replacer les mannequins')));
+  const toggleDeath = (): void => {
+    mainTarget.snap.dead = !mainTarget.snap.dead;
+    if (mainTarget.snap.dead) fxBus.dispatch({ type: 'death', target: mainTarget.id, killer: caster.id });
+  };
+  let recalling = false;
+  const toggleRecall = (): void => {
+    recalling = !recalling;
+    fxBus.dispatch(recalling ? { type: 'recallStart', target: caster.id } : { type: 'recallEnd', target: caster.id, completed: false });
+  };
+  panel.append(
+    el('div', { className: 'row' },
+      el('button', { onclick: resetPositions }, 'Replacer'),
+      el('button', { onclick: toggleDeath }, 'Mort / retour cible'),
+      el('button', { onclick: toggleRecall }, 'Rappel'),
+    ),
+  );
 
   // champions
   panel.append(el('h2', {}, 'Champions'));
@@ -176,6 +234,9 @@ export function startFxLab(): void {
     const sw = el('span', { className: 'sw' });
     sw.style.background = champ.palette.primary;
     row.append(sw, el('span', { className: 'name', title: champ.title }, champ.name));
+    const aa = el('button', { title: 'Auto-attaque' }, 'AA');
+    aa.addEventListener('click', () => autoAttack(champ));
+    row.append(aa);
     for (const slot of SLOTS) {
       const def = slot === 'P' ? champ.passive : champ.abilities[slot];
       const b = el('button', { title: `${def.name} — ${def.description}` }, slot);
@@ -210,16 +271,23 @@ export function startFxLab(): void {
   // ?fxlab&cast=ilyra:W,grondak:R&every=1.5 : relance la liste en boucle ; &spam=1 : charge aléatoire
   // &at=0.6 : pas fixe de 1/60 s puis gel à t = 0.6 s (captures reproductibles, même sur un GPU lent)
   const params = new URLSearchParams(location.search);
+  // slots spéciaux : AA (auto-attaque), DIE (mort/retour de la cible), RECALL (rappel du lanceur)
   const autoCasts = (params.get('cast') ?? '')
     .split(',')
-    .map((s) => s.split(':'))
-    .map(([c, s]) => ({ champ: CHAMPION_LIST.find((x) => x.id === c), slot: s as AbilitySlot | 'P' }))
-    .filter((x): x is { champ: ChampionDef; slot: AbilitySlot | 'P' } => !!x.champ && (SLOTS as readonly string[]).includes(x.slot));
+    .map((x) => x.split(':'))
+    .map(([c, slot]) => ({ champ: CHAMPION_LIST.find((x) => x.id === c), slot: slot ?? '' }))
+    .filter((x): x is { champ: ChampionDef; slot: string } => !!x.champ && x.slot !== '');
   const every = Number(params.get('every') ?? 2);
   if (params.get('spam') === '1') spam = true;
   const freezeAt = params.has('at') ? Number(params.get('at')) : null;
+  const runOne = (champ: ChampionDef, slot: string): void => {
+    if (slot === 'AA') autoAttack(champ);
+    else if (slot === 'DIE') toggleDeath();
+    else if (slot === 'RECALL') toggleRecall();
+    else if ((SLOTS as readonly string[]).includes(slot)) castAbility(champ, slot as AbilitySlot | 'P');
+  };
   const runAuto = (): void => {
-    autoCasts.forEach(({ champ, slot }, i) => fx.runtime.after(i * 0.15, () => castAbility(champ, slot)));
+    autoCasts.forEach(({ champ, slot }, i) => fx.runtime.after(i * 0.15, () => runOne(champ, slot)));
     if (autoCasts.length) fx.runtime.after(every, runAuto);
   };
   runAuto();
@@ -255,7 +323,21 @@ export function startFxLab(): void {
       } else if (moving && d !== caster) {
         d.pos.y = d.home.y + Math.sin(clock * 1.3 + d.id) * 200;
       }
+      const vy = moving && d !== caster && !d.dash ? Math.cos(clock * 1.3 + d.id) : 0;
       d.mesh.position.set(d.pos.x * RENDER_SCALE, 0, -d.pos.y * RENDER_SCALE);
+      // orientation : sens du déplacement, sinon vers sa cible
+      if (d.dash) d.snap.facing = Math.atan2(d.dash.to.y - d.dash.from.y, d.dash.to.x - d.dash.from.x);
+      else if (Math.abs(vy) > 0.05) d.snap.facing = vy > 0 ? Math.PI / 2 : -Math.PI / 2;
+      else d.snap.facing = Math.atan2(d.lookAt.y - d.pos.y, d.lookAt.x - d.pos.x);
+      d.mesh.rotation.y = d.snap.facing;
+      d.snap.x = d.pos.x;
+      d.snap.y = d.pos.y;
+      const serverAnim = d.snap.dead ? 'death' : d.dash ? 'dash' : Math.abs(vy) > 0.05 ? 'run' : (d.snap.anim ?? 'idle');
+      if (serverAnim !== d.anim) {
+        d.anim = serverAnim;
+        d.view.playAnim(serverAnim);
+      }
+      d.view.update(d.snap, dt);
     }
     if (spam) {
       spamAcc += dt;

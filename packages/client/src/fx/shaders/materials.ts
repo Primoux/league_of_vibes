@@ -67,8 +67,17 @@ export function createFresnelMaterial(o: FresnelOptions = {}): THREE.ShaderMater
 // ---------------------------------------------------------------- Givre cristallin (facettes)
 const ICE_VERT = /* glsl */ `
 varying vec3 vViewPos;
+varying vec3 vTint;
 void main() {
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vec4 p = vec4(position, 1.0);
+  vTint = vec3(1.0);
+  #ifdef USE_INSTANCING
+  p = instanceMatrix * p;
+  #endif
+  #ifdef USE_INSTANCING_COLOR
+  vTint = instanceColor;
+  #endif
+  vec4 mv = modelViewMatrix * p;
   vViewPos = mv.xyz;
   gl_Position = projectionMatrix * mv;
 }
@@ -78,6 +87,7 @@ uniform vec3 uColor;
 uniform vec3 uDeep;
 uniform float uOpacity;
 varying vec3 vViewPos;
+varying vec3 vTint;
 void main() {
   // normale de facette via dérivées écran : look low-poly sans dupliquer les sommets
   vec3 n = normalize(cross(dFdx(vViewPos), dFdy(vViewPos)));
@@ -85,7 +95,7 @@ void main() {
   float rim = pow(1.0 - abs(dot(n, v)), 2.0);
   float light = 0.5 + 0.5 * dot(n, normalize(vec3(0.3, 0.8, 0.5)));
   float glint = pow(max(0.0, dot(reflect(-v, n), normalize(vec3(0.2, 0.9, 0.4)))), 24.0);
-  vec3 col = mix(uDeep, uColor, light) * 0.85 + rim * uColor * 0.7 + glint * 1.2;
+  vec3 col = (mix(uDeep, uColor, light) * 0.85 + rim * uColor * 0.7) * vTint + glint * 1.2;
   gl_FragColor = vec4(col, uOpacity * (0.75 + 0.25 * rim));
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -200,7 +210,8 @@ function patchVertex(shader: ShaderLike, u: DissolveUniforms): void {
   Object.assign(shader.uniforms, u);
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vDissolvePos;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvDissolvePos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    // après project_vertex : `transformed` est déjà skinné (la position suit les membres animés)
+    .replace('#include <project_vertex>', '#include <project_vertex>\nvDissolvePos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
 }
 
 /**
@@ -244,7 +255,7 @@ export function makeDissolveDepthMaterial(u: DissolveUniforms): THREE.MeshDepthM
 export function applyDissolve(root: THREE.Object3D, u: DissolveUniforms): void {
   const depth = makeDissolveDepthMaterial(u);
   root.traverse((o) => {
-    if (!(o instanceof THREE.Mesh)) return;
+    if (!(o instanceof THREE.Mesh) || o.userData.noDissolve) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of mats) makeDissolvable(m as THREE.Material, u);
     o.customDepthMaterial = depth;
