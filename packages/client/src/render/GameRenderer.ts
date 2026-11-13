@@ -12,9 +12,9 @@
  *  - `registerChampionFactory` : voir ./EntityView.ts
  */
 import * as THREE from 'three';
-import { INHIBITORS, NEXUS, TOWERS, isInWall, type EntityId, type EntitySnapshot, type Snapshot, type Vec2 } from '@lov/shared';
+import { INHIBITORS, NEXUS, TOWERS, type EntityId, type EntitySnapshot, type Snapshot, type Vec2 } from '@lov/shared';
 import { clock, flushEvents, net, renderTime, snapshots } from '../net/client.ts';
-import { MovePredictor } from '../net/prediction.ts';
+import { MovePredictor, segmentBlocked } from '../net/prediction.ts';
 import type { Interpolated } from '../net/snapshots.ts';
 import { store, type ClientState } from '../state.ts';
 import { CameraController } from './CameraController.ts';
@@ -48,18 +48,6 @@ interface Slot {
   batch?: BatchHandle;
 }
 
-/** La ligne droite a→b traverse-t-elle un mur ? (échantillonnage tous les 50 u) */
-function segmentBlocked(a: Vec2, b: Vec2): boolean {
-  const d = Math.hypot(b.x - a.x, b.y - a.y);
-  const n = Math.ceil(d / 50);
-  const p = { x: 0, y: 0 };
-  for (let i = 1; i <= n; i++) {
-    p.x = a.x + ((b.x - a.x) * i) / n;
-    p.y = a.y + ((b.y - a.y) * i) / n;
-    if (isInWall(p)) return true;
-  }
-  return false;
-}
 
 type ClientStateCameraView = ClientState['cameraView'];
 
