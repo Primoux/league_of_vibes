@@ -141,6 +141,12 @@ export function startFxLab(): void {
   const ally = mount('solenne', 'blue', P.ally);
   const targets = [mount('kaelen', 'red', P.main), mount('sable', 'red', P.t2), mount('nyx', 'red', P.t3)];
   const main = targets[0]!;
+  // &stress=1 : 4v4 complet (8 champions différents) pour mesurer un teamfight
+  if (params.get('stress') === '1') {
+    mount('vrenna', 'blue', { x: 4450, y: 4050 });
+    mount('zephyr', 'blue', { x: 4150, y: 4400 });
+    targets.push(mount('corvin', 'red', { x: 5200, y: 4700 }));
+  }
 
   const useChampion = (champ: ChampionDef): void => {
     if (caster.championId === champ.id) return;
