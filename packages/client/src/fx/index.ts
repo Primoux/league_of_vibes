@@ -9,6 +9,7 @@
  *  - `setFxQuality('high' | 'low')` : qualité (store/paramètres) ;
  *  - `registerFx` / `onWorldEvent` : extension des FX.
  */
+import { installChampionModels, setRespawnHook } from '../render/champions/index.ts';
 import { fxBus } from './FxBus.ts';
 import { FxRuntime } from './core/FxRuntime.ts';
 import type { FxHost } from './core/host.ts';
@@ -16,6 +17,13 @@ import { defaultFx } from './defaults.ts';
 import { FxDispatcher } from './dispatcher.ts';
 import { PostFx, type FxQuality } from './post/PostFx.ts';
 import { fxIndicators } from './telegraph/indicators.ts';
+import { installAutoAttackFx } from './world/autoAttacks.ts';
+import { installStatusFx } from './world/status.ts';
+import { installWorldFx, respawnFx } from './world/events.ts';
+import './summoners.ts';
+import './champions/index.ts';
+
+let worldFxInstalled = false;
 
 export { fxBus } from './FxBus.ts';
 export { fxIndicators } from './telegraph/indicators.ts';
@@ -43,8 +51,16 @@ let current: FxInstance | null = null;
 
 export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
   current?.dispose();
+  installChampionModels();
+  if (!worldFxInstalled) {
+    worldFxInstalled = true;
+    installAutoAttackFx();
+    installStatusFx();
+    installWorldFx();
+  }
   const runtime = new FxRuntime(host);
   const dispatcher = new FxDispatcher(runtime, defaultFx);
+  setRespawnHook((id) => respawnFx(runtime, id));
   fxIndicators.attach(runtime.root);
   const unsub = fxBus.subscribe((e) => dispatcher.handle(e));
 
@@ -85,6 +101,7 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
       cancelAnimationFrame(raf);
       removeEventListener('resize', onResize);
       post?.dispose();
+      setRespawnHook(null);
       runtime.entities.dispose();
       host.scene.remove(runtime.root);
       if (current === this) current = null;
