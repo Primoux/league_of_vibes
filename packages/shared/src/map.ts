@@ -6,7 +6,6 @@
  * base rouge en haut-droite. La carte est symétrique par rotation de 180° autour du centre (6000,6000) :
  * mirror(p) = (MAP_SIZE - x, MAP_SIZE - y). La rivière suit la diagonale x + y = MAP_SIZE.
  *
- * VERSION BOOTSTRAP : positions cohérentes mais murs/brousses provisoires — à affiner par claude-client.
  */
 import { MAP_SIZE } from './constants.ts';
 import type { Lane, MonsterType, Team, TowerTier, Vec2 } from './types.ts';
@@ -82,20 +81,40 @@ export interface CampSpawn {
   leashRadius: number;
 }
 
-const BLUE_CAMPS: Omit<CampSpawn, 'side' | 'id'>[] = [
-  { monster: 'blue_buff', pos: v(3700, 6100), leashRadius: 800 },
-  { monster: 'gromp', pos: v(2200, 6700), leashRadius: 700 },
-  { monster: 'wolves', pos: v(3600, 4900), smalls: [{ monster: 'wolf_small', offset: v(150, 150) }, { monster: 'wolf_small', offset: v(-150, 150) }], leashRadius: 700 },
-  { monster: 'red_buff', pos: v(6200, 3600), leashRadius: 800 },
-  { monster: 'raptors', pos: v(6400, 4700), smalls: [0, 1, 2, 3, 4].map((i) => ({ monster: 'raptor_small' as const, offset: v(Math.cos(i * 1.25) * 220, Math.sin(i * 1.25) * 220) })), leashRadius: 700 },
-  { monster: 'krugs', pos: v(7900, 2300), smalls: [{ monster: 'krug_small', offset: v(200, -100) }], leashRadius: 700 },
+/**
+ * Réflexion sur la diagonale x = y. La jungle bleue est composée de deux quadrants : OUEST (entre la voie top
+ * et la mid, côté buff bleu) et SUD (entre la mid et la voie bot, côté buff rouge). Le quadrant sud est le
+ * reflet du quadrant ouest, ce qui équilibre les deux moitiés de jungle ; l'équipe rouge est obtenue par
+ * rotation 180° (`mirror`).
+ */
+const swapXY = (p: Vec2): Vec2 => ({ x: p.y, y: p.x });
+
+type BlueCamp = Omit<CampSpawn, 'side' | 'id'>;
+const WEST_CAMPS: BlueCamp[] = [
+  { monster: 'blue_buff', pos: v(3800, 6500), leashRadius: 800 },
+  { monster: 'gromp', pos: v(2250, 6900), leashRadius: 700 },
+  { monster: 'wolves', pos: v(3650, 4950), smalls: [{ monster: 'wolf_small', offset: v(-170, 130) }, { monster: 'wolf_small', offset: v(130, -170) }], leashRadius: 700 },
 ];
+/** Correspondance quadrant ouest -> sud. */
+const SOUTH_OF: Partial<Record<MonsterType, MonsterType>> = { blue_buff: 'red_buff', gromp: 'krugs', wolves: 'raptors', wolf_small: 'raptor_small' };
+const SOUTH_CAMPS: BlueCamp[] = WEST_CAMPS.map((c) => ({
+  monster: SOUTH_OF[c.monster]!,
+  pos: swapXY(c.pos),
+  leashRadius: c.leashRadius,
+  smalls:
+    c.monster === 'wolves'
+      ? [0, 1, 2, 3, 4].map((i) => ({ monster: 'raptor_small' as const, offset: v(Math.round(Math.cos(i * 1.257) * 220), Math.round(Math.sin(i * 1.257) * 220)) }))
+      : c.monster === 'gromp'
+        ? [{ monster: 'krug_small' as const, offset: v(180, -120) }]
+        : undefined,
+}));
+const BLUE_CAMPS: BlueCamp[] = [...WEST_CAMPS, ...SOUTH_CAMPS];
 
 export const CAMPS: CampSpawn[] = [
   ...BLUE_CAMPS.map((c) => ({ ...c, side: 'blue' as const, id: `blue_${c.monster}` })),
-  ...BLUE_CAMPS.map((c) => ({ ...c, side: 'red' as const, id: `red_${c.monster}`, pos: mirror(c.pos) })),
-  { id: 'scuttle_top', side: 'river', monster: 'scuttle', pos: v(3400, 8600), leashRadius: 1500 },
-  { id: 'scuttle_bot', side: 'river', monster: 'scuttle', pos: v(8600, 3400), leashRadius: 1500 },
+  ...BLUE_CAMPS.map((c) => ({ ...c, side: 'red' as const, id: `red_${c.monster}`, pos: mirror(c.pos), smalls: c.smalls?.map((s) => ({ ...s, offset: v(-s.offset.x, -s.offset.y) })) })),
+  { id: 'scuttle_top', side: 'river', monster: 'scuttle', pos: v(3300, 8700), leashRadius: 1500 },
+  { id: 'scuttle_bot', side: 'river', monster: 'scuttle', pos: v(8700, 3300), leashRadius: 1500 },
 ];
 
 /** Fosses des objectifs épiques. Fosse du dragon côté bot (rivière bas-droite), fosse du Léviathan côté top. */
@@ -104,32 +123,60 @@ export const PITS = {
   leviathan: { pos: v(4100, 7900), radius: 700 }, // larves et Colosse apparaissent aussi ici avant le Léviathan
 } as const;
 
-/** Murs : polygones convexes (sens anti-horaire). PROVISOIRE — claude-client les affine. */
+/** Rivière : bande centrée sur x + y = MAP_SIZE, de demi-largeur RIVER_HALF_WIDTH (perpendiculaire). */
+export const RIVER_HALF_WIDTH = 520;
+export const LANE_HALF_WIDTH = 330;
+
+/** Murs : polygones CONVEXES, sens anti-horaire. */
 export type Polygon = Vec2[];
 const rect = (x: number, y: number, w: number, h: number): Polygon => [v(x, y), v(x + w, y), v(x + w, y + h), v(x, y + h)];
+const poly = (...pts: [number, number][]): Polygon => ccw(pts.map(([x, y]) => v(x, y)));
 
-const BLUE_WALLS: Polygon[] = [
-  rect(2000, 3600, 900, 700), // entre base et loups
-  rect(2600, 5300, 600, 900), // entre gromp et buff bleu
-  rect(4300, 5200, 800, 600), // jungle top, près de mid
-  rect(4700, 2100, 700, 900), // jungle bot, près du buff rouge
-  rect(6900, 3000, 600, 700), // entre raptors et krugs
-  rect(5300, 3900, 600, 500), // près de mid
-  rect(6600, 1800, 800, 400), // derrière krugs
-  rect(1800, 7600, 600, 1200), // voie top / rivière
-  rect(8800, 2000, 1200, 600), // voie bot / rivière
+export function polygonArea(p: Polygon): number {
+  let a = 0;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) a += (p[j]!.x - p[i]!.x) * (p[j]!.y + p[i]!.y);
+  return a / 2; // > 0 : anti-horaire
+}
+function ccw(p: Polygon): Polygon {
+  return polygonArea(p) < 0 ? [...p].reverse() : p;
+}
+
+/** Quadrant ouest de la jungle bleue (entre voie top et mid). Couloirs de 350 à 600 u. */
+const WEST_WALLS: Polygon[] = [
+  // bordure voie top : longs murs avec entrées (y 5050-5550 et 6300-7350)
+  rect(1650, 3350, 420, 1700),
+  rect(1650, 5550, 380, 750),
+  poly([1650, 7350], [2050, 7550], [2100, 9000], [1650, 9300]),
+  // mur base / loups
+  poly([2450, 3700], [3050, 3700], [3150, 4250], [2450, 4250]),
+  // mur central ouest (entre loups, gromp et buff bleu)
+  poly([2500, 4950], [3150, 4850], [3250, 5700], [2650, 6000], [2450, 5600]),
+  // au-dessus du gromp / buff bleu, vers la rivière
+  poly([2550, 7450], [3250, 7250], [3450, 7500], [2900, 8100], [2500, 7950]),
+  // mur buff bleu / mid (le long de la mid)
+  poly([4250, 5350], [4750, 5850], [4550, 6650], [4250, 6800], [4050, 6150]),
 ];
-export const WALLS: Polygon[] = [...BLUE_WALLS, ...BLUE_WALLS.map((p) => p.map(mirror).reverse())];
 
-/** Brousses (cachent les unités à la vision ennemie). PROVISOIRE. */
+const WEST_BRUSHES: Polygon[] = [
+  rect(420, 8900, 340, 950), // brousse de voie top (côté rivière)
+  poly([1700, 9550], [2150, 9350], [2300, 9650], [1850, 9900]), // tri-brousse top
+  rect(2150, 5150, 300, 380), // entrée de jungle depuis la voie top
+  poly([3300, 4300], [3650, 4300], [3700, 4550], [3300, 4550]), // entrée des loups
+  poly([3350, 7000], [3750, 7000], [3700, 7300], [3350, 7250]), // derrière le buff bleu
+  poly([4850, 5650], [5150, 5600], [5150, 5900], [4900, 5950]), // brousse latérale mid
+  poly([2900, 8650], [3300, 8350], [3500, 8550], [3100, 8900]), // rivière top
+  poly([4750, 7300], [5100, 7000], [5250, 7150], [4900, 7450]), // rivière, entre la fosse du Léviathan et la mid
+];
+
+const reflectPolys = (ps: Polygon[]): Polygon[] => ps.map((p) => ccw(p.map(swapXY)));
+const BLUE_WALLS: Polygon[] = [...WEST_WALLS, ...reflectPolys(WEST_WALLS)];
+/** Ensemble des murs : moitié bleue + rotation 180° (la rotation conserve le sens anti-horaire). */
+export const WALLS: Polygon[] = [...BLUE_WALLS, ...BLUE_WALLS.map((p) => p.map(mirror))];
+
+/** Brousses (cachent les unités à la vision ennemie). */
 export const BRUSHES: Polygon[] = (() => {
-  const blue: Polygon[] = [
-    rect(500, 9000, 300, 900), // brousse voie top
-    rect(9000, 500, 900, 300), // brousse voie bot
-    rect(5300, 5800, 400, 250), // brousse mid (gauche)
-    rect(3000, 7300, 500, 300), // rivière top
-  ];
-  return [...blue, ...blue.map((p) => p.map(mirror).reverse())];
+  const blue = [...WEST_BRUSHES, ...reflectPolys(WEST_BRUSHES)];
+  return [...blue, ...blue.map((p) => p.map(mirror))];
 })();
 
 /** Plateforme de base : zone de soin rapide / achat. */

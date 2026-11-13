@@ -52,6 +52,7 @@ export class NetClient {
   private attempts = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private loopback: ((msg: ClientMsg) => void) | null = null;
+  private pingTimer: ReturnType<typeof setInterval> | null = null;
 
   /** Démos hors ligne (?maplab) : les messages client sont passés à `fn` au lieu du WebSocket. */
   setLoopback(fn: ((msg: ClientMsg) => void) | null): void {
@@ -87,11 +88,17 @@ export class NetClient {
       ws.send(encode({ t: 'hello', name: this.name, version: PROTOCOL_VERSION, reconnectToken: sessionGet('lov.token') ?? undefined }));
       this.queue.forEach((m) => ws.send(m));
       this.queue = [];
+      if (this.pingTimer) clearInterval(this.pingTimer);
+      const ping = () => ws.readyState === WebSocket.OPEN && ws.send(encode({ t: 'netPing', clientTime: performance.now() }));
+      ping();
+      this.pingTimer = setInterval(ping, 2000);
     };
     ws.onclose = () => {
       if (this.ws !== ws) return;
       store.set({ connected: false });
       this.ws = null;
+      if (this.pingTimer) clearInterval(this.pingTimer);
+      this.pingTimer = null;
       if (this.wantConnected) this.scheduleReconnect();
     };
     ws.onmessage = (ev) => {
@@ -153,6 +160,13 @@ export class NetClient {
         store.set({ result: msg.result });
         break;
       case 'pong':
+        if (msg.clientTime !== undefined) {
+          const sample = performance.now() - msg.clientTime;
+          const prev = store.state.rtt;
+          const rtt = Math.round(prev === null ? sample : prev * 0.7 + sample * 0.3);
+          clock.setRtt(rtt);
+          store.set({ rtt });
+        }
         break;
       default:
         break;
