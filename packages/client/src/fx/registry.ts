@@ -63,3 +63,20 @@ export function onWorldEvent<T extends GameEvent['type']>(type: T, fn: WorldFxHa
 export function getWorldHandlers(type: string): readonly ((rt: FxRuntime, e: GameEvent) => void)[] | undefined {
   return worldHandlers.get(type);
 }
+
+/**
+ * FX d'impact d'un sort à l'instant exact de ses dégâts serveur (événement `damage` avec `ability` = id du sort).
+ * Utile pour les sorts ciblés ou de zone instantanée qui n'émettent ni projectile ni zone.
+ */
+export type AbilityHitHandler = (rt: FxRuntime, e: Ev<'damage'>) => void;
+const abilityHits = new Map<string, AbilityHitHandler>();
+let abilityHitsInstalled = false;
+
+export function onAbilityHit(abilityId: string, fn: AbilityHitHandler): void {
+  abilityHits.set(abilityId, fn);
+  if (abilityHitsInstalled) return;
+  abilityHitsInstalled = true;
+  onWorldEvent('damage', (rt, e) => {
+    if (e.ability) abilityHits.get(e.ability)?.(rt, e);
+  });
+}

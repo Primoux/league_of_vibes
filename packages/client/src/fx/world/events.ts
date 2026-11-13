@@ -182,6 +182,7 @@ export function installWorldFx(): void {
     }
     const scale = e.kind === 'nexus' ? 2.2 : e.kind === 'inhibitor' ? 1.3 : 1;
     flash(rt, _p.set(pos.x, 2.5 * scale, pos.z), 6 * scale, team, 0.5);
+    rt.shake(pos, e.kind === 'nexus' ? 70 : e.kind === 'inhibitor' ? 45 : 35, e.kind === 'nexus' ? 1.2 : 0.6);
     shockwave(rt, pos, 3.5 * scale, 0.8, team, 0.3);
     debris(rt, pos, Math.round(26 * scale), 1.6 * scale, team);
     rt.ps.emit(rt.s.smoke, pos, { count: Math.round(24 * scale), shape: 'disc', radius: 1.2 * scale, speed: [0.5, 1.5], up: [1, 3], life: [1.5, 2.5], size: [1.5, 3], drag: 0.8 });
@@ -204,6 +205,7 @@ export function installWorldFx(): void {
     const pos = new THREE.Vector3();
     if (e.killer === undefined || !rt.entities.pos(e.killer, pos)) return;
     flash(rt, _p.set(pos.x, 1.5, pos.z), 4, color, 0.5);
+    rt.shake(pos, 30, 0.5);
     shockwave(rt, pos, 3, 0.7, color, 0.2);
     rt.ps.emit(rt.s.spark, pos, { count: 40, shape: 'ring', radius: 1, up: [6, 12], life: [0.4, 0.7], size: [0.08, 0.14], stretch: 0.08, tint: color });
   });

@@ -16,6 +16,7 @@ export function EndScreen() {
   const mvp = [...result.stats].sort((a, b) => mvpScore(b) - mvpScore(a))[0];
 
   const back = () => {
+    net.send({ t: 'returnToLobby' });
     store.set({ game: null, snapshot: null, result: null, draft: null });
   };
   const leave = () => {

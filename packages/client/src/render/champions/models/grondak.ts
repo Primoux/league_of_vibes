@@ -1,13 +1,11 @@
 /**
  * Grondak, le Rempart de Granit — golem de pierre, fissures de magma ambré, longs bras aux poings massifs.
  */
+import { clamp01, easeOut, easeIn } from '../anim/ease.ts';
 import { J, addRot, setOffset, setRot, type Clip } from '../anim/pose.ts';
 import { geo } from '../builder.ts';
 import type { ChampionModelDef } from '../ChampionView.ts';
 
-const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t);
-const easeOut = (t: number): number => 1 - (1 - clamp01(t)) ** 3;
-const easeIn = (t: number): number => clamp01(t) ** 2;
 
 /** Posture de gorille : bras pendants vers l'avant, dos voûté. */
 function stance(p: Float32Array, breathe = 0): void {

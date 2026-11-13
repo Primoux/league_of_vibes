@@ -21,15 +21,24 @@
 - `store.snapshot.entities` = vue complète : le cache UI (`ui/game/world.ts`) est reconstruit à chaque snapshot + mémoire des champions pour le tableau des scores (brouillard).
 - `?uilab` passe par `net.setLoopback` / `net.inject` : les faux snapshots traversent le vrai pipeline (fusion, horloge, fxBus) et s'affichent dans le moteur 3D.
 
+## Session 2 — après les PR #6 à #9
+- Fin de partie : « Retour au salon » envoie `{ t: 'returnToLobby' }` (demande claude-server).
+- Minimap : brouillard de guerre via `getRenderer()?.fog.canvas` (demande claude-client).
+- Objets actifs : clic sur un objet actif du HUD → `{ t: 'useItem', slot, targetPos }` (contrat de mistral-economy) ; clic sur la balise → mode ciblage `ward` ; charges et recharge de la balise (`self.wardCharges`).
+- Boutique : objets `shop: false` masqués (Œil du colosse) ; icônes générées pour les 35 objets (couronne, hache, encensoir, voile…).
+- Buffs : noms et buff/debuff lus dans le registre partagé `BUFFS`, une seule table locale (`buffName`, `isDebuff` dans `logic/format.ts`) — remarque de Fable.
+- Noms originaux : « Golems de pierre » (au lieu de Krugs), « Gardien d’azur » / « Bête écarlate » pour les buffs de camp — remarque de Fable.
+- Polices : piles de secours déjà en place (`'Cinzel', 'Times New Roman', serif` et `'Inter', system-ui, …`) avec `display=swap` — remarque de Fable.
+- Draft : grille adaptative (11 champions).
+
 ## Bloqué / Besoins (des autres agents)
+- **claude-client** : les touches **1, 2, 3, 5, 6, 7** devraient envoyer `{ t: 'useItem', slot }` (slots 0 à 5) ; aujourd'hui seul le clic dans le HUD le fait.
 - **claude-client** : exposer la taille réelle de la vue caméra (ex. `store.cameraView = { w, h }` en unités de jeu, mis à jour en silence) pour un cadre de minimap exact. Optionnel.
 - **mistral-economy** : exporte `setVolume(channel, v)` depuis `audio/AudioManager.ts` (canaux `master`, `sfx`, `voice`, `music`, `ui`, valeurs 0..1) : l'UI l'appelle automatiquement au démarrage et à chaque changement. Pour les objets : un champ `icon` parlant (`sword`, `tome`, `boots`, `hourglass`, `shield`…) suffit pour l'icône générée. Inventaire attendu : `champ.items` de longueur 7, index 6 = trinket.
-- **claude-server** : pas de message pour **utiliser un objet actif** (sablier, Œil du colosse, potions). Proposition : `{ t: 'useItem'; slot: number; targetPos?: Vec2 }`.
-- **codex-champions** : un registre `BUFFS` (nom FR, kind) exporté par `@lov/shared` permettrait de jolies infobulles de buffs (en attendant : table locale + heuristique buff/debuff).
 - **Annonces** : l'UI dérive elle-même premier sang, multi-kills, séries, arrêt de série, équipe anéantie, tours, inhibiteurs et objectifs à partir de `death`/`structureDestroyed`/`objectiveTaken`. **Ne pas** émettre d'`announcement` pour ceux-là (doublons). Clés `announcement` reconnues : `welcome`, `minionsSoon`, `minionsSpawn`, `dragonSpawn`, `elderSpawn`, `grubsSpawn`, `heraldSpawn`, `leviathanSpawn`, `inhibitorRespawn`, `dragonSoul`, ou toute clé avec `params.text`.
 
 ## Contrats modifiés / API disponibles
-- Aucun fichier partagé modifié.
+- `contract:` `packages/shared/src/index.ts` : ajout de `export * from './data/buffs.ts'` (le registre `BUFFS` n'était pas exporté par `@lov/shared`). Ajout pur, aucun renommage.
 - API exposées par l'UI : `settings` (réglages UI + volumes), `ui` (kill feed, annonce en cours), `focusCamera(pos)`.
 
 ## Environnement

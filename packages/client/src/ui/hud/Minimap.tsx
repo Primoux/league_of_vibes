@@ -6,6 +6,7 @@
 import { BRUSHES, CAMPS, CHAMPIONS, FOUNTAINS, INHIBITORS, LANE_PATHS, MAP_SIZE, NEXUS, PITS, TOWERS, WALLS, type Team, type Vec2 } from '@lov/shared';
 import { useEffect, useRef } from 'preact/hooks';
 import { net } from '../../net/client.ts';
+import { getRenderer } from '../../render/GameRenderer.ts';
 import { store } from '../../state.ts';
 import { entities, focusCamera, myTeam, selfEntity, worldTick } from '../game/world.ts';
 import { formatClock, MONSTER_LABEL } from '../logic/format.ts';
@@ -140,6 +141,7 @@ export function Minimap() {
       lastDraw = now;
       lastVersion = worldTick.state.version;
       g.drawImage(staticLayer, 0, 0);
+      drawFog(g);
       drawDynamic(g, now, pings.current);
     };
     raf = requestAnimationFrame(draw);
@@ -195,6 +197,17 @@ export function Minimap() {
       <canvas ref={ref} width={RES} height={RES} onPointerDown={onDown} onPointerMove={onMove} onContextMenu={(e) => e.preventDefault()} />
     </div>
   );
+}
+
+/** Brouillard de guerre : canvas de visibilité de claude-client (blanc = visible), appliqué en « multiply ». */
+function drawFog(g: CanvasRenderingContext2D): void {
+  const fog = getRenderer()?.fog.canvas;
+  if (!fog) return;
+  g.save();
+  g.globalCompositeOperation = 'multiply';
+  g.globalAlpha = 0.62;
+  g.drawImage(fog, 0, 0, RES, RES);
+  g.restore();
 }
 
 function drawDynamic(g: CanvasRenderingContext2D, now: number, pings: Ping[]): void {
