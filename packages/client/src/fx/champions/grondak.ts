@@ -7,12 +7,14 @@
  *  R  Effondrement    — sol qui se fissure (télégraphie), éruption de pics, débris projetés
  */
 import * as THREE from 'three';
-import { shieldShell, stunStars } from '../effects/auras.ts';
+import { getChampion } from '@lov/shared';
+import { shieldShell } from '../effects/auras.ts';
 import { ProjectileFx, dashTrail, flash, shockwave, telegraph, timed } from '../effects/primitives.ts';
 import { rng } from '../core/rng.ts';
 import type { FxColors, FxRuntime } from '../core/FxRuntime.ts';
 import { registerFx } from '../registry.ts';
 
+const GRONDAK = getChampion('grondak');
 const STONE = [new THREE.Color('#7a6a58'), new THREE.Color('#6b5d4d'), new THREE.Color('#8c7b66'), new THREE.Color('#5a5047')];
 const stone = (): THREE.Color => STONE[Math.floor(rng.next() * STONE.length)]!;
 const _v = new THREE.Vector3();
@@ -138,20 +140,21 @@ registerFx('grondak_q', {
 });
 
 registerFx('grondak_w', {
+  /** Rugissement : ondes de provocation autour de Grondak (rayon du sort). */
   cast(rt, e, c) {
-    if (!rt.entities.pos(e.source, _v, 1.6)) return;
-    flash(rt, _v, 2.6, c.accentHdr, 0.35);
-  },
-  area(rt, e, c) {
-    const center = rt.world(e.pos);
-    const r = rt.scale(e.radius);
-    // rugissement : ondes de provocation successives
+    const center = new THREE.Vector3();
+    if (!rt.entities.pos(e.source, center)) return;
+    const r = rt.scale(GRONDAK.abilities.W.radius ?? 325);
+    flash(rt, _v.set(center.x, 1.6, center.z), 2.6, c.accentHdr, 0.35);
     for (let i = 0; i < 3; i++) rt.after(i * 0.12, () => shockwave(rt, center, r * (1 - i * 0.15), 0.5, c.accentHdr, 0.14));
     dustRing(rt, center, r * 0.6, 14);
     rockBurst(rt, center, 6, 0.5, [0.1, 0.16]);
-    // armure de pierre pendant la durée de la réduction de dégâts
+  },
+  /** Buff `grondak_w` (réduction de dégâts) : armure de pierre. Les `taunt` posés par le sort passent par les statuts. */
+  buff(rt, e) {
+    if (e.buffId !== 'grondak_w') return;
     let dustAcc = 0;
-    shieldShell(rt, e.source, Math.max(0.5, e.duration || 3), `grondak_w:${e.source}`, {
+    shieldShell(rt, e.target, Math.max(0.5, e.duration), `grondak_w:${e.target}`, {
       color: new THREE.Color(0.9, 0.6, 0.3),
       radius: 1.2,
       height: 1.05,
@@ -165,29 +168,32 @@ registerFx('grondak_w', {
       },
     });
   },
+  buffEnd(rt, e) {
+    if (e.buffId === 'grondak_w') rt.endAura(`grondak_w:${e.target}`);
+  },
 });
 
 registerFx('grondak_e', {
+  /** Charge : poussière tout le long, impact à l'arrivée (l'étourdissement est un statut générique). */
   dash(rt, e, c) {
     const from = rt.world(e.from);
     const to = rt.world(e.to);
-    dashTrail(rt, e.source, from, to, e.duration, c.accent.clone().multiplyScalar(0.7));
+    const duration = Math.max(0.05, e.duration);
+    dashTrail(rt, e.source, from, to, duration, c.accent.clone().multiplyScalar(0.7));
     rockBurst(rt, from, 5, 0.5, [0.1, 0.18]);
-    // poussière soulevée tout le long de la charge
     const pos = new THREE.Vector3();
-    timed(rt, e.duration, () => {
+    timed(rt, duration, () => {
       if (!rt.entities.pos(e.source, pos)) return;
       rt.ps.emit(rt.s.dust, pos, { count: 2, shape: 'disc', radius: 0.4, up: [0.3, 1], speed: [0.5, 1.5], life: [0.6, 1], size: [0.8, 1.3], drag: 2 });
       magmaSparks(rt, pos.setY(0.5), c, 1, [0.5, 2]);
     });
-  },
-  hit(rt, e, c) {
-    const at = rt.world(e.pos);
-    shockwave(rt, at, 1.6, 0.4, c.accentHdr, 0.14);
-    rockBurst(rt, at, 10, 1, [0.12, 0.24]);
-    dustRing(rt, at, 0.6, 12);
-    flash(rt, _v.set(at.x, 1.1, at.z), 2.4, c.accentHdr, 0.25);
-    if (e.target !== undefined) stunStars(rt, e.target, 1);
+    rt.after(duration, () => {
+      if (!rt.entities.pos(e.source, pos)) pos.copy(to);
+      shockwave(rt, pos, 1.6, 0.4, c.accentHdr, 0.14);
+      rockBurst(rt, pos, 10, 1, [0.12, 0.24]);
+      dustRing(rt, pos, 0.6, 12);
+      flash(rt, _v.set(pos.x, 1.1, pos.z), 2.4, c.accentHdr, 0.25);
+    });
   },
 });
 
@@ -197,16 +203,19 @@ registerFx('grondak_r', {
     flash(rt, _v, 3, c.accentHdr, 0.5);
     magmaSparks(rt, _v.setY(1.5), c, 12, [1, 3]);
   },
+  /** Détonation (0,25 s) après la télégraphie. */
+  area(rt, e, c) {
+    erupt(rt, rt.world(e.pos), rt.scale(e.radius), c);
+  },
+});
+
+/** Télégraphie : le sol tremble, petits cailloux qui sautent, fissures qui s'illuminent. */
+registerFx('grondak_r_telegraph', {
   area(rt, e, c) {
     const center = rt.world(e.pos);
     const r = rt.scale(e.radius);
     const delay = Math.max(0.2, e.duration);
-    // le sol tremble : petits cailloux qui sautent, poussière, fissures lumineuses
-    telegraph(rt, center, r, delay, c.accent.clone().multiplyScalar(0.8), {
-      color2: c.accentHdr,
-      fill: 0.1,
-      onDone: () => erupt(rt, center, r, c),
-    });
+    telegraph(rt, center, r, delay, c.accent.clone().multiplyScalar(0.8), { color2: c.accentHdr, fill: 0.1 });
     timed(rt, delay, (t) => {
       if (rng.next() < 0.5) {
         const a = rng.next() * Math.PI * 2;

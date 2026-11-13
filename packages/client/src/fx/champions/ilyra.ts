@@ -51,23 +51,69 @@ function gather(rt: FxRuntime, at: THREE.Vector3, n: number): void {
   }
 }
 
+/** Cumuls de givre par cible : nombre de flocons en orbite (mis à jour à chaque réapplication). */
+const frost = new Map<number, { stacks: number; until: number }>();
+
 registerFx('ilyra_p', {
-  /** Proc du passif : la cible est figée dans la glace (étourdissement). */
   buff(rt, e) {
-    const pos = new THREE.Vector3();
-    if (!rt.entities.pos(e.target, pos)) return;
-    const life = Math.max(0.6, Math.min(e.duration || 1, 2));
-    const n = 7;
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2 + rng.range(-0.2, 0.2);
-      _v.set(pos.x + Math.cos(a) * 0.38, 0, pos.z + Math.sin(a) * 0.38);
-      rt.bursts.iceSpikes.spawn({ pos: _v, mode: 'static', size: rng.range(0.55, 0.75), life, heading: Math.atan2(Math.cos(a), Math.sin(a)) + Math.PI, tilt: -0.3, stretch: rng.range(1.6, 2.4) });
+    if (e.buffId === 'stun') return icePrison(rt, e.target, e.duration);
+    if (e.buffId !== 'ilyra_frost') return;
+    const until = rt.time + Math.max(0.5, e.duration);
+    const prev = frost.get(e.target);
+    if (prev) {
+      prev.stacks = e.stacks ?? prev.stacks + 1;
+      prev.until = until;
+      return;
     }
-    rt.bursts.iceSpikes.spawn({ pos: pos.clone(), mode: 'static', size: 0.6, life, stretch: 2.6 });
-    groundMist(rt, pos, 1, MIST, 6);
-    rt.after(life, () => shatter(rt, pos.clone().setY(1), 16, 1));
+    const state = { stacks: e.stacks ?? 1, until };
+    frost.set(e.target, state);
+    const pos = new THREE.Vector3();
+    let acc = 0;
+    let t = 0;
+    rt.add({
+      update(dt) {
+        t += dt;
+        acc += dt;
+        if (!rt.entities.pos(e.target, pos) || rt.time > state.until || state.stacks <= 0) return false;
+        if (acc < 0.05) return true;
+        acc = 0;
+        for (let i = 0; i < state.stacks; i++) {
+          const a = t * 2.5 + (i / state.stacks) * Math.PI * 2;
+          _v.set(pos.x + Math.cos(a) * 0.55, 1.9, pos.z + Math.sin(a) * 0.55);
+          rt.ps.emit(rt.s.snow, _v, { count: 1, shape: 'point', life: 0.12, size: 0.2, spin: 2, tint: ICE_HDR });
+        }
+        return true;
+      },
+      end() {
+        if (frost.get(e.target) === state) frost.delete(e.target);
+      },
+    });
+  },
+  buffEnd(_rt, e) {
+    if (e.buffId === 'ilyra_frost') {
+      const s = frost.get(e.target);
+      if (s) s.stacks = 0;
+    }
   },
 });
+
+/** Proc du passif : la cible est figée dans la glace (étourdissement), puis la glace éclate. */
+function icePrison(rt: FxRuntime, target: number, duration: number): void {
+  const pos = new THREE.Vector3();
+  if (!rt.entities.pos(target, pos)) return;
+  const f = frost.get(target);
+  if (f) f.stacks = 0; // les cumuls sont consommés
+  const life = Math.max(0.6, Math.min(duration || 1, 2));
+  const n = 7;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rng.range(-0.2, 0.2);
+    _v.set(pos.x + Math.cos(a) * 0.38, 0, pos.z + Math.sin(a) * 0.38);
+    rt.bursts.iceSpikes.spawn({ pos: _v, mode: 'static', size: rng.range(0.55, 0.75), life, heading: Math.atan2(Math.cos(a), Math.sin(a)) + Math.PI, tilt: -0.3, stretch: rng.range(1.6, 2.4) });
+  }
+  rt.bursts.iceSpikes.spawn({ pos: pos.clone(), mode: 'static', size: 0.6, life, stretch: 2.6 });
+  groundMist(rt, pos, 1, MIST, 6);
+  rt.after(life, () => shatter(rt, pos.clone().setY(1), 16, 1));
+}
 
 registerFx('ilyra_q', {
   cast(rt, e) {
@@ -119,12 +165,19 @@ registerFx('ilyra_w', {
     if (!rt.entities.pos(e.source, _v, 1.4)) return;
     gather(rt, _v, 8);
   },
+  /** Détonation de la nova. */
+  area(rt, e) {
+    nova(rt, rt.world(e.pos), rt.scale(e.radius));
+  },
+});
+
+/** Pendant le délai : runes de givre qui se remplissent, flocons qui se figent au sol. */
+registerFx('ilyra_w_telegraph', {
   area(rt, e) {
     const center = rt.world(e.pos);
     const r = rt.scale(e.radius);
     const delay = Math.max(0.15, e.duration);
-    telegraph(rt, center, r, delay, FROST, { color2: ICE_HDR, fill: 0.16, onDone: () => nova(rt, center, r) });
-    // flocons qui se figent au sol pendant la charge
+    telegraph(rt, center, r, delay, FROST, { color2: ICE_HDR, fill: 0.16 });
     timed(rt, delay, () => {
       if (rng.next() < 0.6) rt.ps.emit(rt.s.snow, center, { count: 1, shape: 'disc', radius: r * 0.9, up: [0.1, 0.4], life: [0.4, 0.7], size: [0.12, 0.2], spin: [-2, 2], tint: ICE_HDR });
     });
@@ -146,30 +199,34 @@ function nova(rt: FxRuntime, center: THREE.Vector3, r: number): void {
 }
 
 registerFx('ilyra_e', {
+  /** Flux de givre vers l'allié protégé. */
   cast(rt, e) {
-    if (!rt.entities.pos(e.source, _v, 1.2)) return;
-    gather(rt, _v, 6);
+    const from = new THREE.Vector3();
+    if (!rt.entities.pos(e.source, from, 1.2)) return;
+    gather(rt, from, 6);
+    if (e.targetId === undefined || e.targetId === e.source) return;
+    const to = new THREE.Vector3();
+    rt.entities.pos(e.targetId, to, 1.1);
+    rt.add(
+      new ProjectileFx(rt, from, to, 18, {
+        color: FROST.clone().multiplyScalar(1.8),
+        core: ICE_HDR,
+        size: 0.4,
+        height: 1.1,
+        trailStyle: rt.s.sparkles,
+        trailDensity: 5,
+        trailSize: [0.2, 0.3],
+        ribbonWidth: 0.22,
+        ribbonLife: 0.35,
+        targetId: e.targetId,
+      }),
+    );
   },
-  projectile(rt, e) {
-    const p = new ProjectileFx(rt, rt.world(e.from), rt.world(e.to), rt.scale(e.speed), {
-      color: FROST.clone().multiplyScalar(1.8),
-      core: ICE_HDR,
-      size: 0.4,
-      height: 1.1,
-      trailStyle: rt.s.sparkles,
-      trailDensity: 5,
-      trailSize: [0.2, 0.3],
-      ribbonWidth: 0.22,
-      ribbonLife: 0.35,
-    });
-    rt.add(p);
-    return p;
-  },
-  hit(rt, e) {
-    if (e.target === undefined) return;
-    const target = e.target;
+  /** Le bouclier lui-même (buff `ilyra_e`), jusqu'à expiration ou rupture. */
+  buff(rt, e) {
+    if (e.buffId !== 'ilyra_e') return;
     const orbit = new THREE.Vector3();
-    shieldShell(rt, target, 2.5, `ilyra_e:${target}`, {
+    shieldShell(rt, e.target, Math.max(0.3, e.duration), `ilyra_e:${e.target}`, {
       color: new THREE.Color(0.5, 0.95, 1.4),
       radius: 1.05,
       bands: 0.25,
@@ -184,8 +241,11 @@ registerFx('ilyra_e', {
         shatter(rt, center, 10, 0.7);
       },
     });
-    rt.entities.pos(target, _v, 1);
+    rt.entities.pos(e.target, _v, 1);
     flash(rt, _v, 2, ICE_HDR, 0.25);
+  },
+  buffEnd(rt, e) {
+    if (e.buffId === 'ilyra_e') rt.endAura(`ilyra_e:${e.target}`);
   },
 });
 
