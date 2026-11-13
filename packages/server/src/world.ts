@@ -162,6 +162,12 @@ export interface WorldHooks {
   beforeAttackHit: ((ctx: AttackContext, world: World) => void)[];
   /** Après l'impact d'une auto-attaque (on-hit : appliquer des buffs, cumuls...). */
   afterAttackHit: ((ctx: AttackContext, dealt: number, world: World) => void)[];
+  /** Complète l'état privé envoyé au joueur (xpToNext par leveling, canShop/recalling par economy...). */
+  selfState: ((e: Entity, s: import('@lov/shared').SelfState, world: World) => void)[];
+  /** Complète le snapshot public d'une entité (buffs, etc.). Doit rester déterministe (sert au delta). */
+  entitySnapshot: ((e: Entity, s: import('@lov/shared').EntitySnapshot, world: World) => void)[];
+  /** Timers d'objectifs connus d'une équipe (fusionnés dans `snapshot.objectiveTimers`). */
+  objectiveTimers: ((team: Team, world: World) => Record<string, number> | undefined)[];
 }
 
 const emptyHooks = (): WorldHooks => ({
@@ -176,6 +182,9 @@ const emptyHooks = (): WorldHooks => ({
   isTargetable: [],
   beforeAttackHit: [],
   afterAttackHit: [],
+  selfState: [],
+  entitySnapshot: [],
+  objectiveTimers: [],
 });
 
 export interface System {

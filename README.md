@@ -27,6 +27,27 @@ Production : `npm run build && npm start` puis http://localhost:3000.
 | `npm test` | tests vitest (simulation headless) |
 | `npm run build` | build du client dans `packages/client/dist` |
 | `DEV_LOBBY=1 npm run dev:server` | toutes les salles en mode dev |
+| `npx tsx scripts/bots.ts --url ws://localhost:3000/ws --bots 8 --seconds 30` | test de charge : 8 bots WebSocket (CI uniquement) |
+
+## Déploiement
+
+Le serveur sert le client construit et le WebSocket sur le même port (`PORT`, défaut 3000). `GET /health` renvoie
+`{ ok, uptime, rooms, players }`. Une partie tient en mémoire dans un seul processus : **une seule instance**
+(pas de répartition de charge sans affinité de session).
+
+**Docker**
+```bash
+docker build -t league-of-vibes .
+docker run -p 3000:3000 league-of-vibes
+```
+
+**Fly.io** : `fly launch` (le Dockerfile est détecté), `internal_port = 3000`, health check HTTP sur `/health`,
+`min_machines_running = 1` et `auto_stop_machines = false` (sinon la machine s'arrête en pleine partie).
+
+**Render** : nouveau *Web Service* depuis le dépôt, runtime Docker (ou Node : build `npm ci && npm run build`,
+start `npm start`), health check `/health`. Les WebSockets sont pris en charge sans configuration.
+
+Derrière un reverse proxy (nginx, Caddy), transmettre l'upgrade WebSocket sur `/ws`.
 
 ## Organisation
 
