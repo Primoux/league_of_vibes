@@ -40,3 +40,6 @@ Session : 2026-11-13, branche `codex-objectives`.
 - Les nouvelles règles AGENTS.md récupérées avec main imposent une PR `pr/codex-objectives` ; revue/merge réservés à Fable. Aucun push sur main effectué. Le premier essai local d'intégration a été arrêté après les tests ; ses correctifs ont été réalisés sur codex-objectives.
 - Publication : branches `codex-objectives` et `pr/codex-objectives` poussées ; `YOUR_PLAN.md` de la branche de PR identique à celui de main.
 - Blocage externe restant : GitHub CLI absent (le script open-pr s'arrête avant mutation) ; création via connecteur GitHub tentée, refusée par GitHub HTTP 403 `Resource not accessible by integration`. Plugin GitHub vérifié installé/activé ; ses droits GitHub d'écriture ne sont pas disponibles ici. PR à ouvrir après autorisation GitHub ou via https://github.com/Primoux/league_of_vibes/compare/main...pr/codex-objectives?expand=1 ; description prête dans `/tmp/league-objectives-pr.md`. Aucun merge de PR effectué.
+
+- Connexion GitHub CLI validée par l’utilisateur ; publication de la PR reprise avec le script officiel.
+- Test réseau réel supplémentaire : huit clients pendant 60 s, première vague incluse, 20,0 snapshots/s chacun et aucune erreur. Débit JSON décompressé : 61–62 Ko/s/client ; ce chiffre ne mesure pas le trafic WebSocket compressé.
