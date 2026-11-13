@@ -12,8 +12,9 @@ import { onWorldEvent } from '../registry.ts';
 import { FloatingNumbers } from './damageNumbers.ts';
 
 const C = {
-  physical: new THREE.Color(1.0, 0.5, 0.12),
-  magic: new THREE.Color(0.35, 0.6, 1.0),
+  // couleurs linéaires : un bleu (0.35, 0.6, 1) paraît presque blanc une fois converti en sRGB
+  physical: new THREE.Color(1.0, 0.32, 0.04),
+  magic: new THREE.Color(0.1, 0.3, 1.0),
   true: new THREE.Color(1, 1, 1),
   taken: new THREE.Color(1.0, 0.18, 0.15),
   heal: new THREE.Color(0.3, 1.0, 0.4),
