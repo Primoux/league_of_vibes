@@ -298,7 +298,7 @@ describe('données des objets (M4)', () => {
     for (const it of ITEM_LIST.filter((i) => i.category === 'boots')) expect(it.unique).toBe(true);
     expect(ITEMS['colossus_eye']!.shop).toBe(false); // donné par le Colosse, pas acheté
     expect(ITEMS['stealth_ward']!.cost).toBe(0);
-    expect(ITEM_LIST.length).toBeGreaterThanOrEqual(55); // catalogue large (~65 objets)
+    expect(ITEM_LIST.length).toBeGreaterThanOrEqual(95); // catalogue ~100 objets
     // chaque catégorie est représentée
     for (const cat of ['starter', 'consumable', 'boots', 'basic', 'legendary', 'trinket'] as const) {
       expect(ITEM_LIST.some((i) => i.category === cat)).toBe(true);
