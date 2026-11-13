@@ -237,6 +237,33 @@ describe('passifs et actifs d’objets', () => {
     expect(c.data.stasis).toBeUndefined(); // stase levée
   });
 
+  it('carapace du roc : vengeance, renvoie 10 % des dégâts subis', () => {
+    const w = makeWorld();
+    const c = addChamp(w, AT_FOUNTAIN);
+    c.champ!.gold = 5000;
+    cmd(w, c, { t: 'buy', itemId: 'carapace_du_roc' });
+    const e = dummy(w, { x: 5100, y: 5000 });
+    const hpBefore = e.hp;
+    applyDamage(w, { source: e, target: c, amount: 200, type: 'magic' });
+    expect(e.hp).toBeLessThan(hpBefore); // dégâts réfléchis
+  });
+
+  it('lame spectrale : dash vers la position visée, annule le rappel', () => {
+    const w = makeWorld();
+    const c = addChamp(w, { x: 5000, y: 5000 });
+    c.champ!.gold = 5000;
+    c.dead = true; // achat autorisé en mort
+    c.champ!.respawnIn = 9999;
+    cmd(w, c, { t: 'buy', itemId: 'lame_spectrale' });
+    c.dead = false;
+    const slot = c.champ!.items.indexOf('lame_spectrale');
+    cmd(w, c, { t: 'useItem', slot, targetPos: { x: 5400, y: 5000 } });
+    expect(c.data.dash).toBeDefined();
+    run(w, 1);
+    expect(c.pos.x).toBeGreaterThan(5100);
+    expect(c.data.dash).toBeUndefined(); // dash consommé à l'arrivée
+  });
+
   it('sceptre de l’orage : sort-lame armé par un sort, consommé par l’attaque', () => {
     const w = makeWorld();
     const c = addChamp(w, AT_FOUNTAIN, 'ilyra');
@@ -271,6 +298,10 @@ describe('données des objets (M4)', () => {
     for (const it of ITEM_LIST.filter((i) => i.category === 'boots')) expect(it.unique).toBe(true);
     expect(ITEMS['colossus_eye']!.shop).toBe(false); // donné par le Colosse, pas acheté
     expect(ITEMS['stealth_ward']!.cost).toBe(0);
-    expect(ITEM_LIST.length).toBeGreaterThanOrEqual(30); // ~30 objets du PLAN §8
+    expect(ITEM_LIST.length).toBeGreaterThanOrEqual(55); // catalogue large (~65 objets)
+    // chaque catégorie est représentée
+    for (const cat of ['starter', 'consumable', 'boots', 'basic', 'legendary', 'trinket'] as const) {
+      expect(ITEM_LIST.some((i) => i.category === cat)).toBe(true);
+    }
   });
 });
