@@ -3,7 +3,7 @@
 MOBA 4v4 jouable dans le navigateur, aux mécaniques inspirées de League of Legends
 (phase de pick, 3 voies, jungle, sbires, tours, inhibiteurs, nexus, drakes, larves, Colosse du Rift, Léviathan,
 sorts d'invocateur, objets, brouillard de guerre). 10 champions originaux et une caricature jouable de Mélenchon,
-rendu 3D Three.js, serveur autoritaire Node.
+rendu 3D Three.js, serveur autoritaire Node. Le 67 Master complète maintenant le roster de 12 champions.
 
 Projet fan non affilié à Riot Games. Aucun asset ni nom de Riot n'est utilisé.
 
@@ -18,6 +18,26 @@ Ouvre http://localhost:5173/?dev=1 dans deux onglets : crée une salle dans l'un
 lance la partie (le mode dev autorise moins de 8 joueurs). Clic droit pour se déplacer.
 
 Production : `npm run build && npm start` puis http://localhost:3000.
+
+## Portraits et 67 Master
+
+Chaque champion a son illustration de sélection : les douze portraits sont également repris au chargement,
+dans le HUD et le tableau des scores. Images locales WebP de 512 × 512, environ 650 Ko pour le roster complet ;
+le portrait SVG de secours reste disponible si une image ne charge pas. Prompts et provenance dans
+`packages/client/src/assets/champions/manifest.json`.
+
+Le **67 Master**, mage original en hoodie violet et cyan, alterne continuellement ses deux paumes,
+y compris pendant la course et les sorts. Sept impacts de sorts espacés déclenchent son passif.
+
+| Touche | Sort | Effet |
+|---|---|---|
+| Q | Six. | Projectile sur la première cible, dégâts et ralentissement |
+| W | Seven. | 7 géant retardé, dégâts de zone et immobilisation |
+| E | Les mains en l’air | Téléportation et bouclier temporaire |
+| R | SIX… SEVEN ! | Deux ondes : ralentissement, puis projection ; incantation initiale interruptible |
+
+Démo sans serveur : `?uilab=draft` pour les portraits et `?fxlab&champ=master67&close=1`
+pour le modèle et ses sorts (Q/W/E/R dans le panneau). Le labo FX utilise la vraie simulation du serveur.
 
 ## Mélenchon, le Tribun indigné
 
