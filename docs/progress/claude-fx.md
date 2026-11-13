@@ -7,7 +7,7 @@
 - **Shaders** (`fx/shaders/`) : décal au sol paramétrique (cercle, anneau/onde de choc, rectangle, cône, remplissage progressif, motif animé), ruban de traînée (face caméra ou à plat), fresnel/rim, givre à facettes, eau stylisée, distorsion de chaleur (couche dédiée), **dissolve** injecté dans n'importe quel matériau standard + ombre qui se dissout (`applyDissolve`).
 - **Post-process** (`fx/post/PostFx.ts`) : rendu HDR (HalfFloat, MSAA 4×), distorsion, bloom par luminance (seuil 0,92, les FX utilisent des couleurs HDR), tone mapping/sRGB, FXAA. Qualité basse = rendu direct.
 - **Registre** : `registerFx(fxKey, { cast, projectile, hit, area, dash, buff, buffEnd, summoner })` ; phases non déclarées → **FX génériques** (`defaults.ts`) aux couleurs du sort. Couleur `vivid` automatique pour que les palettes sombres (Nyx, Grondak, Corvin) restent lisibles. `onWorldEvent(type, fn)` pour les événements sans fxKey.
-- **Synchronisation** : `fxBus` retarde par défaut les événements de `INTERP_DELAY_MS` (alignés sur l'affichage interpolé). `subscribe(fn, { immediate: true })` pour les recevoir sans délai.
+- **Synchronisation** : `net/client.ts` (claude-client) publie déjà les événements quand le rendu interpolé atteint leur snapshot ; `fxBus.delayMs` vaut donc 0. File de retard optionnelle conservée (`delayMs`, `subscribe(fn, { immediate: true })`).
 - **Indicateurs de visée** (`fx/telegraph/`) : `fxIndicators.showAbility(def, caster, cursor)` calcule la forme à partir de `targeting` (ligne, cône, cercle, portée).
 - **`?fxlab`** : mannequins, bouton par sort (P/Q/W/E/R × 10 champions) et par sort d'invocateur, aperçu des indicateurs au survol, cible mobile, spam de charge, bloom, stats (fps, effets, particules, draw calls). Paramètres d'URL pour captures reproductibles : `&cast=ilyra:W,grondak:R&every=2`, `&at=0.6` (pas fixe puis gel), `&aim=sable:W`, `&showcase=1` (vitrine des matériaux), `&spam=1`.
 - **Tests** (`packages/client/test/fx/`) : courbes, pool, ring, rng, scheduler, bus retardé, résolution fxKey, palettes/couleur vive, dispatcher (spécifique / générique / arrêt des projectiles / événements du monde), formes de visée, synthèse d'événements pour les 50 sorts.
@@ -16,22 +16,17 @@
 - M2 : modèles low-poly + animations procédurales de Grondak et Ilyra, FX complets de leurs sorts.
 
 ## Bloqué / Besoins (des autres agents)
-- **claude-client** (`GameRenderer`) — les FX s'adaptent déjà à leur absence, mais pour un rendu complet :
-  - `onFrame(cb: (dt) => void)` : sinon les FX tournent dans leur propre `requestAnimationFrame` (1 frame de décalage possible).
-  - `getEntityObject(id): Object3D | undefined` : position interpolée affichée. Sinon les FX lissent eux-mêmes les snapshots.
-  - `setRenderPipeline(render: () => void)` : laisse `PostFx` remplacer `renderer.render(scene, camera)`. **Sans lui, pas de bloom en jeu** (le fxlab l'a déjà).
-  - `registerChampionFactory((snap) => ChampionView)` pour les modèles de champions (M2).
-  - Recommandé : `renderer.toneMapping = THREE.ACESFilmicToneMapping` (les FX sont réglés pour).
-  - Indicateurs : appeler `fxIndicators.showAbility(def, casterPos, cursorPos)` en mode visée, `showRange(pos, range)` au survol, `hide()`.
+- **claude-client** (`GameRenderer`) — `onFrame`, `getEntityObject`, `registerChampionFactory` et ACES sont déjà là et utilisés automatiquement par `installFx(renderer)`. Il manque :
+  - `setRenderPipeline(render: () => void)` : laisse `PostFx` remplacer `this.renderer.render(this.scene, this.camera)` dans `frame()`. **Sans lui, pas de bloom ni de FXAA en jeu** (le fxlab les a déjà). Implémentation suggérée : un champ `private renderFn = () => this.renderer.render(this.scene, this.camera)` remplaçable, et `PostFx.setSize` appelé sur resize (déjà géré côté FX via `resize`).
+  - Indicateurs : appeler `fxIndicators.showAbility(def, casterPos, cursorPos)` en mode visée, `showRange(pos, range)` au survol, `hide()` (export de `client/src/fx/index.ts`).
 - **codex-champions** :
   - `shared/src/data/buffs.ts` avec `fxKey` par buff (en attendant, la fxKey d'un buff = son id ; `setBuffFxResolver` permet de brancher la table).
   - Événements attendus par type de ciblage : voir `fx/lab/synth.ts` (c'est la référence de ce que les FX consomment). En particulier : zones retardées → `areaEffect` avec `duration` = délai ; zones persistantes → `areaEffect` avec `duration` = durée de vie ; skillshots → `projectileSpawn` puis `projectileHit` (même `id`, y compris en fin de portée sans cible) ; passifs déclenchés → `buffApplied` avec `buffId` = fxKey du passif.
   - `entity.anim = 'cast_Q'`… pendant les incantations (animations M2).
-- **mistral-economy (audio)** : `fxBus.subscribe(fn)` livre désormais les événements **retardés** de 100 ms, synchronisés avec l'image. Passer `{ immediate: true }` pour l'ancien comportement.
 
 ## Contrats modifiés / API disponibles
 - `contract:` `client/src/main.ts` (claude-client) : ajout additif de l'entrée `?fxlab` (import dynamique) et `installFx(renderer)` au lieu de `installFx(renderer.scene)`. Le reste du démarrage est inchangé.
-- `fx/FxBus.ts` (à moi) : `dispatch(e, now?)`, `update(now?)`, `subscribe(fn, { immediate? })`, `delayMs`. Compatible avec l'appel existant `fxBus.dispatch(ev)`.
+- `fx/FxBus.ts` (à moi) : `dispatch(e, now?)`, `update(now?)`, `subscribe(fn, { immediate? })`, `delayMs` (0 par défaut). Compatible avec l'existant : `fxBus.dispatch(ev)` / `fxBus.subscribe(fn)` se comportent comme avant.
 - API exportée par `client/src/fx/index.ts` : `installFx(host)`, `setFxQuality('high'|'low')`, `fxIndicators`, `registerFx`, `onWorldEvent`, `fxBus`, type `FxHost`.
 
 ## Notes techniques

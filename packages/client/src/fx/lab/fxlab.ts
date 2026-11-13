@@ -94,7 +94,6 @@ export function startFxLab(): void {
 
   const host: FxHost = { scene, camera, renderer, getEntityObject: (id) => dummies.get(id)?.mesh };
   const fx = installFx(host, { manualUpdate: true, ownPost: true });
-  fxBus.delayMs = 0;
 
   // Les dashes/blinks déplacent le mannequin concerné.
   fxBus.subscribe((e) => {

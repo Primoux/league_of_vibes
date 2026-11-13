@@ -2,14 +2,13 @@
  * Bus FX côté client. Propriétaire : claude-fx.
  * Le renderer appelle `fxBus.dispatch(event)` pour chaque GameEvent reçu ; les modules FX/audio s'abonnent.
  *
- * Synchronisation : les entités sont affichées avec INTERP_DELAY_MS de retard (interpolation), alors que les
- * événements arrivent avec le snapshot le plus récent. Par défaut, les abonnés reçoivent donc les événements
- * **retardés du même délai** pour que l'impact d'un sort coïncide avec la position affichée de la cible.
- * `subscribe(fn, { immediate: true })` reçoit l'événement dès réception (UI, annonces…).
- *
+ * Synchronisation : `net/client.ts` (claude-client) publie déjà chaque événement au moment où le rendu
+ * interpolé atteint son snapshot (horloge serveur synchronisée) : `delayMs` vaut donc 0 par défaut.
+ * Si une source publiait des événements « bruts » (dès réception), `delayMs = INTERP_DELAY_MS` les retarde
+ * pour les abonnés normaux ; `subscribe(fn, { immediate: true })` les reçoit toujours sans délai.
  * Les événements retardés sont libérés par `fxBus.update(now)`, appelé à chaque frame par `installFx`.
  */
-import { INTERP_DELAY_MS, type GameEvent } from '@lov/shared';
+import type { GameEvent } from '@lov/shared';
 
 type Fn = (e: GameEvent) => void;
 
@@ -21,8 +20,8 @@ export interface SubscribeOptions {
 const nowMs = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
 export class FxBus {
-  /** Délai appliqué aux abonnés non immédiats (ms). 0 = livraison directe (fxlab, tests). */
-  delayMs = INTERP_DELAY_MS;
+  /** Délai appliqué aux abonnés non immédiats (ms). 0 = livraison directe (cas du jeu : déjà synchronisé par net/client). */
+  delayMs = 0;
   private subs = new Set<Fn>();
   private immediateSubs = new Set<Fn>();
   private queueAt: number[] = [];
