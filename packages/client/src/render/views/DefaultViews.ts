@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import { CHAMPIONS, type DragonElement, type EntitySnapshot } from '@lov/shared';
+import { MelenchonView } from '../champions/melenchon.ts';
 import { minionModel } from '../models/minions.ts';
 import { monsterModel } from '../models/monsters.ts';
 import { inhibitorModel, nexusModel, towerModel, wardModel } from '../models/structures.ts';
@@ -123,7 +124,7 @@ export function setDragonElement(e: DragonElement | undefined): void {
 export function defaultViewFor(snap: EntitySnapshot): EntityView | null {
   switch (snap.kind) {
     case 'champion':
-      return championPlaceholder(snap);
+      return snap.subtype === 'melenchon' ? new MelenchonView() : championPlaceholder(snap);
     case 'minion':
       return minionModel(snap.subtype, snap.team);
     case 'tower':
