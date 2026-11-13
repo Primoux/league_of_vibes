@@ -1,5 +1,5 @@
 import { render, h } from 'preact';
-import { installAudio } from './audio/AudioManager.ts';
+import { audio, installAudio } from './audio/AudioManager.ts';
 import { fxIndicators, installFx, setFxQuality } from './fx/index.ts';
 import { installControls } from './input/controls.ts';
 import { net } from './net/client.ts';
@@ -31,6 +31,8 @@ if (params.has('melenchonlab')) {
     if (s.settings.quality !== fxQuality) setFxQuality((fxQuality = s.settings.quality));
   });
   installAudio();
+  // écouteur audio = centre de la caméra (objet mis à jour en place chaque frame : aucune allocation)
+  audio.setListener(() => store.state.cameraCenter);
   render(h(App, {}), document.getElementById('ui')!);
   if (params.has('autoplay')) autoplay();
   // Reprise de session après rechargement de page (token en sessionStorage).
