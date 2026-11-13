@@ -6,7 +6,8 @@ import { LOADING_SECONDS } from '@lov/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
-import { handleMsg, labEvent, mockDraft, mockLobby, startGame, stopGame } from './mock.ts';
+import { chat, juice } from '../game/world.ts';
+import { handleMsg, labEvent, labTick, mockDraft, mockLobby, startGame, stopGame } from './mock.ts';
 
 let patched = false;
 function patchNet(): void {
@@ -46,6 +47,9 @@ const EVENTS: [string, string][] = [
   ['Drake', 'drake'],
   ['Léviathan', 'leviathan'],
   ['Annonce serveur', 'announce'],
+  ['Âme du drake', 'soul'],
+  ['PV bas', 'lowHp'],
+  ['Message allié', 'chatAlly'],
   ['Niveau +1', 'levelUp'],
   ['+1500 or', 'gold'],
   ['Fontaine on/off', 'shopToggle'],
@@ -65,6 +69,20 @@ function autoStart(): void {
   if (screen === 'end' || screen === 'endlose') {
     startGame();
     labEvent(screen === 'end' ? 'end' : 'endLose');
+  }
+  // état visuel figé, indépendant de la simulation (captures headless)
+  if (q.get('demo') === 'juice') {
+    ['killEnemy', 'soul', 'lowHp'].forEach((e) => labEvent(e));
+    labTick();
+    juice.set({ levelSeq: 1, level: 8, golds: [{ key: 1, amount: 300 }], boughtSeq: 1, boughtItem: 'boots' });
+    const at = Date.now();
+    chat.set({
+      lines: [
+        { key: 1, at, playerId: 'p4', text: 'Drake dans 30 s, on se regroupe bot !', teamOnly: true },
+        { key: 2, at, playerId: 'p-me', text: 'J’arrive avec la nova', teamOnly: true },
+        { key: 3, at, playerId: 'p7', text: 'gg ez… ou pas', teamOnly: false },
+      ],
+    });
   }
   const panel = q.get('panel');
   if (panel === 'shop') store.set({ shopOpen: true });
@@ -109,7 +127,7 @@ export function UiLab() {
                   </button>
                 ))}
               </div>
-              <p>P boutique · Tab scores · C stats · Échap paramètres · Q/W/E/R lancent (faux) sorts</p>
+              <p>Entrée chat · P boutique · Tab scores · C stats · Échap paramètres · Q/W/E/R sorts</p>
             </>
           )}
         </div>
