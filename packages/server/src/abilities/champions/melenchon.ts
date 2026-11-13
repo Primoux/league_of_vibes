@@ -1,6 +1,6 @@
 import { getChampion } from '@lov/shared';
 import type { World } from '../../world.ts';
-import { addBuff, getBuff, removeBuff } from '../../combat/buffs.ts';
+import { addBuff, removeBuff } from '../../combat/buffs.ts';
 import { applyShield } from '../effects.ts';
 import { cc, hit, line, param, type AbilityHandler } from '../context.ts';
 import { blink, delayedArea, enemiesInRadius } from '../primitives.ts';
