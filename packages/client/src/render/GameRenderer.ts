@@ -440,6 +440,8 @@ export class GameRenderer {
     this.cam.update(dt, selfPos ?? null, s.cameraLocked, s.settings.edgePan, s.settings.cameraSpeed, innerWidth, innerHeight);
     s.cameraCenter.x = this.cam.center.x;
     s.cameraCenter.y = this.cam.center.y;
+    // cam.update() a déplacé la caméra : ses matrices monde doivent être à jour avant de lancer les rayons
+    this.camera.updateMatrixWorld();
     this.updateCameraView(s.cameraView);
 
     if (selfPos) {

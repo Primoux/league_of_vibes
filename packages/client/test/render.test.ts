@@ -170,3 +170,13 @@ describe('tremblement de caméra', () => {
     expect(maxOff).toBeGreaterThan(20);
   });
 });
+
+import { digitAction } from '../src/input/rules.ts';
+describe('touches objets', () => {
+  it('1 2 3 5 6 7 = slots 0 à 5, 4 = balise, par position physique', () => {
+    expect(['Digit1', 'Digit2', 'Digit3', 'Digit5', 'Digit6', 'Digit7'].map((c) => digitAction(c))).toEqual([0, 1, 2, 3, 4, 5].map((slot) => ({ kind: 'item', slot })));
+    expect(digitAction('Digit4')).toEqual({ kind: 'ward' });
+    expect(digitAction('Digit8')).toBeNull();
+    expect(digitAction('KeyQ')).toBeNull();
+  });
+});
