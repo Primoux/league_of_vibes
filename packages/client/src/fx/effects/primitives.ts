@@ -173,6 +173,8 @@ export interface ProjectileLook {
   /** Appelé à chaque frame avec la position de tête (FX spécifiques : rotation d'un mesh, étincelles…). */
   onStep?: (head: THREE.Vector3, dir: THREE.Vector3, dt: number) => void;
   onEnd?: (head: THREE.Vector3) => void;
+  /** Tête chercheuse : suit la position courante de cette entité (auto-attaques, sorts ciblés). */
+  targetId?: number;
 }
 
 /** Projectile visuel : se déplace de `from` à `to` à `speed` (monde/s), ou jusqu'à `finish()`. */
@@ -187,6 +189,7 @@ export class ProjectileFx implements Effect {
   private readonly sprite: THREE.Sprite;
   private readonly ribbon: Ribbon | null;
   private readonly prev = new THREE.Vector3();
+  private readonly aim = new THREE.Vector3();
 
   constructor(
     private readonly rt: FxRuntime,
@@ -205,6 +208,7 @@ export class ProjectileFx implements Effect {
     this.prev.copy(this.from);
     this.sprite = rt.acquireSprite(look.core ?? look.color, look.size ?? 0.6);
     this.sprite.position.copy(this.head);
+    if (look.size === 0) this.sprite.visible = false;
     if ((look.ribbonWidth ?? 0.25) > 0) {
       this.ribbon = rt.acquireRibbon();
       this.ribbon.width = look.ribbonWidth ?? 0.25;
@@ -230,9 +234,20 @@ export class ProjectileFx implements Effect {
 
   update(dt: number): boolean {
     if (this.flying) {
-      this.traveled = Math.min(this.dist, this.traveled + this.speed * dt);
       this.prev.copy(this.head);
-      this.head.copy(this.from).addScaledVector(this.dir, this.traveled);
+      if (this.look.targetId !== undefined && this.rt.entities.pos(this.look.targetId, this.aim, this.head.y)) {
+        // tête chercheuse : avance vers la position actuelle de la cible
+        this.aim.sub(this.head);
+        const d = this.aim.length();
+        const step = this.speed * dt;
+        if (d > 1e-4) this.dir.copy(this.aim).divideScalar(d);
+        this.head.addScaledVector(this.dir, Math.min(step, d));
+        // arrivé quand le pas couvre la distance restante ; sinon on reste « en vol » même si la cible s'éloigne
+        this.traveled = step >= d ? this.dist : Math.min(this.dist - 1e-3, this.traveled + step);
+      } else {
+        this.traveled = Math.min(this.dist, this.traveled + this.speed * dt);
+        this.head.copy(this.from).addScaledVector(this.dir, this.traveled);
+      }
       this.sprite.position.copy(this.head);
       this.ribbon?.push(this.head);
       this.look.onStep?.(this.head, this.dir, dt);
@@ -298,6 +313,28 @@ export function dashTrail(rt: FxRuntime, entityId: number, fromAt: THREE.Vector3
       }
       return r.alive > 0;
     },
+    end: () => rt.releaseRibbon(r),
+  });
+}
+
+/** Éclair en zigzag (ruban) de `from` à `to`, qui s'efface en `life` s. */
+export function lightning(rt: FxRuntime, from: THREE.Vector3, to: THREE.Vector3, color: THREE.Color, opts: { width?: number; life?: number; jag?: number; segments?: number } = {}): void {
+  const r = rt.acquireRibbon();
+  r.width = opts.width ?? 0.18;
+  r.life = opts.life ?? 0.25;
+  r.minDist = 0.001;
+  r.setColor(color, new THREE.Color(3, 3, 3));
+  const n = opts.segments ?? 10;
+  const jag = opts.jag ?? 0.25;
+  const p = new THREE.Vector3();
+  for (let i = 0; i <= n; i++) {
+    const k = i / n;
+    p.lerpVectors(from, to, k);
+    if (i > 0 && i < n) p.set(p.x + (Math.random() - 0.5) * jag * 2, p.y + (Math.random() - 0.5) * jag, p.z + (Math.random() - 0.5) * jag * 2);
+    r.push(p);
+  }
+  rt.add({
+    update: () => r.alive > 0,
     end: () => rt.releaseRibbon(r),
   });
 }
