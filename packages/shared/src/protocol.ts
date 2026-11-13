@@ -120,6 +120,7 @@ export type ClientMsg =
   | { t: 'buy'; itemId: string }
   | { t: 'sell'; slot: number }
   | { t: 'undoShop' }
+  | { t: 'useItem'; slot: number } // actif d'objet (potion, sablier, totem...) ; le trinket se pose via placeWard
   | { t: 'recall' }
   | { t: 'placeWard'; pos: Vec2 }
   | { t: 'ping'; pos: Vec2; kind: string }

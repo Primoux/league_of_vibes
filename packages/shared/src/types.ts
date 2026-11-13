@@ -132,6 +132,8 @@ export interface SelfState {
   stats: Stats;
   recalling?: number; // secondes restantes
   canShop: boolean;
+  /** Charges du trinket de vision (mistral-economy, lu depuis data.economy). */
+  wardCharges?: { charges: number; cooldownRemaining: number };
 }
 
 /**
