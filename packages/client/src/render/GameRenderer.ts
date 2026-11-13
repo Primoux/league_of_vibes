@@ -1,152 +1,324 @@
 /**
  * Rendu Three.js de la partie. Propriétaire : claude-client.
- * BOOTSTRAP : sol, structures depuis shared/map, entités en formes simples, caméra iso qui suit le joueur,
- * interpolation naïve. TODO(claude-client) : interpolation bufferisée, terrain, murs 3D, brouillard, barres de vie.
+ *
+ * API publique (contrats pour claude-fx / mistral-ui) :
+ *  - `scene`, `camera`, `renderer`
+ *  - `toWorld(p, h)` / `toGame(v)` (réexportés depuis ./coords.ts)
+ *  - `getEntityObject(id)` : Object3D de l'entité (racine au sol), ou undefined
+ *  - `pickEntity(clientX, clientY)` : id de l'entité sous le curseur (hitbox simplifiées), ou null
+ *  - `pickGround(clientX, clientY)` : position jeu au sol sous le curseur, ou null
+ *  - `onFrame(cb(dt))` : hook appelé à chaque frame avant le rendu ; retourne une fonction de désabonnement
+ *  - `interpolatedEntity(id)` : position/orientation affichées (interpolées ; prédites pour le joueur local)
+ *  - `registerChampionFactory` : voir ./EntityView.ts
  */
 import * as THREE from 'three';
-import {
-  CAMPS,
-  INHIBITORS,
-  MAP_SIZE,
-  NEXUS,
-  PITS,
-  RENDER_SCALE,
-  TOWERS,
-  WALLS,
-  type EntitySnapshot,
-  type Snapshot,
-  type Vec2,
-} from '@lov/shared';
-import { fxBus } from '../fx/FxBus.ts';
+import { INHIBITORS, NEXUS, TOWERS, isInWall, type EntityId, type EntitySnapshot, type Snapshot, type Vec2 } from '@lov/shared';
+import { clock, flushEvents, net, renderTime, snapshots } from '../net/client.ts';
+import { MovePredictor } from '../net/prediction.ts';
+import type { Interpolated } from '../net/snapshots.ts';
 import { store } from '../state.ts';
+import { CameraController } from './CameraController.ts';
+import { ClickMarkers } from './ClickMarkers.ts';
+import { S, toGameInto, toWorld, toGame } from './coords.ts';
+import { getChampionFactory, type EntityView } from './EntityView.ts';
+import { MapView } from './MapView.ts';
+import { rayCylinder, worldHitbox, type Ray3 } from './picking.ts';
+import { defaultViewFor, inhibitorView, nexusView, towerView } from './views/DefaultViews.ts';
 
-const S = RENDER_SCALE;
-/** Coordonnées jeu (x, y) -> monde Three.js (x, 0, -y) : y du jeu = -z. */
-export const toWorld = (p: Vec2, h = 0): THREE.Vector3 => new THREE.Vector3(p.x * S, h, -p.y * S);
-export const toGame = (v: THREE.Vector3): Vec2 => ({ x: v.x / S, y: -v.z / S });
+export { toWorld, toGame };
+export { registerChampionFactory, type ChampionView, type EntityView } from './EntityView.ts';
 
-const TEAM_COLOR = { blue: 0x3a7bff, red: 0xff4a4a, neutral: 0xc9a227 } as const;
+type FrameCb = (dt: number) => void;
+
+interface Slot {
+  view: EntityView;
+  anim: string;
+  dead: boolean;
+}
+
+/** La ligne droite a→b traverse-t-elle un mur ? (échantillonnage tous les 50 u) */
+function segmentBlocked(a: Vec2, b: Vec2): boolean {
+  const d = Math.hypot(b.x - a.x, b.y - a.y);
+  const n = Math.ceil(d / 50);
+  const p = { x: 0, y: 0 };
+  for (let i = 1; i <= n; i++) {
+    p.x = a.x + ((b.x - a.x) * i) / n;
+    p.y = a.y + ((b.y - a.y) * i) / n;
+    if (isInWall(p)) return true;
+  }
+  return false;
+}
+
+let current: GameRenderer | null = null;
+
+/** Instance active du renderer (pour claude-fx / mistral-ui), null avant création. */
+export function getRenderer(): GameRenderer | null {
+  return current;
+}
+
+/** Position/orientation affichées d'une entité (null si inconnue). L'objet retourné est réutilisé : copier si besoin. */
+export function interpolatedEntity(id: EntityId): Readonly<Interpolated> | null {
+  return current?.interpolatedEntity(id) ?? null;
+}
 
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
+  readonly cam: CameraController;
   readonly camera: THREE.PerspectiveCamera;
-  private ground: THREE.Mesh;
-  private meshes = new Map<number, THREE.Object3D>();
-  private targets = new Map<number, THREE.Vector3>();
+  readonly predictor = new MovePredictor(segmentBlocked);
+  readonly map: MapView;
+  readonly markers: ClickMarkers;
+  private slots = new Map<EntityId, Slot>();
+  private positions = new Map<EntityId, Interpolated>();
+  private staticStructures: { pos: Vec2; view: EntityView }[] = [];
+  private frameCbs = new Set<FrameCb>();
   private raycaster = new THREE.Raycaster();
-  private camTarget = new THREE.Vector3();
-  private lastTick = -1;
+  private ndc = new THREE.Vector2();
+  private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private tmpV = new THREE.Vector3();
+  private ray: Ray3 = { ox: 0, oy: 0, oz: 0, dx: 0, dy: 0, dz: 0 };
+  private vel = { x: 0, y: 0 };
+  private lastFrame = performance.now();
+  private lastFocusSeq = -1;
+  private cameraInitForGame: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    current = this;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.scene.background = new THREE.Color(0x0b1020);
-    this.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    this.cam = new CameraController(innerWidth / innerHeight);
+    this.camera = this.cam.camera;
+    this.scene.add(this.camera); // permet d'attacher des objets à la caméra (FX écran)
 
-    this.scene.add(new THREE.HemisphereLight(0xbfd8ff, 0x203020, 0.9));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-    sun.position.set(40, 80, 20);
-    this.scene.add(sun);
-
-    const size = MAP_SIZE * S;
-    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshStandardMaterial({ color: 0x2f4f2a }));
-    this.ground.rotation.x = -Math.PI / 2;
-    this.ground.position.set(size / 2, 0, -size / 2);
-    this.scene.add(this.ground);
-    this.buildMap();
+    this.map = new MapView(this.scene, this.renderer);
+    this.markers = new ClickMarkers(this.scene);
+    this.buildStaticStructures();
 
     addEventListener('resize', () => this.resize());
     this.resize();
     store.subscribe((s) => s.snapshot && this.applySnapshot(s.snapshot));
+    net.on((msg) => {
+      if (msg.t === 'snapshot') this.onRawSnapshot(msg.snap);
+    });
     this.renderer.setAnimationLoop(() => this.frame());
   }
 
-  private buildMap(): void {
-    const river = new THREE.Mesh(new THREE.PlaneGeometry(2.2, MAP_SIZE * S * 1.3), new THREE.MeshStandardMaterial({ color: 0x2a5d8f }));
-    river.rotation.set(-Math.PI / 2, 0, -Math.PI / 4);
-    river.position.copy(toWorld({ x: MAP_SIZE / 2, y: MAP_SIZE / 2 }, 0.01));
-    this.scene.add(river);
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x4a4038 });
-    for (const poly of WALLS) {
-      const shape = new THREE.Shape(poly.map((p) => new THREE.Vector2(p.x * S, p.y * S)));
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: 1.2, bevelEnabled: false });
-      const m = new THREE.Mesh(geo, wallMat);
-      m.rotation.x = -Math.PI / 2;
-      this.scene.add(m);
+  /** Structures issues de map.ts, visibles tant que le serveur n'envoie pas l'entité correspondante. */
+  private buildStaticStructures(): void {
+    const add = (pos: Vec2, view: EntityView) => {
+      view.object3d.position.copy(toWorld(pos));
+      this.scene.add(view.object3d);
+      this.staticStructures.push({ pos, view });
+    };
+    for (const t of TOWERS) add(t.pos, towerView(t.team));
+    for (const i of INHIBITORS) add(i.pos, inhibitorView(i.team));
+    for (const team of ['blue', 'red'] as const) add(NEXUS[team], nexusView(team));
+  }
+
+  private hideStaticNear(e: EntitySnapshot): void {
+    for (const s of this.staticStructures) {
+      if (s.view.object3d.visible && Math.abs(s.pos.x - e.x) < 200 && Math.abs(s.pos.y - e.y) < 200) s.view.object3d.visible = false;
     }
-    for (const t of TOWERS) this.addStatic(new THREE.CylinderGeometry(0.5, 0.7, 3), TEAM_COLOR[t.team], t.pos, 1.5);
-    for (const i of INHIBITORS) this.addStatic(new THREE.TorusGeometry(0.6, 0.2), TEAM_COLOR[i.team], i.pos, 0.8);
-    for (const team of ['blue', 'red'] as const) this.addStatic(new THREE.OctahedronGeometry(1.4), TEAM_COLOR[team], NEXUS[team], 1.6);
-    for (const c of CAMPS) this.addStatic(new THREE.CircleGeometry(0.5), 0x8a7a40, c.pos, 0.02, true);
-    for (const pit of Object.values(PITS)) this.addStatic(new THREE.CircleGeometry(pit.radius * S), 0x1d3d5f, pit.pos, 0.015, true);
   }
 
-  private addStatic(geo: THREE.BufferGeometry, color: number, pos: Vec2, h: number, flat = false): void {
-    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color }));
-    m.position.copy(toWorld(pos, h));
-    if (flat) m.rotation.x = -Math.PI / 2;
-    this.scene.add(m);
+  // ------------------------------------------------------------------ snapshots
+
+  private onRawSnapshot(snap: Snapshot): void {
+    const selfId = store.state.game?.entityId;
+    if (selfId === undefined) return;
+    for (const ev of snap.events) {
+      if (ev.type === 'dash' && ev.source === selfId) this.predictor.suspend(ev.duration + 0.1);
+    }
   }
 
-  private meshFor(e: EntitySnapshot): THREE.Object3D {
-    let m = this.meshes.get(e.id);
-    if (m) return m;
-    const color = TEAM_COLOR[e.team];
-    const geo = e.kind === 'champion' ? new THREE.CapsuleGeometry(0.45, 0.9) : new THREE.BoxGeometry(0.5, 0.5, 0.5);
-    m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color }));
-    m.position.copy(toWorld(e, 0.9));
-    this.scene.add(m);
-    this.meshes.set(e.id, m);
-    return m;
-  }
-
-  applySnapshot(snap: Snapshot): void {
-    if (snap.tick === this.lastTick) return;
-    this.lastTick = snap.tick;
-    const seen = new Set<number>();
+  private applySnapshot(snap: Snapshot): void {
     for (const e of snap.entities) {
-      seen.add(e.id);
-      const m = this.meshFor(e);
-      m.visible = !e.dead;
-      this.targets.set(e.id, toWorld(e, 0.9));
+      let slot = this.slots.get(e.id);
+      if (!slot) {
+        const view = this.createView(e);
+        if (!view) continue;
+        slot = { view, anim: '', dead: false };
+        this.slots.set(e.id, slot);
+        this.scene.add(view.object3d);
+        if (e.kind === 'tower' || e.kind === 'inhibitor' || e.kind === 'nexus') this.hideStaticNear(e);
+      }
+      const anim = e.dead ? 'death' : (e.anim ?? 'idle');
+      if (anim !== slot.anim) {
+        slot.anim = anim;
+        slot.view.playAnim(anim);
+      }
+      slot.dead = !!e.dead;
     }
-    for (const [id, m] of this.meshes) {
-      if (!seen.has(id)) {
-        this.scene.remove(m);
-        this.meshes.delete(id);
-        this.targets.delete(id);
+    // entités disparues (snapshot delta ou complet : le buffer fait foi)
+    for (const [id, slot] of this.slots) {
+      if (!snapshots.entities.has(id)) {
+        slot.view.dispose();
+        slot.view.object3d.removeFromParent();
+        this.slots.delete(id);
+        this.positions.delete(id);
       }
     }
-    for (const ev of snap.events) fxBus.dispatch(ev);
+  }
+
+  private createView(e: EntitySnapshot): EntityView | null {
+    if (e.kind === 'champion') {
+      const f = getChampionFactory();
+      const v = f?.(e);
+      if (v) return v;
+    }
+    return defaultViewFor(e);
+  }
+
+  // ------------------------------------------------------------------ API publique
+
+  getEntityObject(id: EntityId): THREE.Object3D | undefined {
+    return this.slots.get(id)?.view.object3d;
+  }
+
+  interpolatedEntity(id: EntityId): Readonly<Interpolated> | null {
+    return this.positions.get(id) ?? null;
+  }
+
+  onFrame(cb: FrameCb): () => void {
+    this.frameCbs.add(cb);
+    return () => this.frameCbs.delete(cb);
+  }
+
+  private setRay(clientX: number, clientY: number): void {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(this.ndc, this.camera);
   }
 
   /** Position au sol sous le curseur (coordonnées jeu), ou null. */
-  pickGround(clientX: number, clientY: number): Vec2 | null {
-    const ndc = new THREE.Vector2((clientX / innerWidth) * 2 - 1, -(clientY / innerHeight) * 2 + 1);
-    this.raycaster.setFromCamera(ndc, this.camera);
-    const hit = this.raycaster.intersectObject(this.ground)[0];
-    return hit ? toGame(hit.point) : null;
+  pickGround(clientX: number, clientY: number, out: Vec2 = { x: 0, y: 0 }): Vec2 | null {
+    this.setRay(clientX, clientY);
+    const hit = this.raycaster.ray.intersectPlane(this.groundPlane, this.tmpV);
+    return hit ? toGameInto(out, hit) : null;
+  }
+
+  /**
+   * Entité sous le curseur (la plus proche de la caméra), ou null.
+   * `filter` permet d'exclure des entités (ex. alliés pour une attaque).
+   */
+  pickEntity(clientX: number, clientY: number, filter?: (e: EntitySnapshot) => boolean): EntityId | null {
+    this.setRay(clientX, clientY);
+    const r = this.raycaster.ray;
+    const ray = this.ray;
+    ray.ox = r.origin.x;
+    ray.oy = r.origin.y;
+    ray.oz = r.origin.z;
+    ray.dx = r.direction.x;
+    ray.dy = r.direction.y;
+    ray.dz = r.direction.z;
+    let best: EntityId | null = null;
+    let bestT = Infinity;
+    for (const [id, slot] of this.slots) {
+      if (slot.dead || !slot.view.object3d.visible) continue;
+      const e = snapshots.entities.get(id);
+      if (!e || (filter && !filter(e))) continue;
+      const hb = worldHitbox(e);
+      const p = this.positions.get(id);
+      if (!hb || !p) continue;
+      const t = rayCylinder(ray, p.x * S, -p.y * S, hb[0], hb[1]);
+      if (t >= 0 && t < bestT) {
+        bestT = t;
+        best = id;
+      }
+    }
+    return best;
+  }
+
+  /** Ordre de déplacement local (prédiction + marqueur). Appelé par l'input. */
+  localMoveCommand(pos: Vec2, attack = false): void {
+    this.predictor.command(pos, (store.state.rtt ?? 80) / 1000);
+    this.markers.spawn(pos, attack ? 0xff4040 : 0x5cff8a);
+  }
+
+  // ------------------------------------------------------------------ boucle
+
+  private updatePositions(dt: number): void {
+    const now = Date.now();
+    clock.update(dt * 1000);
+    const rt = renderTime(now);
+    const selfId = store.state.game?.entityId;
+    for (const id of this.slots.keys()) {
+      let p = this.positions.get(id);
+      if (!p) {
+        p = { x: 0, y: 0, facing: 0 };
+        this.positions.set(id, p);
+      }
+      if (id === selfId) this.predictSelf(id, p, dt, now);
+      else snapshots.sample(id, rt, p);
+    }
+    flushEvents(rt);
+  }
+
+  private predictSelf(id: EntityId, out: Interpolated, dt: number, now: number): void {
+    const e = snapshots.entities.get(id);
+    const last = snapshots.latestSample(id);
+    if (!e || !last) return;
+    snapshots.velocity(id, this.vel);
+    const lead = (clock.serverNow(now) - last.t) / 1000 + (store.state.rtt ?? 80) / 2000;
+    const speed = store.state.snapshot?.self?.stats.moveSpeed ?? 335;
+    const px = out.x;
+    const py = out.y;
+    const pos = this.predictor.update(dt, { x: last.x, y: last.y, vx: this.vel.x, vy: this.vel.y, lead }, speed, !e.dead);
+    out.x = pos.x;
+    out.y = pos.y;
+    const mx = pos.x - px;
+    const my = pos.y - py;
+    if (this.predictor.moving && mx * mx + my * my > 1) out.facing = Math.atan2(my, mx);
+    else out.facing = e.facing;
   }
 
   private frame(): void {
-    for (const [id, m] of this.meshes) {
-      const t = this.targets.get(id);
-      if (t) m.position.lerp(t, 0.25);
-    }
+    const nowMs = performance.now();
+    const dt = Math.min(0.1, (nowMs - this.lastFrame) / 1000);
+    this.lastFrame = nowMs;
     const s = store.state;
-    const me = s.game ? this.meshes.get(s.game.entityId) : undefined;
-    if (me) this.camTarget.lerp(me.position, 0.15);
-    else if (s.game) this.camTarget.copy(toWorld({ x: 1500, y: 1500 }));
-    this.camera.position.set(this.camTarget.x, this.camTarget.y + 22, this.camTarget.z + 14);
-    this.camera.lookAt(this.camTarget);
+
+    this.updatePositions(dt);
+
+    for (const [id, slot] of this.slots) {
+      const p = this.positions.get(id);
+      const e = snapshots.entities.get(id);
+      if (!p || !e) continue;
+      const o = slot.view.object3d;
+      o.position.set(p.x * S, 0, -p.y * S);
+      o.rotation.y = p.facing;
+      slot.view.update(e, dt);
+    }
+
+    // caméra
+    const selfPos = s.game ? this.positions.get(s.game.entityId) : undefined;
+    if (s.game && this.cameraInitForGame !== s.game.entityId && selfPos && (selfPos.x || selfPos.y)) {
+      this.cameraInitForGame = s.game.entityId;
+      this.cam.jumpTo(selfPos);
+    }
+    if (s.cameraFocus && s.cameraFocus.seq !== this.lastFocusSeq) {
+      this.lastFocusSeq = s.cameraFocus.seq;
+      this.cam.jumpTo(s.cameraFocus.pos);
+      if (s.cameraLocked) store.set({ cameraLocked: false });
+    }
+    this.cam.update(dt, selfPos ?? null, s.cameraLocked, s.settings.edgePan, s.settings.cameraSpeed, innerWidth, innerHeight);
+    s.cameraCenter.x = this.cam.center.x;
+    s.cameraCenter.y = this.cam.center.y;
+
+    this.map.update(dt, this.camera);
+    this.markers.update(dt);
+    for (const cb of this.frameCbs) cb(dt);
     this.renderer.render(this.scene, this.camera);
   }
 
   private resize(): void {
     this.renderer.setSize(innerWidth, innerHeight, false);
-    this.camera.aspect = innerWidth / innerHeight;
-    this.camera.updateProjectionMatrix();
+    this.cam.resize(innerWidth / innerHeight);
   }
 }
