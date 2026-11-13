@@ -182,6 +182,9 @@ const ITEM_GLYPH: Record<string, string> = {
   orb: 'M12 3 A9 9 0 1 1 11.99 3 Z M9 7.5 A3 3 0 1 0 9.01 7.5 Z',
   heart: 'M12 21 C5 16 2 12.5 2 8.5 C2 5.5 4.5 3 7.5 3 C9.5 3 11 4 12 5.5 C13 4 14.5 3 16.5 3 C19.5 3 22 5.5 22 8.5 C22 12.5 19 16 12 21 Z',
   claw: 'M5 21 C5 13 7 6 12 2 C10 7 10 12 11 15 C12 10 14 6 18 3 C16 8 15.5 13 16 17 C17 14 19 12 22 11 C19 15 18 19 17 22 Z',
+  crown: 'M2 7 L7 11 L12 3 L17 11 L22 7 L20 19 H4 Z M4 20.5 H20 V22 H4 Z',
+  axe: 'M11 2 H13 V22 H11 Z M13 3 C18 3 21 6 21 10 C21 13 19 15 17 15 C17 12 15.5 10 13 10 Z M11 5 C8 5 6 6.5 6 8.5 C7.5 8 9.5 8 11 9 Z',
+  censer: 'M11 1 H13 V4 H11 Z M12 4 L16 7 H8 Z M6 8 H18 C18 13 15.5 16 12 16 C8.5 16 6 13 6 8 Z M9 17 H15 L16 20 H8 Z M7 21 H17 V23 H7 Z',
   bow: 'M5 2 C17 4 20 10 20 12 C20 14 17 20 5 22 L6.5 20.2 C14 18.5 17.5 15 17.5 12 C17.5 9 14 5.5 6.5 3.8 Z M4 11 H19 V13 H4 Z M2 9 L5 12 L2 15 Z',
 };
 
@@ -199,6 +202,13 @@ function itemGlyphKey(item: ItemDef): string {
   const k = `${item.icon} ${item.id}`.toLowerCase();
   const table: [RegExp, string][] = [
     [/hourglass|sablier|stasis/, 'hourglass'],
+    [/crown|couronne/, 'crown'],
+    [/executioner|bourreau|axe|hache/, 'axe'],
+    [/censer|encensoir|lantern/, 'censer'],
+    [/veil|voile|negatron/, 'cloak'],
+    [/rafale|gust/, 'blade'],
+    [/colossus|colosse_masse|masse/, 'hammer'],
+    [/cloth|rockplate/, 'chest'],
     [/potion|flask|elixir|biscuit/, 'potion'],
     [/ward|eye|trinket|totem/, 'eye'],
     [/boot|greave|tabi|shoe/, 'boots'],

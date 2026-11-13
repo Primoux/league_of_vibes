@@ -1,5 +1,5 @@
 /** Formatage pur (testé). Propriétaire : mistral-ui. */
-import type { DragonElement, MonsterType, Role, Stats } from '@lov/shared';
+import { BUFFS, type DragonElement, type MonsterType, type Role, type Stats } from '@lov/shared';
 
 /** 125.4 -> "2:05" ; 3725 -> "1:02:05". */
 export function formatClock(seconds: number): string {
@@ -71,13 +71,13 @@ export const MONSTER_LABEL: Partial<Record<MonsterType, string>> = {
   grub: 'Larve',
   herald: 'Colosse du Rift',
   leviathan: 'Léviathan',
-  blue_buff: 'Sentinelle bleue',
-  red_buff: 'Brute rouge',
+  blue_buff: 'Gardien d’azur',
+  red_buff: 'Bête écarlate',
   scuttle: 'Crabe de rivière',
   gromp: 'Grenouille',
   wolves: 'Loups',
   raptors: 'Raptors',
-  krugs: 'Krugs',
+  krugs: 'Golems de pierre',
 };
 
 export const STAT_LABEL: Record<keyof Stats, string> = {
@@ -114,6 +114,41 @@ export function formatRanks(values: number[], unit = ''): string {
   const uniq = values.every((v) => v === values[0]);
   const fmt = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1).replace('.', ',')}${unit}`;
   return uniq ? fmt(values[0] ?? 0) : values.map(fmt).join(' / ');
+}
+
+/** Noms des buffs hors registre `BUFFS` (buffs de camps et d'objectifs). */
+const EXTRA_BUFF_NAMES: Record<string, string> = {
+  blue_buff: 'Gardien d’azur',
+  red_buff: 'Bête écarlate',
+  leviathan: 'Bénédiction du Léviathan',
+  leviathan_buff: 'Bénédiction du Léviathan',
+  elder: 'Drake Ancien',
+  elder_buff: 'Drake Ancien',
+  recall: 'Rappel',
+};
+
+/** Nom lisible d'un buff : registre partagé `BUFFS`, puis table locale, puis id reformaté. */
+export function buffName(id: string): string {
+  const known = BUFFS[id]?.name ?? EXTRA_BUFF_NAMES[id];
+  if (known) return known;
+  const s = id.replace(/_/g, ' ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+const DEBUFF_WORDS = /stun|root|slow|silence|knock|taunt|suppress|fear|blind|ground|bleed|burn|ignite|mark|frost|givre|poison|exhaust|grievous|anti/i;
+
+/** Effet négatif ? (registre `BUFFS` sinon heuristique sur l'id). */
+export function isDebuff(id: string): boolean {
+  const def = BUFFS[id];
+  if (def) return def.kind !== 'buff';
+  return DEBUFF_WORDS.test(id);
+}
+
+/** Initiales affichées dans la pastille de buff. */
+export function buffInitials(id: string): string {
+  const name = buffName(id);
+  const words = name.split(/[\s’']+/).filter((w) => w.length > 2);
+  return (words.length > 1 ? words.slice(0, 2).map((w) => w[0]).join('') : name.slice(0, 2)).toUpperCase();
 }
 
 /** Hash déterministe (FNV-1a 32 bits) pour générer des motifs stables. */
