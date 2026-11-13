@@ -16,6 +16,9 @@ export interface TimedEvent {
   ev: GameEvent;
 }
 
+/** Passifs dont le déclenchement concerne la cible (givre, saignement, marque…) plutôt que le champion. */
+const PASSIVE_ON_TARGET = new Set(['ilyra', 'vrenna', 'corvin', 'nyx']);
+
 const dist = (a: Vec2, b: Vec2): number => Math.hypot(b.x - a.x, b.y - a.y);
 const num = (v: number | number[] | undefined, fallback: number): number => (typeof v === 'number' ? v : Array.isArray(v) ? (v[0] ?? fallback) : fallback);
 
@@ -28,7 +31,9 @@ export function synthAbility(champ: ChampionDef, slot: AbilitySlot | 'P', caster
 
   if (slot === 'P') {
     // Convention : un passif qui se déclenche est signalé par un buff portant la fxKey du passif.
-    out.push({ t: 0, ev: { type: 'buffApplied', target: caster.id, buffId: key, duration: 2, source: caster.id } });
+    const on = PASSIVE_ON_TARGET.has(champ.id) ? target.id : caster.id;
+    const duration = num(p.stun, num(p.duration, 2));
+    out.push({ t: 0, ev: { type: 'buffApplied', target: on, buffId: key, duration, source: caster.id } });
     return out;
   }
 
