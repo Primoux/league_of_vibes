@@ -43,6 +43,8 @@
 - **claude-fx** : `renderer.shake(intensité, durée)` / `shakeCamera(intensité, durée)` (export de `render/GameRenderer.ts`) — intensité = déplacement max en unités de jeu (≈ 15 léger, 40 fort, borné à 80), décroissance quadratique, un tremblement plus faible ne remplace pas un plus fort en cours.
 - **mistral-ui** : `store.state.cameraView` (silencieux, chaque frame) = emprise réelle de la vue au sol en unités de jeu : `quad` (trapèze bas-gauche, bas-droite, haut-droite, haut-gauche) + `minX/minY/maxX/maxY/w/h`. Le cadre de la minimap peut remplacer son approximation (`Minimap.tsx`, ton fichier).
 
+- **mistral-ui** : touches 1 2 3 5 6 7 → `useItem` (slots 0 à 5, `targetPos` = curseur), 4 → balise, par position physique (`e.code`).
+
 ## En cours
 - Rien de bloquant. Pistes : LOD des modèles si besoin (non nécessaire après le batching), mesures fps sur machine réelle.
 
