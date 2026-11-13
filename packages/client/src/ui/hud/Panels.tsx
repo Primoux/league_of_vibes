@@ -1,0 +1,267 @@
+import { CHAMPIONS, ITEMS, type Stats, type Team } from '@lov/shared';
+import type { ComponentChildren } from 'preact';
+import { useState } from 'preact/hooks';
+import { store } from '../../state.ts';
+import { itemTip, tip } from '../components.tsx';
+import { champMemo, ui, useWorld } from '../game/world.ts';
+import { ChampionPortrait, Glyph, ItemIcon, RoleIcon, SummonerIcon } from '../icons/Icons.tsx';
+import { formatGoldShort, formatStat, STAT_LABEL } from '../logic/format.ts';
+import { sortScoreRows, type ScoreRow } from '../logic/game.ts';
+import { inventoryValue } from '../logic/shop.ts';
+import { DEFAULT_SETTINGS, settings, type AudioChannel, type Graphics } from '../settings.ts';
+import { useMini } from '../useStore.ts';
+
+// ------------------------------------------------------------------ tableau des scores (Tab)
+export function Scoreboard() {
+  const open = useMini(ui, (s) => s.scoreboard);
+  if (!open) return null;
+  return <ScoreboardPanel />;
+}
+
+function ScoreboardPanel() {
+  const rows = useWorld(() => buildRows(), (a, b) => JSON.stringify(a) === JSON.stringify(b));
+  const time = store.state.snapshot?.time ?? 0;
+  return (
+    <div class="lov-scoreboard lov-frame">
+      {(['blue', 'red'] as Team[]).map((team) => {
+        const tr = sortScoreRows(rows.filter((r) => r.team === team));
+        const kills = tr.reduce((s, r) => s + r.kills, 0);
+        const value = tr.reduce((s, r) => s + inventoryValue(r.items, ITEMS), 0);
+        return (
+          <section key={team} class={`lov-sb-team ${team}`}>
+            <header>
+              <b>{team === 'blue' ? 'Équipe bleue' : 'Équipe rouge'}</b>
+              <span>
+                <Glyph name="skull" size={13} /> {kills}
+              </span>
+              <span title="Valeur des objets">
+                <Glyph name="gold" size={13} /> {formatGoldShort(value)}
+              </span>
+            </header>
+            {tr.map((r) => (
+              <div key={r.playerId} class={`lov-sb-row ${r.isMe ? 'me' : ''} ${r.dead ? 'dead' : ''}`}>
+                <div class="pic">
+                  <ChampionPortrait id={r.championId} size={40} variant="round" grayscale={r.dead} />
+                  <span class="lvl">{r.level}</span>
+                  {r.dead && r.respawnIn !== undefined && <span class="respawn">{Math.ceil(r.respawnIn)}</span>}
+                </div>
+                <div class="sums">
+                  <SummonerIcon id={r.summoners[0]} size={18} />
+                  <SummonerIcon id={r.summoners[1]} size={18} />
+                </div>
+                <div class="who">
+                  <b>{r.name}</b>
+                  <small>
+                    {r.role && <RoleIcon role={r.role} size={11} />} {CHAMPIONS[r.championId]?.name ?? r.championId}
+                  </small>
+                </div>
+                <div class="items">
+                  {Array.from({ length: 7 }, (_, i) => {
+                    const id = r.items[i] ?? null;
+                    return (
+                      <span key={i} class={i === 6 ? 'trinket' : ''} {...(id && ITEMS[id] ? tip(itemTip(id)) : {})}>
+                        <ItemIcon itemId={id} size={28} />
+                      </span>
+                    );
+                  })}
+                </div>
+                <div class="kda">
+                  {r.kills} / <span class="d">{r.deaths}</span> / {r.assists}
+                </div>
+                <div class="cs">{r.cs}</div>
+              </div>
+            ))}
+          </section>
+        );
+      })}
+      <footer class="lov-muted">Maintiens Tab · {Math.floor(time / 60)} min de jeu</footer>
+    </div>
+  );
+}
+
+function buildRows(): ScoreRow[] {
+  const s = store.state;
+  const me = s.playerId;
+  const roles = new Map(s.lobby?.players.map((p) => [p.id, p.role]) ?? []);
+  const players = s.game?.players ?? [];
+  return players.map((p) => {
+    const m = champMemo.get(p.id);
+    return {
+      playerId: p.id,
+      name: p.name,
+      team: p.team,
+      championId: p.championId,
+      role: roles.get(p.id),
+      level: m?.level ?? 1,
+      kills: m?.kills ?? 0,
+      deaths: m?.deaths ?? 0,
+      assists: m?.assists ?? 0,
+      cs: m?.cs ?? 0,
+      items: m?.items ?? [],
+      summoners: p.summoners,
+      dead: m?.dead ?? false,
+      respawnIn: m?.respawnIn,
+      isMe: p.id === me,
+    };
+  });
+}
+
+// ------------------------------------------------------------------ statistiques détaillées (C)
+const STAT_ORDER: (keyof Stats)[] = ['ad', 'ap', 'armor', 'mr', 'attackSpeed', 'abilityHaste', 'critChance', 'moveSpeed', 'attackRange', 'lifesteal', 'armorPen', 'magicPen', 'hpRegen', 'manaRegen'];
+const STAT_ICON: Partial<Record<keyof Stats, string>> = { ad: 'sword', ap: 'bolt', armor: 'tower', mr: 'inhibitor', attackSpeed: 'bolt', moveSpeed: 'check' };
+
+export function StatsPanel() {
+  const open = useMini(ui, (s) => s.stats);
+  const stats = useWorld(() => store.state.snapshot?.self?.stats ?? null, (a, b) => a === b);
+  if (!open || !stats) return null;
+  return (
+    <div class="lov-stats lov-frame">
+      <h3>Statistiques</h3>
+      <ul>
+        {STAT_ORDER.map((k) => (
+          <li key={k} title={STAT_LABEL[k]}>
+            <span class={`k k-${k}`}>
+              <Glyph name={STAT_ICON[k] ?? 'nexus'} size={12} />
+              {STAT_LABEL[k]}
+            </span>
+            <b>{formatStat(k, stats[k])}</b>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ paramètres
+const CHANNEL_LABEL: Record<AudioChannel, string> = { master: 'Général', sfx: 'Effets', voice: 'Annonces', music: 'Musique', ui: 'Interface' };
+const KEYS: [string, string][] = [
+  ['Clic droit', 'Se déplacer / attaquer'],
+  ['A + clic', 'Attaque-déplacement'],
+  ['Q W E R', 'Sorts'],
+  ['Ctrl + Q/W/E/R', 'Monter un sort'],
+  ['D / F', 'Sorts d’invocateur'],
+  ['1-3, 5-7 / 4', 'Objets / balise'],
+  ['B', 'Rappel'],
+  ['S', 'Stop'],
+  ['P', 'Boutique'],
+  ['Tab', 'Tableau des scores (maintenir)'],
+  ['C', 'Statistiques'],
+  ['Espace', 'Centrer la caméra'],
+  ['Y', 'Verrouiller la caméra'],
+  ['Alt + clic', 'Ping'],
+  ['Échap', 'Fermer / paramètres'],
+];
+
+type SetTab = 'audio' | 'game' | 'video' | 'keys';
+
+export function SettingsPanel() {
+  const open = useMini(ui, (s) => s.settings);
+  if (!open) return null;
+  return <SettingsModal onClose={() => ui.set({ settings: false })} />;
+}
+
+export function SettingsModal({ onClose }: { onClose: () => void }) {
+  const s = useMini(settings, (x) => x, (a, b) => a === b);
+  const [tab, setTab] = useState<SetTab>('audio');
+  const row = (label: string, ctrl: ComponentChildren) => (
+    <label class="lov-set-row">
+      <span>{label}</span>
+      {ctrl}
+    </label>
+  );
+  const toggle = (on: boolean, fn: (v: boolean) => void) => <input type="checkbox" class="lov-switch" checked={on} onChange={(e) => fn(e.currentTarget.checked)} />;
+  return (
+    <div class="lov-modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div class="lov-settings lov-frame">
+        <header>
+          <h2>Paramètres</h2>
+          <button class="lov-icon-btn" onClick={onClose} title="Fermer">
+            <Glyph name="close" size={16} />
+          </button>
+        </header>
+        <nav class="lov-shop-tabs">
+          {(
+            [
+              ['audio', 'Son'],
+              ['game', 'Jeu'],
+              ['video', 'Graphismes'],
+              ['keys', 'Raccourcis'],
+            ] as [SetTab, string][]
+          ).map(([k, l]) => (
+            <button key={k} class={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+              {l}
+            </button>
+          ))}
+        </nav>
+        <div class="lov-set-body">
+          {tab === 'audio' &&
+            (Object.keys(CHANNEL_LABEL) as AudioChannel[]).map((ch) =>
+              row(
+                CHANNEL_LABEL[ch],
+                <span class="lov-range">
+                  <input type="range" min={0} max={100} value={Math.round(s.volumes[ch] * 100)} onInput={(e) => settings.set({ volumes: { ...s.volumes, [ch]: Number(e.currentTarget.value) / 100 } })} />
+                  <b>{Math.round(s.volumes[ch] * 100)}</b>
+                </span>,
+              ),
+            )}
+          {tab === 'game' && (
+            <>
+              <p class="lov-muted">Lancement rapide : le sort part immédiatement vers le curseur, sans confirmation.</p>
+              <div class="lov-qc">
+                {(['Q', 'W', 'E', 'R', 'D', 'F'] as const).map((k) => (
+                  <button key={k} class={`lov-chip ${s.quickCast[k] ? 'on' : ''}`} onClick={() => settings.set({ quickCast: { ...s.quickCast, [k]: !s.quickCast[k] } })}>
+                    {k}
+                  </button>
+                ))}
+              </div>
+              {row('Défilement aux bords de l’écran', toggle(s.edgePan, (v) => settings.set({ edgePan: v })))}
+              {row('Caméra verrouillée par défaut', toggle(s.cameraLock, (v) => settings.set({ cameraLock: v })))}
+              {row('Timers d’objectifs sur la minimap', toggle(s.showTimers, (v) => settings.set({ showTimers: v })))}
+              {row(
+                'Taille de l’interface',
+                <span class="lov-range">
+                  <input type="range" min={80} max={130} step={5} value={Math.round(s.hudScale * 100)} onInput={(e) => settings.set({ hudScale: Number(e.currentTarget.value) / 100 })} />
+                  <b>{Math.round(s.hudScale * 100)} %</b>
+                </span>,
+              )}
+              {row('Réduire les animations', toggle(s.reduceMotion, (v) => settings.set({ reduceMotion: v })))}
+            </>
+          )}
+          {tab === 'video' &&
+            row(
+              'Qualité graphique',
+              <span class="lov-seg">
+                {(['low', 'medium', 'high'] as Graphics[]).map((g) => (
+                  <button key={g} class={s.graphics === g ? 'on' : ''} onClick={() => settings.set({ graphics: g })}>
+                    {g === 'low' ? 'Basse' : g === 'medium' ? 'Moyenne' : 'Haute'}
+                  </button>
+                ))}
+              </span>,
+            )}
+          {tab === 'keys' && (
+            <table class="lov-keys">
+              <tbody>
+                {KEYS.map(([k, v]) => (
+                  <tr key={k}>
+                    <td>
+                      <kbd>{k}</kbd>
+                    </td>
+                    <td>{v}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <footer>
+          <button class="lov-btn ghost small" onClick={() => settings.set(DEFAULT_SETTINGS)}>
+            Réinitialiser
+          </button>
+          <button class="lov-btn primary" onClick={onClose}>
+            OK
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
