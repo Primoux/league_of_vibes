@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FOUNTAINS, PASSIVE_GOLD_PER_10S, TICK_RATE, scaled, PASSIVE_GOLD_START, type ClientMsg, type Stats, type Team, type Vec2 } from '@lov/shared';
 import { applyDamage } from '../src/combat/damage.ts';
-import { economySystem, KILL_GOLD, FIRST_BLOOD_GOLD, PLATE_GOLD, TOWER_GLOBAL_GOLD, TOWER_LOCAL_GOLD, OBJECTIVE_GOLD } from '../src/systems/economy.ts';
+import { economySystem, KILL_GOLD, FIRST_BLOOD_GOLD, PLATE_GOLD, STRUCTURE_TEAM_GOLD, STRUCTURE_LOCAL_GOLD, OBJECTIVE_GOLD } from '../src/systems/economy.ts';
 import { econ } from '../src/items/index.ts';
 import { createSystems } from '../src/systems/index.ts';
 import { World, createChampion, type Entity } from '../src/world.ts';
@@ -100,11 +100,34 @@ describe('economy — or', () => {
     const far = addChamp(w, 'blue', { x: 11000, y: 11000 });
     const tower = dummy(w, 'red', { x: 5100, y: 5000 }, 'tower', 'outer', 5000);
     w.events.emit({ type: 'structureDestroyed', target: tower.id, kind: 'tower', team: 'red' });
-    expect(near.champ!.gold).toBeCloseTo(500 + TOWER_GLOBAL_GOLD + TOWER_LOCAL_GOLD, 5);
-    expect(far.champ!.gold).toBeCloseTo(500 + TOWER_GLOBAL_GOLD, 5);
+    expect(near.champ!.gold).toBeCloseTo(500 + STRUCTURE_TEAM_GOLD + STRUCTURE_LOCAL_GOLD.outer!, 5);
+    expect(far.champ!.gold).toBeCloseTo(500 + STRUCTURE_TEAM_GOLD, 5);
     w.events.emit({ type: 'structureDestroyed', target: tower.id, kind: 'tower', team: 'red', plate: true });
-    expect(near.champ!.gold).toBeCloseTo(500 + TOWER_GLOBAL_GOLD + TOWER_LOCAL_GOLD + PLATE_GOLD, 5);
-    expect(far.champ!.gold).toBeCloseTo(500 + TOWER_GLOBAL_GOLD, 5); // plaque = local seulement
+    expect(near.champ!.gold).toBeCloseTo(500 + STRUCTURE_TEAM_GOLD + STRUCTURE_LOCAL_GOLD.outer! + PLATE_GOLD, 5);
+    expect(far.champ!.gold).toBeCloseTo(500 + STRUCTURE_TEAM_GOLD, 5); // plaque = local seulement
+  });
+
+  it('lit les récompenses posées dans data.rewards (sbires/monstres de codex-objectives)', () => {
+    const w = makeWorld();
+    const c = addChamp(w, 'blue', { x: 5000, y: 5000 });
+    const m = dummy(w, 'red', { x: 5050, y: 5000 }, 'minion', 'cannon', 100);
+    m.data.rewards = { gold: 87, xp: 93, lastHitOnly: true, xpRadius: 1400 };
+    applyDamage(w, { source: c, target: m, amount: 500, type: 'true' });
+    expect(c.champ!.gold).toBeCloseTo(500 + 87, 5);
+  });
+
+  it('réduit de moitié l’or des camps sans Smite (smiteRequired)', () => {
+    const w = makeWorld();
+    const c = addChamp(w, 'blue', { x: 5000, y: 5000 }); // flash/ignite : pas de Smite
+    const g = dummy(w, 'neutral', { x: 5050, y: 5000 }, 'monster', 'gromp', 100);
+    g.data.rewards = { gold: 90, xp: 180, smiteRequired: true };
+    applyDamage(w, { source: c, target: g, amount: 500, type: 'true' });
+    expect(c.champ!.gold).toBeCloseTo(500 + 45, 5);
+    c.champ!.summoners.D = 'smite';
+    const g2 = dummy(w, 'neutral', { x: 5050, y: 5000 }, 'monster', 'gromp', 100);
+    g2.data.rewards = { gold: 90, xp: 180, smiteRequired: true };
+    applyDamage(w, { source: c, target: g2, amount: 500, type: 'true' });
+    expect(c.champ!.gold).toBeCloseTo(500 + 45 + 90, 5);
   });
 
   it('simulation : or total à 10 min cohérent avec une partie LoL-like', () => {

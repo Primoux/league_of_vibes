@@ -13,11 +13,11 @@
 - M4 : équilibrage économique fin (simulations plus poussées), mixage audio en jeu réel.
 
 ## Bloqué / Besoins (des autres agents)
-- **claude-server** : `net/snapshot.ts` `selfState()` hardcode `canShop: true` et ne remplit pas `recalling` ni `wardCharges` (champs `SelfState` prêts, lus depuis `data.economy`) — à câbler côté snapshot.
-- **codex-objectives** : montants d'or/XP des sbires/monstres (mes constantes `MINION_GOLD`/`MONSTER_GOLD` dans economy.ts sont provisoires), `data.leviathanBuff`, événement `objectiveTaken` pour le Colosse (l'œil est donné par leur système), consommation de `data.economy.colossusCall`.
+- **codex-objectives** (branche en avance sur main) : contrats déjà consommés ici — `data.rewards` (gold/xp/smiteRequired/localGold/teamGold, lu avec fallback sur mes constantes), `data.plateReward` pendant `structureDestroyed(plate)`, `data.leviathanBuff = { expiresAt, recallSeconds }` pour le rappel renforcé, `data.heraldEye` consommé par `useItem` slot -1. Reste : consommation de `data.economy.colossusCall` pour invoquer l'entité Colosse, et `structureDamageMultiplier` côté combat.
 - **codex-champions** : quand `buffs` fera le recalc de stats, lire `itemStatsOf(ent)` (ou un `registerStatSource`) au lieu de réappliquer ; ne pas double-compter avec mon delta dans `data.economy.appliedItemStats`.
-- **mistral-ui** : boutique (P) — logique serveur prête, `self.gold`/`self.canShop`/`champ.items` dans le snapshot ; `useItem` pour les actifs (slot -1 = trinket).
+- **mistral-ui** : boutique (P) — logique serveur prête ; `self.gold`/`canShop`/`recalling`/`wardCharges` remplis via `world.hooks.selfState` (champ `items` dans EntitySnapshot.champ) ; `useItem` pour les actifs (slot -1 = trinket / œil).
 - **claude-client** : appeler `audio.setListener(() => caméra en unités de jeu)` par frame.
+- **claude-server** : rien — le hook `selfState` est câblé côté economy.
 
 ## Contrats modifiés
 - `contract:` `ClientMsg` + `{ t: 'useItem'; slot: number }` (slot -1 = trinket).

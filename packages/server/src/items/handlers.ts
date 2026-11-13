@@ -180,6 +180,14 @@ export function tickItems(world: World, dt: number): void {
 export function useItem(world: World, ent: Entity, slot: number): void {
   if (!ent.champ || ent.dead) return;
   const st = econ(ent);
+  // Œil du colosse donné par codex-objectives hors inventaire (data.heraldEye).
+  if (slot === -1 && ent.data.heraldEye) {
+    delete ent.data.heraldEye;
+    st.colossusCall = { team: ent.team as Team, x: ent.pos.x, y: ent.pos.y };
+    world.events.emit({ type: 'announcement', key: 'colosse_invoque', team: ent.team as Team });
+    world.events.emit({ type: 'itemUsed', target: ent.id, itemId: 'colossus_eye' });
+    return;
+  }
   const id = slot === -1 ? st.trinket : ent.champ.items[slot];
   if (!id) return;
   const def = ITEMS[id];

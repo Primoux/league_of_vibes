@@ -71,7 +71,7 @@ describe('rappel', () => {
   it(' dure 4 s avec le buff du Léviathan', () => {
     const w = makeWorld();
     const c = addChamp(w, { x: 6000, y: 6000 });
-    c.data.leviathanBuff = true; // posé par codex-objectives
+    c.data.leviathanBuff = { expiresAt: w.time + 100, recallSeconds: 4 }; // posé par codex-objectives
     cmd(w, c, { t: 'recall' });
     expect(econ(c).recall!.total).toBe(RECALL_LEVIATHAN_SECONDS);
     run(w, RECALL_LEVIATHAN_SECONDS + 0.5);

@@ -36,22 +36,38 @@ export const KILL_GOLD = 300;
 export const FIRST_BLOOD_GOLD = 100;
 export const ASSIST_SHARE = 0.5; // fraction de la prime partagée entre les assistants
 export const SELL_RATIO = 0.7;
-export const LOCAL_GOLD_RADIUS = 1600;
-export const TOWER_GLOBAL_GOLD = 150;
-export const TOWER_LOCAL_GOLD = 150;
+export const LOCAL_GOLD_RADIUS = 1000;
+/** Récompenses de structures (fallback ; codex-objectives pose `data.rewards` sur les structures). */
+export const STRUCTURE_TEAM_GOLD = 50;
+export const STRUCTURE_LOCAL_GOLD: Record<string, number> = { outer: 250, inner: 300, inhib: 300, nexus: 50 };
 export const PLATE_GOLD = 125;
-export const INHIBITOR_GLOBAL_GOLD = 250;
-/** Or du last hit par type de sbire (valeurs de référence ; codex-objectives affinera dans data/minions.ts). */
-export const MINION_GOLD: Record<string, number> = { melee: 21, caster: 14, cannon: 60, super: 70 };
-/** Or du last hit par monstre (idem, data/monsters.ts côté codex-objectives). */
+/** Or du last hit par type de sbire (fallback ; codex-objectives pose `data.rewards.gold`, déjà scalé avec le temps). */
+export const MINION_GOLD: Record<string, number> = { melee: 21, caster: 14, cannon: 60, super: 90 };
+/** Or du last hit par monstre (fallback ; idem via data.rewards). */
 export const MONSTER_GOLD: Record<string, number> = {
-  blue_buff: 80, red_buff: 80, gromp: 80, wolves: 90, wolf_small: 20,
-  raptors: 90, raptor_small: 18, krugs: 95, krug_small: 25, scuttle: 70, grub: 50,
+  blue_buff: 90, red_buff: 90, gromp: 90, wolves: 55, wolf_small: 7,
+  raptors: 30, raptor_small: 7, krugs: 65, krug_small: 7, scuttle: 55, grub: 20,
 };
-/** Or d'équipe par objectif épique (objectif global). */
+/** Or d'équipe par objectif épique (aligné sur `teamGold` de data/monsters.ts de codex-objectives). */
 export const OBJECTIVE_GOLD: Partial<Record<MonsterType, number>> = {
-  dragon: 25, elder_dragon: 250, grub: 50, herald: 100, leviathan: 300,
+  dragon: 25, elder_dragon: 250, grub: 20, herald: 100, leviathan: 300,
 };
+
+/** Récompenses posées par codex-objectives sur les entités (sbires, monstres, structures, plaques). */
+export interface RewardData {
+  gold?: number;
+  xp?: number;
+  lastHitOnly?: boolean;
+  smiteRequired?: boolean;
+  xpRadius?: number;
+  localGold?: number;
+  teamGold?: number;
+}
+interface PlateReward {
+  gold: number;
+  radius: number;
+  source: EntityId;
+}
 export const WARD_LIFETIME = 90;
 export const WARD_SIGHT = 900;
 export const WARD_CAST_RANGE = 600;
@@ -209,7 +225,9 @@ function undoShop(world: World, ent: Entity): void {
 function startRecall(world: World, ent: Entity): void {
   const st = econ(ent);
   if (ent.dead || st.recall) return;
-  const total = ent.data.leviathanBuff ? RECALL_LEVIATHAN_SECONDS : RECALL_SECONDS;
+  // Buff du Léviathan (codex-objectives) : rappel renforcé, `recallSeconds` dans data.leviathanBuff.
+  const lb = ent.data.leviathanBuff as { expiresAt: number; recallSeconds?: number } | undefined;
+  const total = lb && lb.expiresAt > world.time ? (lb.recallSeconds ?? RECALL_LEVIATHAN_SECONDS) : RECALL_SECONDS;
   st.recall = { remaining: total, total };
   world.events.emit({ type: 'recallStart', target: ent.id });
 }
@@ -285,29 +303,41 @@ function grantKillGold(world: World, e: { target: EntityId; killer?: EntityId; a
 
   // Last hit sur sbire / monstre : or + CS pour le champion tueur.
   if ((target.kind === 'minion' || target.kind === 'monster') && killer?.champ && killer.team !== target.team) {
+    const rw = target.data.rewards as RewardData | undefined;
+    let gold = rw?.gold ?? (target.kind === 'minion' ? (MINION_GOLD[target.subtype ?? 'melee'] ?? 21) : (MONSTER_GOLD[target.subtype ?? ''] ?? 50));
+    // Camps de jungle : or complet uniquement avec Smite (PLAN §7).
+    if (rw?.smiteRequired && !hasSmite(killer)) gold = Math.round(gold / 2);
     killer.champ.cs++;
-    const gold = target.kind === 'minion' ? (MINION_GOLD[target.subtype ?? 'melee'] ?? 21) : (MONSTER_GOLD[target.subtype ?? ''] ?? 50);
     addGold(world, killer, gold, target.pos);
   }
+}
+
+function hasSmite(ent: Entity): boolean {
+  const s = ent.champ!.summoners;
+  return s.D === 'smite' || s.F === 'smite';
 }
 
 function grantStructureGold(world: World, e: { target: EntityId; kind: 'tower' | 'inhibitor' | 'nexus'; team: Team; plate?: boolean }): void {
   const struct = world.get(e.target);
   const pos = struct?.pos ?? { x: 0, y: 0 };
   const team = otherTeam(e.team); // l'équipe qui a détruit la structure
+  if (e.plate) {
+    // Plaque : or local, lu dans data.plateReward posé par codex-objectives pendant l'événement.
+    const plate = struct?.data.plateReward as PlateReward | undefined;
+    const gold = plate?.gold ?? PLATE_GOLD;
+    const radius = plate?.radius ?? LOCAL_GOLD_RADIUS;
+    for (const c of world.query('champion')) {
+      if (c.champ && c.team === team && dist(c.pos, pos) <= radius) addGold(world, c, gold, pos);
+    }
+    return;
+  }
+  const rw = struct?.data.rewards as RewardData | undefined;
+  const teamGold = rw?.teamGold ?? STRUCTURE_TEAM_GOLD;
+  const localGold = rw?.localGold ?? (STRUCTURE_LOCAL_GOLD[struct?.subtype ?? ''] ?? STRUCTURE_LOCAL_GOLD.outer!);
   for (const c of world.query('champion')) {
     if (!c.champ || c.team !== team) continue;
-    if (e.kind === 'tower' && !e.plate) {
-      addGold(world, c, TOWER_GLOBAL_GOLD);
-      if (dist(c.pos, pos) <= LOCAL_GOLD_RADIUS) addGold(world, c, TOWER_LOCAL_GOLD);
-    } else if (e.kind === 'inhibitor') {
-      addGold(world, c, INHIBITOR_GLOBAL_GOLD);
-    }
-  }
-  if (e.plate) {
-    for (const c of world.query('champion')) {
-      if (c.champ && c.team === team && dist(c.pos, pos) <= LOCAL_GOLD_RADIUS) addGold(world, c, PLATE_GOLD, pos);
-    }
+    addGold(world, c, teamGold);
+    if (dist(c.pos, pos) <= LOCAL_GOLD_RADIUS) addGold(world, c, localGold);
   }
 }
 
@@ -337,6 +367,17 @@ export const economySystem: System = {
     world.events.on('death', (e) => grantKillGold(world, e));
     world.events.on('structureDestroyed', (e) => grantStructureGold(world, e));
     world.events.on('objectiveTaken', (e) => grantObjectiveGold(world, e));
+
+    // Complète le SelfState envoyé au client (hook ajouté par claude-server).
+    world.hooks.selfState.push((e, s, w) => {
+      if (!e.champ) return;
+      const st = econ(e);
+      s.canShop = st.canShop;
+      if (st.recall) s.recalling = Math.max(0, st.recall.remaining);
+      if (st.trinket === 'stealth_ward') {
+        s.wardCharges = { charges: st.trinketCharges, cooldownRemaining: Math.max(0, st.trinketRechargeAt - w.time) };
+      }
+    });
 
     // Le rappel est interrompu par les dégâts subis.
     world.events.on('damage', (e) => {
