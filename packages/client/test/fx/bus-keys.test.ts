@@ -86,3 +86,21 @@ describe('palettes', () => {
     expect(paletteForKey('inconnu')).toBe(DEFAULT_PALETTE);
   });
 });
+
+describe('couleur vive', () => {
+  it("choisit l'accent pour les palettes sombres et garantit une luminosité minimale", async () => {
+    const THREE = await import('three');
+    const { makeVivid } = await import('../../src/fx/core/FxRuntime.ts');
+    const hsl = { h: 0, s: 0, l: 0 };
+    const pick = (id: string): { h: number; s: number; l: number } => {
+      const p = paletteForKey(`${id}_q`);
+      makeVivid(new THREE.Color(p.primary), new THREE.Color(p.accent)).getHSL(hsl);
+      return { ...hsl };
+    };
+    const accentHue = (hex: string): number => new THREE.Color(hex).getHSL(hsl).h;
+    expect(pick('grondak').h).toBeCloseTo(accentHue('#ffb347'), 2); // brun terne → accent orange
+    expect(pick('nyx').h).toBeCloseTo(accentHue('#ff2e63'), 2); // quasi-noir → accent rose
+    expect(pick('ilyra').h).toBeCloseTo(accentHue('#8fd3ff'), 2); // primaire déjà vive
+    for (const id of ['grondak', 'nyx', 'corvin', 'tharox']) expect(pick(id).l).toBeGreaterThanOrEqual(0.579);
+  });
+});
