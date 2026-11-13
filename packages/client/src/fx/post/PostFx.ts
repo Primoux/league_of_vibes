@@ -1,5 +1,5 @@
 /**
- * Post-process : bloom modéré + distorsion de chaleur + sortie (tone mapping/sRGB) + FXAA.
+ * Post-process : MSAA ×4 (cible HDR) + distorsion de chaleur et filet anti-NaN + bloom modéré + sortie (tone mapping/sRGB).
  *
  * Bloom « sélectif » par luminance : seuls les pixels au-dessus du seuil brillent. Les FX utilisent des
  * couleurs HDR (> 1) et franchissent le seuil, la scène éclairée normalement reste en dessous.
@@ -7,7 +7,6 @@
  */
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { FXAAPass } from 'three/examples/jsm/postprocessing/FXAAPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
@@ -33,7 +32,11 @@ varying vec2 vUv;
 void main() {
   vec4 d = texture2D(tDistort, vUv);
   vec2 off = (d.rg - 0.5) * 2.0 * d.a * uStrength;
-  gl_FragColor = texture2D(tDiffuse, vUv + off);
+  vec4 c = texture2D(tDiffuse, vUv + off);
+  // Filet de sécurité : un seul NaN/Inf (shader d'un autre objet, GPU qui diverge de la norme…) serait étalé
+  // par le bloom en blocs noirs. On le neutralise ici, avant le bloom, et on plafonne le HDR.
+  if (any(isnan(c)) || any(isinf(c))) c = vec4(0.0, 0.0, 0.0, 1.0);
+  gl_FragColor = vec4(min(c.rgb, vec3(64.0)), c.a);
 }`,
 };
 
@@ -41,7 +44,6 @@ export class PostFx {
   quality: FxQuality = 'high';
   private readonly composer: EffectComposer;
   private readonly bloom: UnrealBloomPass;
-  private readonly fxaa: FXAAPass;
   private readonly distortRT: THREE.WebGLRenderTarget;
   private readonly clearColor = new THREE.Color(0.5, 0.5, 0);
   private readonly prevClear = new THREE.Color();
@@ -64,9 +66,8 @@ export class PostFx {
     this.composer.addPass(distort);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(this.size.x, this.size.y), 0.55, 0.45, 0.92);
     this.composer.addPass(this.bloom);
+    // Antialiasing : MSAA ×4 sur la cible HDR (une passe FXAA en plus serait redondante et coûteuse).
     this.composer.addPass(new OutputPass());
-    this.fxaa = new FXAAPass();
-    this.composer.addPass(this.fxaa);
     this.setSize(this.size.x, this.size.y);
   }
 

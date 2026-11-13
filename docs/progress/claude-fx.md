@@ -31,14 +31,38 @@
 - **Événements du monde** (`fx/world/events.ts`) : chiffres flottants GPU (dégâts physiques/magiques/bruts, crits, dégâts subis en rouge, soins, or — seulement ce qui concerne le joueur local), level-up, âme à la mort, réapparition, canal de rappel (réussi / annulé), destruction de tour / plaque / inhibiteur / nexus, objectifs pris/apparus (couleur d'élément), auras de buffs (bleu, rouge, Léviathan, Ancien), brûlures.
 - **9 sorts d'invocateur** (`fx/summoners.ts`).
 
+- **Les 10 champions ont leur modèle et leurs FX dédiés** : Tharox (sanglier, charges et piétinement), Kaelen (chevalier solaire, tailles, parade, lame de lumière), Vrenna (lancière, saignement, bonds), Zephyr (arcaniste, orbe boomerang, brèche, chaîne, rayons), Sable (pistolera, tir explosif, volée, balle visée au laser), Corvin (archer corbeau, marques, pièges, nuée), Nyx (assassin, entailles, pas de l'ombre, marque explosive), Solenne (prêtresse, rayon, bénédiction, colonne d'aube). Tous alignés sur les événements réels de leurs kits.
+- `onAbilityHit(abilityId, fn)` : FX à l'instant exact des dégâts serveur d'un sort (sorts ciblés/instantanés).
+- **Tremblement de caméra** (API `shake` de claude-client) sur les gros impacts, atténué selon la distance à la caméra.
+- Correctif important : `pow()` d'une base légèrement négative (arrondi) dans les shaders ruban / fresnel / givre produisait un NaN que le bloom étalait en grande tache. Toutes les bases sont bornées.
+
+### M4 — en cours
+- **Teinte ennemie** : les télégraphies et zones au sol posées par un ennemi du joueur local tirent vers le rouge (le dispatcher marque `rt.enemyContext` pendant le handler ; `rt.groundColor()`), sans perdre l'identité du sort. fxlab : `&as=red` pour voir la scène côté rouge.
+
+- **Perf mesurée** (fxlab `&stress=1` : 4v4, 8 champions qui lancent sorts et attaques en continu ; au pic : 29 effets, 2 000 particules, 71 draw calls, profil d'allocations par échantillonnage CDP) : **~0,1 ms de CPU FX par frame**, allocations négligeables (les sites qui retiennent de la mémoire sont dans le lab, pas dans les FX).
+- **Optimisations GPU** : systèmes de débris instanciés masqués quand vides (plus de draw call ni de passe d'ombre au repos), lots de particules et chiffres flottants remis à zéro dès que tout est mort (le vertex shader ne retraite plus des milliers d'instances mortes après un combat), passe FXAA retirée (MSAA ×4 sur la cible HDR). Au repos : 50 → 38 draw calls dans le lab.
+- **Vérifié en partie réelle** (serveur `SKIP_DRAFT=1 DEV_LOBBY=1` + client `?autoplay`, touches simulées par CDP) : modèles, passif, sort Q clavier → serveur → FX, aucune exception.
+- Lisibilité : passif de Grondak (présent la plupart du temps hors combat) rendu discret ; couleurs des chiffres de dégâts saturées.
+
+- **Revue en partie multijoueur réelle** : 7 bots WebSocket (pilote de test hors dépôt : montent leurs sorts, combattent au milieu) + 1 client navigateur qui rejoint la salle par l'UI et regarde le milieu (clic minimap). Teamfights à 8, morts, annonces, brouillard : **aucune exception** sur ~100 s de jeu.
+
+- **Souffle des drakes** à la couleur de leur élément (élément appris par `objectiveSpawn`, comme le renderer) : flammes, eau, poussière et roches, éclairs, brume toxique ; souffle violet-feu de l'Ancien ; coups lourds du Léviathan et du Colosse. fxlab : bouton « Souffle de drake » (modèle de drake de claude-client, élément tournant).
+
+- **Animations retravaillées** (retour utilisateur) :
+  - orientation **lissée** (plus de demi-tours instantanés : le modèle enfant reçoit l'écart avec l'orientation serveur) + inclinaison vers l'avant selon la vitesse et dans les virages ;
+  - nouvelle **course** (enjambée modérée, genou plié en balancier, bassin et épaules en contre-rotation, tête stabilisée, double rebond) ;
+  - **port d'arme** : l'accessoire garde un angle (épée basse, lance inclinée, bâton droit) au lieu de suivre le balancier du bras ; à la mort l'arme se couche à plat ;
+  - **recul à l'impact** (couche additive sur `damage`) ;
+  - **idle** avec transfert de poids, **mort** en deux temps (genoux qui cèdent, chute, rebond — le corps ne passe plus sous le sol), **frappe** et **incantation** génériques engageant tout le corps.
+  - Les couches s'appliquent sur une pose finale séparée (la pose de l'animateur reste propre pour les fondus).
+
 ## En cours
-- M3 : modèles et FX dédiés des 8 autres champions.
+- M4 : retouches au fil des retours (équilibrage visuel des ultimes, lisibilité à distance).
 
 ## Bloqué / Besoins (des autres agents)
 - **claude-client** (`GameRenderer`) — `onFrame`, `getEntityObject`, `registerChampionFactory` et ACES sont déjà là et utilisés automatiquement par `installFx(renderer)`. Il manque :
   - `setRenderPipeline(render: () => void)` : laisse `PostFx` remplacer `this.renderer.render(this.scene, this.camera)` dans `frame()`. **Sans lui, pas de bloom ni de FXAA en jeu** (le fxlab les a déjà). Implémentation suggérée : un champ `private renderFn = () => this.renderer.render(this.scene, this.camera)` remplaçable, et `PostFx.setSize` appelé sur resize (déjà géré côté FX via `resize`).
   - Indicateurs : appeler `fxIndicators.showAbility(def, casterPos, cursorPos)` en mode visée, `showRange(pos, range)` au survol, `hide()` (export de `client/src/fx/index.ts`).
-- **claude-client** — optionnel : une API `shake(intensité, durée)` sur la caméra (impacts de R, explosions de structures).
 - **codex-champions** :
   - `shared/src/data/buffs.ts` avec `fxKey` par buff (en attendant, la fxKey d'un buff = son id ; `setBuffFxResolver` permet de brancher la table).
   - Événements attendus par type de ciblage : voir `fx/lab/synth.ts` (c'est la référence de ce que les FX consomment). En particulier : zones retardées → `areaEffect` avec `duration` = délai ; zones persistantes → `areaEffect` avec `duration` = durée de vie ; skillshots → `projectileSpawn` puis `projectileHit` (même `id`, y compris en fin de portée sans cible) ; passifs déclenchés → `buffApplied` avec `buffId` = fxKey du passif.

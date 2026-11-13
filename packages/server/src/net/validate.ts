@@ -75,6 +75,9 @@ function validate(m: Obj): boolean {
       return SLOTS.has(m.slot as string);
     case 'buy':
       return str(m.itemId, 48);
+    case 'useItem':
+      // slot −1 = trinket, 0..5 = inventaire (protocol.ts)
+      return Number.isInteger(m.slot) && (m.slot as number) >= -1 && (m.slot as number) <= 5 && optPos(m.targetPos);
     case 'sell':
       return Number.isInteger(m.slot) && (m.slot as number) >= 0 && (m.slot as number) < 8;
     case 'ping':

@@ -53,14 +53,16 @@ registerFx('grondak_p', {
   buff(rt, e, c) {
     const plates: THREE.Vector3[] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
     let acc = 0;
+    // État fréquent (présent dès 8 s hors combat) : coque discrète, liseré fin, peu de bandes.
     shieldShell(rt, e.target, e.duration > 0 ? e.duration : 30, `grondak_p:${e.target}`, {
-      color: new THREE.Color(1.3, 0.8, 0.3),
+      color: new THREE.Color(0.75, 0.45, 0.16),
       radius: 1.15,
       height: 1.05,
-      bands: 0.25,
+      bands: 0.08,
+      power: 3.2,
       onStep(center, t, dt) {
         acc += dt;
-        if (acc < 0.06) return;
+        if (acc < 0.12) return;
         acc = 0;
         // éclats de roche lumineux en orbite (particules courtes = traînée)
         plates.forEach((p, i) => {
@@ -190,6 +192,7 @@ registerFx('grondak_e', {
     rt.after(duration, () => {
       if (!rt.entities.pos(e.source, pos)) pos.copy(to);
       shockwave(rt, pos, 1.6, 0.4, c.accentHdr, 0.14);
+      rt.shake(pos, 15, 0.2);
       rockBurst(rt, pos, 10, 1, [0.12, 0.24]);
       dustRing(rt, pos, 0.6, 12);
       flash(rt, _v.set(pos.x, 1.1, pos.z), 2.4, c.accentHdr, 0.25);
@@ -231,6 +234,7 @@ registerFx('grondak_r_telegraph', {
 /** Éruption de l'ultime : anneau de grands pics, débris projetés en l'air, nuage de poussière. */
 function erupt(rt: FxRuntime, center: THREE.Vector3, r: number, c: FxColors): void {
   flash(rt, _v.set(center.x, 0.5, center.z), r * 1.4, c.accentHdr, 0.35);
+  rt.shake(center, 40, 0.45);
   shockwave(rt, center, r * 1.15, 0.6, c.accentHdr, 0.25);
   const n = 14;
   for (let i = 0; i < n; i++) {

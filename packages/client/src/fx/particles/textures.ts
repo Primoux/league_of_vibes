@@ -277,9 +277,11 @@ export function getParticleAtlas(): THREE.CanvasTexture {
   }
   atlas = new THREE.CanvasTexture(canvas);
   atlas.colorSpace = THREE.NoColorSpace; // masque, pas une couleur
-  atlas.generateMipmaps = true;
-  atlas.minFilter = THREE.LinearMipmapLinearFilter;
-  atlas.anisotropy = 2;
+  // Pas de mipmaps : aux niveaux réduits, chaque cellule (128 px) ne fait que quelques texels et déborde sur
+  // ses voisines → le quad entier d'une particule sombre apparaissait comme un carré noir à distance.
+  atlas.generateMipmaps = false;
+  atlas.minFilter = THREE.LinearFilter;
+  atlas.magFilter = THREE.LinearFilter;
   return atlas;
 }
 
@@ -287,8 +289,9 @@ export function getParticleAtlas(): THREE.CanvasTexture {
 export function atlasCell(name: TexName): THREE.Texture {
   const t = getParticleAtlas().clone();
   const idx = TEX[name];
-  t.repeat.set(1 / GRID, 1 / GRID);
-  t.offset.set((idx % GRID) / GRID, 1 - (Math.floor(idx / GRID) + 1) / GRID);
+  // cellule légèrement rentrée (comme les particules) : le filtrage ne lit pas la cellule voisine
+  t.repeat.set(0.97 / GRID, 0.97 / GRID);
+  t.offset.set(((idx % GRID) + 0.015) / GRID, 1 - (Math.floor(idx / GRID) + 1 - 0.015) / GRID);
   t.needsUpdate = true;
   return t;
 }
