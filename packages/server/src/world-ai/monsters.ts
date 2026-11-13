@@ -3,7 +3,17 @@ import { MONSTERS } from '../../../shared/src/data/monsters.ts';
 import type { Entity, World } from '../world.ts';
 import { attack, stats } from './runtime.ts';
 export interface MonsterState { home: Vec2; leash: number; lastCombat: number; resetting: boolean; camp?: string; epic?: boolean }
+const installed = new WeakSet<World>();
+export function installMonsterHooks(world: World): void {
+  if (installed.has(world)) return;
+  installed.add(world);
+  world.hooks.canAttack.push(entity => {
+    const state = entity.data.monster as MonsterState | undefined;
+    return !state || (!state.resetting && entity.subtype !== 'scuttle');
+  });
+}
 export function spawnMonster(world: World, type: MonsterType, pos: Vec2, leash: number, extra: Partial<MonsterState> = {}): Entity {
+  installMonsterHooks(world);
   const def = MONSTERS[type];
   const growth = 1 + Math.floor(world.time / 300) * 0.08;
   const hp = Math.round(def.hp * growth);

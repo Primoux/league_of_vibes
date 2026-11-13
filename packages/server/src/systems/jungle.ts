@@ -1,5 +1,6 @@
 import { CAMPS, TIMERS, scaled } from '@lov/shared';
 import type { Entity, System, World } from '../world.ts';
+import { applyHeal } from '../combat/damage.ts';
 import { addBuff, applyDamage, retire } from '../world-ai/runtime.ts';
 import { aggroMonster, spawnMonster, updateMonster, type MonsterState } from '../world-ai/monsters.ts';
 interface CampState { ids: number[]; next: number }
@@ -44,12 +45,11 @@ export const jungleSystem: System = {
       if (!monster?.camp || !killer?.champ) return;
       if (target.subtype === 'blue_buff' || target.subtype === 'red_buff') grant(world, killer, target.subtype === 'blue_buff' ? 'blue' : 'red');
       if (target.subtype === 'scuttle') {
-        const ward = world.spawn({ kind: 'ward', subtype: 'scuttle_shrine', team: killer.team, pos: { ...monster.home }, radius: 30, hp: 1, mana: 0, stats: { ...target.stats, maxHp: 1 }, data: { jungle: { expiresAt: world.time + 90 }, visionRadius: 900 } });
+        const ward = world.spawn({ kind: 'ward', subtype: 'scuttle_shrine', team: killer.team, pos: { ...monster.home }, radius: 30, hp: 1, mana: 0, stats: { ...target.stats, maxHp: 1 }, data: { jungle: { expiresAt: world.time + 90 }, sightRadius: 900 } });
         ward.data.speedRadius = 450;
       }
       if (Object.values(killer.champ.summoners).includes('smite')) {
-        const amount = Math.min(killer.stats.maxHp - killer.hp, killer.stats.maxHp * 0.08);
-        killer.hp += amount; world.events.emit({ type: 'heal', source: killer.id, target: killer.id, amount });
+        applyHeal(world, { source: killer, target: killer, amount: killer.stats.maxHp * 0.08 });
       }
     });
   },
@@ -73,7 +73,12 @@ export const jungleSystem: System = {
       const ward = entity.data.jungle as { expiresAt: number } | undefined;
       if (entity.kind === 'ward' && ward) {
         if (world.time >= ward.expiresAt) { world.remove(entity.id); continue; }
-        for (const champ of world.query('champion')) if (!champ.dead && champ.team === entity.team && Math.hypot(champ.pos.x - entity.pos.x, champ.pos.y - entity.pos.y) <= 450) addBuff(world, champ, 'scuttle_speed', { duration: 1, params: { moveSpeedPercent: 0.2 } });
+        for (const champ of world.query('champion')) if (!champ.dead && champ.team === entity.team && Math.hypot(champ.pos.x - entity.pos.x, champ.pos.y - entity.pos.y) <= 450) {
+          if (world.time >= Number(champ.data.nextScuttleSpeed ?? 0)) {
+            champ.data.nextScuttleSpeed = world.time + 0.75;
+            addBuff(world, champ, 'scuttle_speed', { duration: 1, params: { moveSpeedPercent: 0.2 } });
+          }
+        }
       }
       const burn = entity.data.redBurn as { source: number; until: number; next: number } | undefined;
       if (burn && !entity.dead && world.time >= burn.next && world.time <= burn.until) {

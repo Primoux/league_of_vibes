@@ -21,7 +21,7 @@ describe('jungle', () => {
     champion.pos = { ...wolf.pos }; applyDamage(world, { source: champion, target: wolf, amount: 100, type: 'true' });
     const pack = [...world.query('monster')].filter(e => (e.data.monster as { camp: string }).camp === 'blue_wolves');
     expect(pack.every(e => e.attackTarget === champion.id)).toBe(true);
-    const home = { ...wolf.pos }; wolf.pos.x += 900; world.step(); expect((wolf.data.monster as { resetting: boolean }).resetting).toBe(true);
+    const home = { ...wolf.pos }; champion.pos = { x: 1000, y: 1000 }; wolf.pos.x += 900; world.step(); expect((wolf.data.monster as { resetting: boolean }).resetting).toBe(true);
     for (let i = 0; i < 180; i++) world.step();
     expect(wolf.hp).toBe(wolf.stats.maxHp); expect(wolf.pos).toEqual(home); expect(wolf.attackTarget).toBeUndefined();
   });

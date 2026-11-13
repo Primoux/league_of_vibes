@@ -72,3 +72,42 @@ describe('objectifs épiques', () => {
     world.step(scaled(TIMERS.leviathanSpawn) - world.time); expect(getObjectiveState(world)!.leviathan.ids).toHaveLength(1);
   });
 });
+
+// Les âmes doivent agir via les mêmes hooks que les champions et le combat réel.
+describe('effets des six âmes', () => {
+  function combatants() {
+    const { world, champion } = setup();
+    const enemy = createChampion(world, { playerId: 'e', name: 'Ennemi', team: 'red', championId: 'grondak', summoners: ['flash', 'smite'], pos: { ...champion.pos } });
+    champion.hp = champion.stats.maxHp = 5000; enemy.hp = enemy.stats.maxHp = 5000;
+    return { world, champion, enemy, state: getObjectiveState(world)! };
+  }
+  it('infernal : explosion avec cooldown sans boucle de dégâts', () => {
+    const { world, champion, enemy, state } = combatants(); state.teams.blue.soul = 'infernal';
+    applyDamage(world, { source: champion, target: enemy, amount: 1, type: 'true' });
+    const after = enemy.hp; expect(after).toBeLessThan(4990);
+    applyDamage(world, { source: champion, target: enemy, amount: 1, type: 'true' }); expect(enemy.hp).toBe(after - 1);
+  });
+  it('océan : soin après avoir touché un champion', () => {
+    const { world, champion, enemy, state } = combatants(); state.teams.blue.soul = 'ocean'; champion.hp = 2000;
+    applyDamage(world, { source: champion, target: enemy, amount: 1, type: 'true' }); world.step(1);
+    expect(champion.hp).toBeGreaterThan(2000);
+  });
+  it('montagne : bouclier renouvelable hors combat', () => {
+    const { world, champion, state } = combatants(); state.teams.blue.soul = 'mountain'; world.step(); expect(champion.shield).toBeGreaterThan(180);
+  });
+  it('nuage : vitesse après lancement de l’ultime puis expiration', () => {
+    const { world, champion, state } = combatants(); state.teams.blue.soul = 'cloud'; const speed = champion.stats.moveSpeed;
+    world.events.emit({ type: 'abilityCast', source: champion.id, championId: 'grondak', slot: 'R', abilityId: 'grondak_r' });
+    world.step(); expect(champion.stats.moveSpeed).toBe(speed * 1.5);
+    world.step(6); expect(champion.stats.moveSpeed).toBeCloseTo(speed);
+  });
+  it('hextech : dégâts et ralentissement en chaîne', () => {
+    const { world, champion, enemy, state } = combatants(); state.teams.blue.soul = 'hextech'; const speed = enemy.stats.moveSpeed;
+    applyDamage(world, { source: champion, target: enemy, amount: 1, type: 'true' }); world.step();
+    expect(enemy.hp).toBe(4919); expect(enemy.stats.moveSpeed).toBeCloseTo(speed * 0.6);
+  });
+  it('chemtech : amplification sous 50 % de PV', () => {
+    const { world, champion, enemy, state } = combatants(); state.teams.blue.soul = 'chemtech'; champion.hp = 2000;
+    applyDamage(world, { source: champion, target: enemy, amount: 100, type: 'true' }); expect(enemy.hp).toBeCloseTo(4889);
+  });
+});

@@ -1,7 +1,7 @@
 import { INHIBITORS, NEXUS, TEAMS, TIMERS, TOWERS, dist2, otherTeam, scaled, type Lane, type Team, type TowerTier } from '@lov/shared';
 import { STRUCTURES } from '../../../shared/src/data/structures.ts';
 import type { Entity, System, World } from '../world.ts';
-import { attack, inRange, nearest, setStructureDamageGuard, stats, type DamageRequest } from '../world-ai/runtime.ts';
+import { attack, inRange, nearest, stats, usesCoreCombat, type DamageRequest } from '../world-ai/runtime.ts';
 
 export interface StructureState { lane: Lane | 'base'; tier?: TowerTier; plates: number; respawnAt?: number; destroyed: boolean; rampTarget?: number; ramp: number; bulwarkUntil: number; bulwark: number }
 export const structureState = (e: Entity): StructureState => e.data.structure as StructureState;
@@ -35,7 +35,7 @@ function spawnStructures(world: World): void {
     const def = tier ? STRUCTURES.towers[tier] : undefined;
     const hp = def?.hp ?? (kind === 'inhibitor' ? STRUCTURES.inhibitorHp : STRUCTURES.nexusHp);
     const e = world.spawn({ kind, team, pos: { ...pos }, subtype: tier ?? kind, radius: kind === 'nexus' ? 220 : 100, hp, mana: 0,
-      stats: stats(hp, def?.ad ?? 0, def?.armor ?? 20, kind === 'tower' ? STRUCTURES.range : 0, 0, 0.833),
+      stats: stats(hp, def?.ad ?? 0, def?.armor ?? 20, kind === 'tower' ? STRUCTURES.range : 0, 0, 1.1),
       data: { pveCombat: true, structure: { lane, tier, plates: tier === 'outer' ? 5 : 0, destroyed: false, ramp: 0, bulwark: 0, bulwarkUntil: 0 } satisfies StructureState,
         rewards: { localGold: def?.localGold ?? 0, teamGold: def?.teamGold ?? 0 } } });
     return e;
@@ -44,11 +44,33 @@ function spawnStructures(world: World): void {
   for (const i of INHIBITORS) spawn('inhibitor', i.team, i.lane, i.pos);
   for (const team of TEAMS) spawn('nexus', team, 'base', NEXUS[team]);
 }
+function towerDamage(tower: Entity, target: Entity): number {
+  return target.kind === 'minion' ? target.stats.maxHp * (target.subtype === 'cannon' || target.subtype === 'super' ? 0.14 : target.subtype === 'caster' ? 0.7 : 0.45) : STRUCTURES.towers[structureState(tower).tier!].ad * (1 + structureState(tower).ramp * 0.4);
+}
 export const structuresSystem: System = {
   name: 'structures',
   init(world) {
     spawnStructures(world);
-    setStructureDamageGuard(world, request => structureDamageMultiplier(world, request));
+    world.hooks.beforeDamage.push(ctx => {
+      if (['tower', 'inhibitor', 'nexus'].includes(ctx.target.kind)) {
+        if (ctx.source?.kind === 'minion') ctx.multiplier *= ctx.source.subtype === 'super' ? 0.6 : 0.35;
+        if (!isStructureAttackable(world, ctx.target)) ctx.multiplier = 0;
+        else if (ctx.target.kind === 'tower' && ctx.target.subtype === 'outer' && world.time < scaled(STRUCTURES.fortificationUntil)) ctx.multiplier *= 0.5;
+      }
+    });
+    world.hooks.isTargetable.push(target => !['tower', 'inhibitor', 'nexus'].includes(target.kind) || isStructureAttackable(world, target));
+    world.hooks.beforeAttackHit.push(ctx => {
+      if (ctx.attacker.kind !== 'tower' || !ctx.attacker.data.structure) return;
+      const state = structureState(ctx.attacker);
+      if (state.rampTarget !== ctx.target.id) { state.rampTarget = ctx.target.id; state.ramp = 0; }
+      ctx.amount = towerDamage(ctx.attacker, ctx.target);
+      if (ctx.target.kind === 'minion') ctx.damageType = 'true';
+    });
+    world.hooks.afterAttackHit.push(ctx => {
+      if (ctx.attacker.kind === 'tower' && ctx.attacker.data.structure && ctx.target.kind === 'champion') {
+        const state = structureState(ctx.attacker); state.ramp = Math.min(3, state.ramp + 1);
+      }
+    });
     world.events.on('damage', event => {
       const source = world.get(event.source); const target = world.get(event.target);
       if (!source || !target || event.amount <= 0) return;
@@ -110,8 +132,8 @@ export const structuresSystem: System = {
       target ??= nearest(world, e, STRUCTURES.range, candidate => candidate.team !== e.team && candidate.team !== 'neutral' && candidate.kind === 'champion');
       if (!target) { e.attackTarget = undefined; state.ramp = 0; state.rampTarget = undefined; continue; }
       if (state.rampTarget !== target.id) { state.rampTarget = target.id; state.ramp = 0; }
-      const damage = target.kind === 'minion' ? target.stats.maxHp * (target.subtype === 'cannon' || target.subtype === 'super' ? 0.14 : 0.45) : def.ad * (1 + state.ramp * 0.4);
-      if (attack(world, e, target, damage) && target.kind === 'champion') state.ramp = Math.min(3, state.ramp + 1);
+      const damage = towerDamage(e, target);
+      if (attack(world, e, target, damage) && !usesCoreCombat(world) && target.kind === 'champion') state.ramp = Math.min(3, state.ramp + 1);
     }
   },
 };

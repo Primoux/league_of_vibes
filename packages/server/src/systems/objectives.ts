@@ -3,6 +3,8 @@ import { DRAGON_ELEMENTS } from '../../../shared/src/data/monsters.ts';
 import type { Entity, System, World } from '../world.ts';
 import { addBuff, applyDamage, nearest, retire, type BuffOptions } from '../world-ai/runtime.ts';
 import { aggroMonster, spawnMonster, updateMonster, type MonsterState } from '../world-ai/monsters.ts';
+import { installObjectiveEffects, updateObjectiveEffects } from '../world-ai/objective-effects.ts';
+import { applyHeal } from '../combat/damage.ts';
 import { getCampTimers } from './jungle.ts';
 import { isStructureAttackable } from './structures.ts';
 
@@ -36,7 +38,7 @@ function grantDragon(world: World, team: Team, element: DragonElement, killer?: 
   for (const champ of world.query('champion')) if (champ.team === team) grant(world, champ, `dragon_${element}`, { duration: 1e9, source: killer, stacks, params: dragonParams[element] });
   if (progress.dragons.length === 4 && !progress.soul) {
     progress.soul = state.rift ?? element;
-    for (const champ of world.query('champion')) if (champ.team === team) grant(world, champ, `soul_${progress.soul}`, { duration: 1e9, source: killer, params: { soul: 1 } });
+    for (const champ of world.query('champion')) if (champ.team === team) grant(world, champ, `soul_${progress.soul}`, { duration: 1e9, source: killer, params: progress.soul === 'cloud' ? { moveSpeedPercent: 0.15 } : { soul: 1 } });
     state.elder = true;
     world.events.emit({ type: 'announcement', key: 'dragon_soul', team, params: { element: progress.soul } });
   }
@@ -47,16 +49,23 @@ export function useHeraldEye(world: World, owner: Entity): boolean {
   const eye = owner.data.heraldEye as HeraldEye | undefined;
   if (!eye || owner.dead || owner.team === 'neutral' || world.time >= eye.expiresAt || world.winner) return false;
   const herald = spawnMonster(world, 'herald', owner.pos, 30000);
-  herald.team = owner.team; herald.subtype = 'summoned_herald'; herald.data.summonedHerald = { owner: owner.id, expiresAt: world.time + 180, nextCharge: 0 };
+  herald.team = owner.team; herald.subtype = 'summoned_herald'; herald.data.owner = owner.id; herald.data.summonedHerald = { owner: owner.id, expiresAt: world.time + 180, nextCharge: 0 };
   delete herald.data.monster; delete herald.data.rewards; delete owner.data.heraldEye;
   world.events.emit({ type: 'announcement', key: 'herald_summoned', team: owner.team });
   return true;
 }
-function spawnEpic(world: World, type: MonsterType, x = 0, y = 0): Entity {
+function spawnEpic(world: World, type: MonsterType, x = 0, y = 0, element?: DragonElement): Entity {
   const pit = type === 'dragon' || type === 'elder_dragon' ? PITS.dragon : PITS.leviathan;
   const entity = spawnMonster(world, type, { x: pit.pos.x + x, y: pit.pos.y + y }, pit.radius, { epic: true, home: { ...pit.pos } });
-  world.events.emit({ type: 'objectiveSpawn', monster: type, pos: { ...entity.pos } });
+  if (element) entity.data.dragonElement = element;
+  world.events.emit({ type: 'objectiveSpawn', monster: type, pos: { ...entity.pos }, element });
   return entity;
+}
+function epicBreath(world: World, entity: Entity, target: Entity): void {
+  if (!['dragon', 'elder_dragon', 'leviathan'].includes(entity.subtype ?? '')) return;
+  const fxKey = entity.subtype === 'dragon' ? `dragon_${String(entity.data.dragonElement)}` : String(entity.subtype);
+  world.events.emit({ type: 'areaEffect', source: entity.id, pos: { ...target.pos }, radius: 300, duration: 0.5, fxKey });
+  for (const victim of world.query('champion')) if (!victim.dead && victim.id !== target.id && dist2(victim.pos, target.pos) <= 300 ** 2) applyDamage(world, { source: entity, target: victim, amount: entity.stats.ad * 0.5, type: 'magic', ability: fxKey });
 }
 export const objectivesSystem: System = {
   name: 'objectives',
@@ -65,6 +74,10 @@ export const objectivesSystem: System = {
     const slot = (timer: number): Slot => ({ next: scaled(timer), ids: [], done: false });
     const state: ObjectiveState = { dragon: slot(TIMERS.dragonFirstSpawn), grubs: slot(TIMERS.grubsSpawn), herald: slot(TIMERS.heraldSpawn), leviathan: slot(TIMERS.leviathanSpawn), dragonCount: 0, elder: false, teams: { blue: empty(), red: empty() } };
     states.set(world, state);
+    installObjectiveEffects(world, state);
+    world.hooks.afterAttackHit.push(ctx => {
+      if ((ctx.attacker.data.monster as MonsterState | undefined)?.epic) epicBreath(world, ctx.attacker, ctx.target);
+    });
     world.events.on('damage', event => {
       if (event.amount <= 0) return;
       const source = world.get(event.source); const target = world.get(event.target);
@@ -81,7 +94,7 @@ export const objectivesSystem: System = {
             const grub = spawnMonster(world, 'grub', source.pos, 30000); grub.kind = 'minion'; grub.team = source.team; grub.subtype = 'grubling';
             delete grub.data.monster; delete grub.data.rewards;
             grub.hp = grub.stats.maxHp = 250; grub.stats.ad = 25; grub.stats.moveSpeed = 400;
-            grub.data.grubling = { target: target.id, expiresAt: world.time + 15 };
+            grub.data.owner = source.id; grub.data.grubling = { target: target.id, expiresAt: world.time + 15 };
           }
         }
         if (target.kind === 'champion' && progress.elderUntil > world.time && source.data.elderBuff && !target.dead && !event.ability?.startsWith('elder_')) {
@@ -131,16 +144,13 @@ export const objectivesSystem: System = {
       if (!slot.done && slot.ids.length === 0 && world.time >= slot.next) slot.ids = fn();
     };
     spawn('dragon', () => {
-      const entity = spawnEpic(world, state.elder ? 'elder_dragon' : 'dragon');
+      let element: DragonElement | undefined;
       if (!state.elder) {
         state.dragonCount++;
-        const element = state.rift ?? DRAGON_ELEMENTS[Math.floor(Math.random() * DRAGON_ELEMENTS.length)]!;
+        element = state.rift ?? DRAGON_ELEMENTS[Math.floor(Math.random() * DRAGON_ELEMENTS.length)]!;
         if (state.dragonCount === 3) state.rift = element;
-        entity.data.dragonElement = element;
-        // Le spawn élémentaire enrichit l'événement déjà émis sans doubler le son/l'annonce.
-        const event = world.events.pending[world.events.pending.length - 1];
-        if (event?.type === 'objectiveSpawn') event.element = element;
       }
+      const entity = spawnEpic(world, state.elder ? 'elder_dragon' : 'dragon', 0, 0, element);
       return [entity.id];
     });
     if (world.time >= scaled(TIMERS.heraldSpawn)) {
@@ -159,9 +169,7 @@ export const objectivesSystem: System = {
         if (entity.dead) { retire(world, entity); continue; }
         const target = world.get(entity.attackTarget);
         if (updateMonster(world, entity, dt) && target && ['dragon', 'elder_dragon', 'leviathan'].includes(entity.subtype ?? '')) {
-          const fxKey = entity.subtype === 'dragon' ? `dragon_${String(entity.data.dragonElement)}` : String(entity.subtype);
-          world.events.emit({ type: 'areaEffect', source: entity.id, pos: { ...target.pos }, radius: 300, duration: 0.5, fxKey });
-          for (const victim of world.query('champion')) if (!victim.dead && victim.id !== target.id && dist2(victim.pos, target.pos) <= 300 ** 2) applyDamage(world, { source: entity, target: victim, amount: entity.stats.ad * 0.5, type: 'magic', ability: fxKey });
+          epicBreath(world, entity, target);
         }
       }
       const summon = entity.data.summonedHerald as { owner: number; expiresAt: number; nextCharge: number } | undefined;
@@ -214,6 +222,7 @@ export const objectivesSystem: System = {
       }
     }
     updatePveBuffs(world, dt);
+    updateObjectiveEffects(world, state, dt);
   },
 };
 
@@ -234,8 +243,8 @@ function updatePveBuffs(world: World, dt: number): void {
       const params = buff.params ?? {};
       for (const key of keys) bonus[key] = (bonus[key] ?? 0) + ((params[key] ?? 0) + entity.stats[key] * (params[`${key}Percent`] ?? 0)) * buff.stacks;
       if (params.outOfCombatMoveSpeed && world.time - Number(entity.data.pveLastCombat ?? -Infinity) > 5) bonus.moveSpeed = (bonus.moveSpeed ?? 0) + entity.stats.moveSpeed * params.outOfCombatMoveSpeed * buff.stacks;
-      if (params.moveSpeedPercent) bonus.moveSpeed = (bonus.moveSpeed ?? 0) + entity.stats.moveSpeed * params.moveSpeedPercent;
-      if (params.missingHpRegen) entity.hp = Math.min(entity.stats.maxHp, entity.hp + (entity.stats.maxHp - entity.hp) * params.missingHpRegen * buff.stacks * dt / 5);
+      if (params.missingHpRegen) applyHeal(world, { source: entity, target: entity, amount: (entity.stats.maxHp - entity.hp) * params.missingHpRegen * buff.stacks * dt / 5, silent: true });
+      if (params.slow) bonus.moveSpeed = (bonus.moveSpeed ?? 0) - entity.stats.moveSpeed * params.slow;
     }
     entity.data.pveStatBonus = bonus;
     for (const key of keys) entity.stats[key] += bonus[key] ?? 0;

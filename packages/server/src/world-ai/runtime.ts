@@ -1,6 +1,7 @@
-/** Adaptateurs PvE temporaires : remplacer via configurePveApis dès disponibilité des API combat/buffs. */
-import { damageMultiplier, dist2, type DamageType, type Stats } from '@lov/shared';
+/** Dégâts centralisés et attaques déléguées au combat réel ; adaptateur provisoire pour les buffs. */
+import { dist2, type DamageType, type Stats } from '@lov/shared';
 import type { Entity, World } from '../world.ts';
+import { applyDamage as coreDamage } from '../combat/damage.ts';
 export const stats = (hp: number, ad: number, armor = 0, range = 125, speed = 0, attackSpeed = 1): Stats => ({
   maxHp: hp, hpRegen: 0, maxMana: 0, manaRegen: 0, ad, ap: 0, armor, mr: armor,
   attackSpeed, attackRange: range, moveSpeed: speed, critChance: 0, abilityHaste: 0, lifesteal: 0, armorPen: 0, magicPen: 0,
@@ -9,25 +10,8 @@ export interface DamageRequest { source: Entity; target: Entity; amount: number;
 export interface BuffOptions { duration: number; source?: Entity; stacks?: number; params?: Record<string, number> }
 interface Apis { applyDamage: (world: World, request: DamageRequest) => void; addBuff: (world: World, target: Entity, id: string, options: BuffOptions) => void }
 export const isStructure = (e: Entity): boolean => e.kind === 'tower' || e.kind === 'inhibitor' || e.kind === 'nexus';
-const guards = new WeakMap<World, (request: DamageRequest) => number>();
-export function setStructureDamageGuard(world: World, guard: (request: DamageRequest) => number): void { guards.set(world, guard); }
 const fallback: Apis = {
-  applyDamage(world, request) {
-    const { source, target, type, ability } = request;
-    if (target.dead || target.team === source.team) return;
-    const multiplier = isStructure(target) ? (guards.get(world)?.(request) ?? 1) : 1;
-    let amount = Math.max(0, request.amount * multiplier);
-    if (type !== 'true') amount *= damageMultiplier(type === 'physical' ? target.stats.armor - source.stats.armorPen : target.stats.mr - source.stats.magicPen);
-    const absorbed = Math.min(target.shield, amount);
-    target.shield -= absorbed;
-    amount -= absorbed;
-    target.hp = Math.max(0, target.hp - amount);
-    world.events.emit({ type: 'damage', source: source.id, target: target.id, amount, damageType: type, ability });
-    if (target.hp <= 0 && !target.dead) {
-      target.dead = true; target.anim = 'death'; target.moveTarget = undefined; target.attackTarget = undefined;
-      world.events.emit({ type: 'death', target: target.id, killer: source.id });
-    }
-  },
+  applyDamage(world, request) { coreDamage(world, request); },
   addBuff(world, target, id, options) {
     const buffs = (target.data.pveBuffs ??= {}) as Record<string, { expiresAt: number; stacks: number; params?: Record<string, number> }>;
     buffs[id] = { expiresAt: world.time + options.duration, stacks: options.stacks ?? 1, params: options.params };
@@ -48,9 +32,12 @@ export function nearest(world: World, source: Entity, range: number, predicate: 
   }
   return best;
 }
-/** Le combat général doit ignorer les entités data.pveCombat ; cet adaptateur gère leur cadence. */
+/** En partie complète, le combat central gère windup, projectiles et hooks. Fallback isolé pour tests de domaine. */
+export function usesCoreCombat(world: World): boolean { return world.systems.some(system => system.name === 'combat'); }
 export function attack(world: World, source: Entity, target: Entity, amount = source.stats.ad): boolean {
   source.attackTarget = target.id;
+  if (usesCoreCombat(world)) return false;
+  if (!world.allow(world.hooks.canAttack, source) || !world.hooks.isTargetable.every(fn => fn(target, source, world))) return false;
   if (!inRange(source, target, source.stats.attackRange)) { source.moveTarget = target.pos; return false; }
   source.moveTarget = undefined;
   if (world.time < Number(source.data.pveNextAttack ?? 0)) return false;
