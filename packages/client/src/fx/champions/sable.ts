@@ -150,6 +150,7 @@ registerFx('sable_r', {
     const at = rt.world(e.pos, 1);
     flash(rt, at, 3, FIRE, 0.3);
     shockwave(rt, at.clone().setY(0), 2, 0.4, FIRE, 0.14);
+    rt.shake(at, 20, 0.25);
     rt.ps.emit(rt.s.spark, at, { count: 30, shape: 'point', speed: [4, 9], life: [0.25, 0.45], size: [0.07, 0.12], stretch: 0.06, gravity: 6, tint: FIRE });
     for (let i = 0; i < 3; i++) rt.after(i * 0.05, () => rt.ps.emit(rt.s.smoke, at, { count: 3, shape: 'sphere', radius: 0.3, up: [0.4, 1], life: [0.8, 1.2], size: [0.5, 0.9] }));
   },

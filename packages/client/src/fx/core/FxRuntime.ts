@@ -207,6 +207,19 @@ export class FxRuntime {
     return c;
   }
 
+  /**
+   * Tremblement de caméra pour un impact en `at` (monde), atténué avec la distance à la caméra :
+   * une explosion hors écran ne secoue pas la vue. `intensity` en unités de jeu (15 léger, 40 fort).
+   */
+  shake(at: THREE.Vector3, intensity: number, duration: number): void {
+    if (!this.host.shake) return;
+    const cam = this.host.camera.position;
+    // point visé ≈ projection de la caméra au sol (vue plongeante)
+    const d = Math.hypot(at.x - cam.x, at.z - (cam.z - cam.y * 0.6));
+    const k = 1 - d / 30;
+    if (k > 0) this.host.shake(intensity * k, duration);
+  }
+
   /** Coordonnées de jeu → monde (dans `out`). */
   world(p: Vec2, h = 0, out = new THREE.Vector3()): THREE.Vector3 {
     return out.set(p.x * RENDER_SCALE, h, -p.y * RENDER_SCALE);

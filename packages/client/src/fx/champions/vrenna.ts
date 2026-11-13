@@ -153,6 +153,7 @@ function impactR(rt: FxRuntime, source: number, fallback: THREE.Vector3): void {
   if (!rt.entities.pos(source, pos)) pos.copy(fallback);
   flash(rt, _v.set(pos.x, 1, pos.z), 3.5, GOLD, 0.3);
   shockwave(rt, pos, 2.6, 0.5, GOLD, 0.2);
+  rt.shake(pos, 20, 0.25);
   rt.ps.emit(rt.s.spark, pos, { count: 30, shape: 'disc', radius: 0.5, up: [3, 8], speed: [1, 3], life: [0.3, 0.6], size: [0.07, 0.12], stretch: 0.06, gravity: 6, tint: GOLD });
   rt.ps.emit(rt.s.dust, pos, { count: 12, shape: 'ring', radius: 0.6, speed: [1.5, 3], up: [0.3, 1], life: [0.7, 1.1], size: [0.9, 1.4], drag: 2 });
 }

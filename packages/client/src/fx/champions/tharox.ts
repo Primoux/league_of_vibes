@@ -139,5 +139,6 @@ onAbilityHit('tharox_r', (rt, e) => {
   if (!rt.entities.pos(e.target, _v, 1)) return;
   flash(rt, _v, 2.8, EMBER, 0.25);
   shockwave(rt, _v.setY(0), 1.8, 0.4, EMBER, 0.14);
+  rt.shake(_v, 25, 0.3);
   embers(rt, _v.setY(1), 12);
 });

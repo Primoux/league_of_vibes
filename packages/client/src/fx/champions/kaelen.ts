@@ -109,6 +109,7 @@ onAbilityHit('kaelen_r', (rt, e) => {
   if (!rt.entities.pos(e.target, pos)) return;
   flash(rt, _v.set(pos.x, 1, pos.z), 4, SUN, 0.35);
   shockwave(rt, pos, 2.4, 0.5, SUN, 0.2);
+  rt.shake(pos, 25, 0.3);
   rt.ps.emit(rt.s.spark, pos, { count: 40, shape: 'disc', radius: 0.4, up: [4, 10], speed: [1, 3], life: [0.3, 0.6], size: [0.08, 0.14], stretch: 0.07, tint: SUN });
   rt.ps.emit(rt.s.glow, pos, { count: 8, shape: 'disc', radius: 0.3, up: [6, 10], life: [0.3, 0.5], size: [0.6, 1], tint: SUN });
 });
