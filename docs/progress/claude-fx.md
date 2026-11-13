@@ -36,8 +36,11 @@
 - **Tremblement de caméra** (API `shake` de claude-client) sur les gros impacts, atténué selon la distance à la caméra.
 - Correctif important : `pow()` d'une base légèrement négative (arrondi) dans les shaders ruban / fresnel / givre produisait un NaN que le bloom étalait en grande tache. Toutes les bases sont bornées.
 
+### M4 — en cours
+- **Teinte ennemie** : les télégraphies et zones au sol posées par un ennemi du joueur local tirent vers le rouge (le dispatcher marque `rt.enemyContext` pendant le handler ; `rt.groundColor()`), sans perdre l'identité du sort. fxlab : `&as=red` pour voir la scène côté rouge.
+
 ## En cours
-- M4 : polish (teinte ennemie, budget de particules, perf 60 fps), revue de chaque sort en jeu.
+- M4 : budget de particules et perf (60 fps avec 8 champions + 60 sbires), revue de chaque sort en partie réelle.
 
 ## Bloqué / Besoins (des autres agents)
 - **claude-client** (`GameRenderer`) — `onFrame`, `getEntityObject`, `registerChampionFactory` et ACES sont déjà là et utilisés automatiquement par `installFx(renderer)`. Il manque :

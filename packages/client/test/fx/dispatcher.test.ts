@@ -7,6 +7,8 @@ import { onWorldEvent, registerFx } from '../../src/fx/registry.ts';
 /** Faux runtime : le dispatcher n'utilise que colors/world/time. */
 const fakeRt = {
   time: 0,
+  enemyContext: false,
+  entities: { isEnemy: (id: number) => id === 666 },
   colors: () => ({}),
   world: (p: { x: number; y: number }, h = 0, out = new THREE.Vector3()) => out.set(p.x / 100, h, -p.y / 100),
 } as unknown as FxRuntime;
@@ -64,6 +66,17 @@ describe('FxDispatcher', () => {
     expect((finish.mock.calls[0]![0] as THREE.Vector3).x).toBe(5);
     expect(defaults.hit).toHaveBeenCalledOnce();
     expect(d.inFlight).toBe(0);
+  });
+
+  it("marque le contexte ennemi pendant le handler d'un événement posé par un ennemi", () => {
+    const defaults = makeDefaults();
+    const seen: boolean[] = [];
+    defaults.area = vi.fn((rt: FxRuntime) => void seen.push(rt.enemyContext));
+    const d = new FxDispatcher(fakeRt, defaults);
+    d.handle({ type: 'areaEffect', source: 666, fxKey: 'x_r', pos: { x: 0, y: 0 }, radius: 1, duration: 1 });
+    d.handle({ type: 'areaEffect', source: 1, fxKey: 'x_r', pos: { x: 0, y: 0 }, radius: 1, duration: 1 });
+    expect(seen).toEqual([true, false]);
+    expect(fakeRt.enemyContext).toBe(false);
   });
 
   it('transmet les événements du monde aux handlers onWorldEvent', () => {
