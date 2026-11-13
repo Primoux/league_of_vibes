@@ -30,8 +30,29 @@ if (params.has('fxlab')) {
   });
   installAudio();
   render(h(App, {}), document.getElementById('ui')!);
+  if (params.has('autoplay')) autoplay();
   // Reprise de session après rechargement de page (token en sessionStorage).
-  if (hasSessionToken()) net.connect(store.state.name || 'Invocateur');
+  else if (hasSessionToken()) net.connect(store.state.name || 'Invocateur');
+}
+
+/**
+ * `?autoplay` (dev) : se connecte, crée une salle dev, se met prêt et lance la partie.
+ * Avec le serveur en `SKIP_DRAFT=1`, une partie solo démarre sans aucun clic.
+ */
+function autoplay(): void {
+  let started = false;
+  net.on((msg) => {
+    if (msg.t !== 'lobby' || started || msg.state.phase !== 'lobby') return;
+    const me = msg.state.players.find((p) => p.id === store.state.playerId);
+    if (!me) return;
+    if (!me.ready) net.send({ t: 'setReady', ready: true });
+    else if (me.isHost) {
+      started = true;
+      net.send({ t: 'startGame' });
+    }
+  });
+  net.connect(store.state.name || 'Testeur');
+  net.send({ t: 'createRoom', devMode: true });
 }
 
 function hasSessionToken(): boolean {

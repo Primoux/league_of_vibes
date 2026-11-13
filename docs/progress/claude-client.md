@@ -23,8 +23,23 @@
 - **Indicateurs** (`render/Indicators.ts`) : cercle AA (survol de son champion / attaque-déplacement), indicateurs de sort par défaut (portée, skillshot, zone, cône, dash).
 - Démos : `?maplab&zoo` (tous les modèles), `?maplab&cx=..&cy=..` (position caméra), `?maplab&aim=Q` (indicateur).
 
+### M4
+- **MeshBatcher** (`render/MeshBatcher.ts`) : les vues procédurales (sbires, monstres, structures, balises) gardent leur hiérarchie animée, mais leurs pièces sont dessinées en InstancedMesh partagés par (géométrie, matériau). Les champions de claude-fx ne sont pas touchés.
+- **Végétation en tuiles** de 2000 u (frustum culling), arbres hors carte sans ombre portée ; terrain 200² segments.
+- **Qualité basse/haute à chaud** (`store.settings.quality` → `GameRenderer.applyQuality`) : pixel ratio, ombres, décor de fond ; `setFxQuality` (claude-fx) suit via `main.ts`.
+- Mesures, scénario `?maplab&bench` (8 champions + 60 sbires) avec `?stats` :
+  | | draw calls | triangles |
+  |---|---|---|
+  | avant M4 | 1356 | 594k |
+  | haute | 413 | 249k |
+  | basse | 212 | 98k |
+- Plus d'allocation par frame dans les étiquettes ; `applySnapshot` ne tourne qu'une fois par snapshot.
+- Retour de revue PR #1 : élément du drake appliqué avant la création de la vue (et vue reconstruite si périmée).
+- **`?autoplay`** (dev) : connexion + salle dev + prêt + lancement automatiques. Avec `SKIP_DRAFT=1` côté serveur : partie solo sans clic. Validé de bout en bout avec le vrai serveur.
+- `?stats` : overlay fps / draw calls / triangles (`?stats=log` : aussi dans la console).
+
 ## En cours
-- M4 : perf (instancing des sbires, LOD), réglage qualité à chaud (aujourd'hui la qualité est lue au démarrage).
+- Rien de bloquant. Pistes : LOD des modèles si besoin (non nécessaire après le batching), mesures fps sur machine réelle.
 
 ### Intégrations
 - `GameRenderer.setRenderPipeline(fn)` pour PostFx (claude-fx) ; indicateurs de claude-fx branchés via `registerIndicatorRenderer(fxIndicatorRenderer(fxIndicators))` dans `main.ts`.
