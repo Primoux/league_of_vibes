@@ -9,7 +9,20 @@
  * Pas de prédiction quand la ligne droite traverse un mur (le serveur contourne, on le suit), pendant un
  * dash, mort ou si le serveur reste immobile alors qu'on prédit un mouvement (CC, attaque…).
  */
-import type { Vec2 } from '@lov/shared';
+import { isInWall, type Vec2 } from '@lov/shared';
+
+/** La ligne droite a→b traverse-t-elle un mur ? (échantillonnage tous les 50 u) */
+export function segmentBlocked(a: Vec2, b: Vec2): boolean {
+  const d = Math.hypot(b.x - a.x, b.y - a.y);
+  const n = Math.ceil(d / 50);
+  const p = { x: 0, y: 0 };
+  for (let i = 1; i <= n; i++) {
+    p.x = a.x + ((b.x - a.x) * i) / n;
+    p.y = a.y + ((b.y - a.y) * i) / n;
+    if (isInWall(p)) return true;
+  }
+  return false;
+}
 
 export const SNAP_DIST = 250;
 /** Taux de correction (1/s) pendant un déplacement prédit et à l'arrêt. */
