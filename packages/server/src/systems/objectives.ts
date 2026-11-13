@@ -4,7 +4,7 @@ import type { Entity, System, World } from '../world.ts';
 import { addBuff, applyDamage, nearest, retire, type BuffOptions } from '../world-ai/runtime.ts';
 import { aggroMonster, spawnMonster, updateMonster, type MonsterState } from '../world-ai/monsters.ts';
 import { installObjectiveEffects, updateObjectiveEffects } from '../world-ai/objective-effects.ts';
-import { applyHeal } from '../combat/damage.ts';
+import { removeBuff, updateBuffs } from '../combat/buffs.ts';
 import { getCampTimers } from './jungle.ts';
 import { isStructureAttackable } from './structures.ts';
 
@@ -43,16 +43,31 @@ function grantDragon(world: World, team: Team, element: DragonElement, killer?: 
     world.events.emit({ type: 'announcement', key: 'dragon_soul', team, params: { element: progress.soul } });
   }
 }
+function syncPersistentObjectives(world: World, champion: Entity): void {
+  if (champion.team === 'neutral') return;
+  const progress = states.get(world)?.teams[champion.team]; if (!progress) return;
+  for (const element of DRAGON_ELEMENTS) {
+    const stacks = progress.dragons.filter(type => type === element).length;
+    if (stacks) addBuff(world, champion, `dragon_${element}`, { duration: 1e9, stacks, params: dragonParams[element] });
+  }
+  if (progress.soul) addBuff(world, champion, `soul_${progress.soul}`, { duration: 1e9, params: progress.soul === 'cloud' ? { moveSpeedPercent: 0.15 } : { soul: 1 } });
+  if (progress.grubs) addBuff(world, champion, 'grub_siege', { duration: 1e9, stacks: progress.grubs, params: { structureDamage: 8 } });
+}
 interface HeraldEye { expiresAt: number }
 /** Point de raccordement de l'objet actif pour economy. Ne consomme l'œil qu'après validation. */
 export function useHeraldEye(world: World, owner: Entity): boolean {
   const eye = owner.data.heraldEye as HeraldEye | undefined;
   if (!eye || owner.dead || owner.team === 'neutral' || world.time >= eye.expiresAt || world.winner) return false;
-  const herald = spawnMonster(world, 'herald', owner.pos, 30000);
-  herald.team = owner.team; herald.subtype = 'summoned_herald'; herald.data.owner = owner.id; herald.data.summonedHerald = { owner: owner.id, expiresAt: world.time + 180, nextCharge: 0 };
-  delete herald.data.monster; delete herald.data.rewards; delete owner.data.heraldEye;
-  world.events.emit({ type: 'announcement', key: 'herald_summoned', team: owner.team });
+  summonHerald(world, owner, owner.pos);
+  delete owner.data.heraldEye;
   return true;
+}
+function summonHerald(world: World, owner: Entity, pos: { x: number; y: number }): void {
+  if (owner.team === 'neutral') return;
+  const herald = spawnMonster(world, 'herald', pos, 30000);
+  herald.team = owner.team; herald.subtype = 'summoned_herald'; herald.data.owner = owner.id; herald.data.summonedHerald = { owner: owner.id, expiresAt: world.time + 180, nextCharge: 0 };
+  delete herald.data.monster; delete herald.data.rewards;
+  world.events.emit({ type: 'announcement', key: 'herald_summoned', team: owner.team });
 }
 function spawnEpic(world: World, type: MonsterType, x = 0, y = 0, element?: DragonElement): Entity {
   const pit = type === 'dragon' || type === 'elder_dragon' ? PITS.dragon : PITS.leviathan;
@@ -74,6 +89,8 @@ export const objectivesSystem: System = {
     const slot = (timer: number): Slot => ({ next: scaled(timer), ids: [], done: false });
     const state: ObjectiveState = { dragon: slot(TIMERS.dragonFirstSpawn), grubs: slot(TIMERS.grubsSpawn), herald: slot(TIMERS.heraldSpawn), leviathan: slot(TIMERS.leviathanSpawn), dragonCount: 0, elder: false, teams: { blue: empty(), red: empty() } };
     states.set(world, state);
+    world.hooks.objectiveTimers.push(team => getObjectiveTimers(world, team));
+    world.events.on('respawn', event => { const champion = world.get(event.target); if (champion) syncPersistentObjectives(world, champion); });
     installObjectiveEffects(world, state);
     world.hooks.afterAttackHit.push(ctx => {
       if ((ctx.attacker.data.monster as MonsterState | undefined)?.epic) epicBreath(world, ctx.attacker, ctx.target);
@@ -92,7 +109,7 @@ export const objectivesSystem: System = {
           if (progress.grubs >= 3 && world.time >= Number(source.data.nextGrubling ?? 0)) {
             source.data.nextGrubling = world.time + 15;
             const grub = spawnMonster(world, 'grub', source.pos, 30000); grub.kind = 'minion'; grub.team = source.team; grub.subtype = 'grubling';
-            delete grub.data.monster; delete grub.data.rewards;
+            delete grub.data.monster; delete grub.data.rewards; grub.data.xpReward = 0;
             grub.hp = grub.stats.maxHp = 250; grub.stats.ad = 25; grub.stats.moveSpeed = 400;
             grub.data.owner = source.id; grub.data.grubling = { target: target.id, expiresAt: world.time + 15 };
           }
@@ -164,6 +181,13 @@ export const objectivesSystem: System = {
     } else spawn('herald', () => [spawnEpic(world, 'herald').id]);
     spawn('leviathan', () => [spawnEpic(world, 'leviathan').id]);
     for (const entity of world.entities.values()) {
+      const eye = entity.data.heraldEye as HeraldEye | undefined;
+      if (eye && world.time >= eye.expiresAt) delete entity.data.heraldEye;
+      const economy = entity.data.economy as { colossusCall?: { team: Team; x: number; y: number } | null } | undefined;
+      if (economy?.colossusCall) {
+        const call = economy.colossusCall; economy.colossusCall = null;
+        if (!entity.dead && entity.champ && call.team === entity.team && Number.isFinite(call.x) && Number.isFinite(call.y) && call.x >= 0 && call.x <= 12000 && call.y >= 0 && call.y <= 12000) summonHerald(world, entity, { x: call.x, y: call.y });
+      }
       const monster = entity.data.monster as MonsterState | undefined;
       if (monster?.epic) {
         if (entity.dead) { retire(world, entity); continue; }
@@ -214,39 +238,15 @@ export const objectivesSystem: System = {
       if (entity.kind === 'minion' && entity.team !== 'neutral' && !entity.dead && !entity.data.grubling) {
         let empowered = false;
         for (const champ of world.query('champion')) if (champ.team === entity.team && !champ.dead && champ.data.leviathanBuff && dist2(champ.pos, entity.pos) <= 1400 ** 2) { empowered = true; break; }
-        if (empowered && !entity.data.leviathanMinion) {
-          entity.data.leviathanMinion = true; entity.stats.ad *= 1.5; entity.stats.armor += 50; entity.stats.mr += 50; entity.stats.attackRange += 100;
+        if (empowered && world.time >= Number(entity.data.nextLeviathanRefresh ?? 0)) {
+          entity.data.leviathanMinion = true; entity.data.nextLeviathanRefresh = world.time + 0.75;
+          addBuff(world, entity, 'leviathan_minion', { duration: 1, params: { adPercent: 0.5, armor: 50, mr: 50, attackRange: 100 } });
         } else if (!empowered && entity.data.leviathanMinion) {
-          delete entity.data.leviathanMinion; entity.stats.ad /= 1.5; entity.stats.armor -= 50; entity.stats.mr -= 50; entity.stats.attackRange -= 100;
+          delete entity.data.leviathanMinion; delete entity.data.nextLeviathanRefresh; removeBuff(world, entity, 'leviathan_minion');
         }
       }
     }
-    updatePveBuffs(world, dt);
+    if (!world.systems.some(system => system.name === 'buffs')) updateBuffs(world, dt);
     updateObjectiveEffects(world, state, dt);
   },
 };
-
-/** Effets du mock uniquement. Une API addBuff externe est responsable des statistiques et de la ténacité. */
-function updatePveBuffs(world: World, dt: number): void {
-  for (const entity of world.query('champion')) {
-    const buffs = entity.data.pveBuffs as Record<string, { expiresAt: number; stacks: number; params?: Record<string, number> }> | undefined;
-    if (!buffs) continue;
-    const previous = entity.data.pveStatBonus as Record<string, number> | undefined;
-    const keys = ['ad', 'ap', 'armor', 'mr', 'abilityHaste', 'attackSpeed', 'moveSpeed'] as const;
-    for (const key of keys) entity.stats[key] -= previous?.[key] ?? 0;
-    const bonus: Record<string, number> = {};
-    for (const [id, buff] of Object.entries(buffs)) {
-      if (buff.expiresAt <= world.time || (entity.dead && ['leviathan', 'elder', 'blue_buff', 'red_buff'].includes(id))) {
-        delete buffs[id]; world.events.emit({ type: 'buffRemoved', target: entity.id, buffId: id }); continue;
-      }
-      if (entity.dead) continue;
-      const params = buff.params ?? {};
-      for (const key of keys) bonus[key] = (bonus[key] ?? 0) + ((params[key] ?? 0) + entity.stats[key] * (params[`${key}Percent`] ?? 0)) * buff.stacks;
-      if (params.outOfCombatMoveSpeed && world.time - Number(entity.data.pveLastCombat ?? -Infinity) > 5) bonus.moveSpeed = (bonus.moveSpeed ?? 0) + entity.stats.moveSpeed * params.outOfCombatMoveSpeed * buff.stacks;
-      if (params.missingHpRegen) applyHeal(world, { source: entity, target: entity, amount: (entity.stats.maxHp - entity.hp) * params.missingHpRegen * buff.stacks * dt / 5, silent: true });
-      if (params.slow) bonus.moveSpeed = (bonus.moveSpeed ?? 0) - entity.stats.moveSpeed * params.slow;
-    }
-    entity.data.pveStatBonus = bonus;
-    for (const key of keys) entity.stats[key] += bonus[key] ?? 0;
-  }
-}

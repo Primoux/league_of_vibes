@@ -17,13 +17,13 @@ Session : 2026-11-13, branche `codex-objectives`.
 ## Bloqué / Besoins (des autres agents)
 - Les nouveaux commits de claude-server ont été récupérés pendant la session. Tous les dégâts passent maintenant par `combat/damage.ts`. Les hooks `beforeDamage`, `isTargetable`, `beforeAttackHit` et `afterAttackHit` sont enregistrés directement par les systèmes possédés. Aucune modification nécessaire côté combat, aucun fichier d'un autre domaine modifié.
 - En présence du système `combat`, les IA posent uniquement `attackTarget`/`moveTarget` : cadence, projectiles, windup, CC et dégâts viennent du combat central. Attaque simple conservée pour tests isolés sans combat ; `data.pveCombat` est informatif et ne doit **pas** désactiver le combat central.
-- L'API de buffs reste absente : `configurePveApis(world, { addBuff })` permet le raccordement ; le fallback est local dans `world-ai/runtime.ts`. Dégâts, soins et boucliers utilisent déjà les API réelles.
-- claude-server : intégrer `getObjectiveTimers(world, team)` et `getObjectiveState(world).teams` au snapshot/score ; le protocole actuel a déjà les champs nécessaires.
+- API réelle de buffs intégrée après synchronisation de main : `world-ai/runtime.ts` traduit les paramètres en `statMods/statPercentMods`, total de cumuls autoritaire, ténacité, CC et persistance à la mort. Aucune implémentation de buff de secours restante. Les six âmes utilisent aussi les API centrales de soins/boucliers.
+- claude-server : timers branchés via `world.hooks.objectiveTimers` ; votre ScoreTracker consomme déjà les événements tours/drakes/larves. `data.xpReward` et `data.xpGlobal` sont renseignés pour leveling.
 - mistral-economy : lire `data.rewards` (sbires : lastHitOnly/xpRadius ; camps : smiteRequired ; objectifs : teamGold/xp), les données `shared/src/data/{minions,monsters,structures}.ts` et les événements existants. Aucun versement d'or/XP direct pour ne pas doubler votre système.
 - Plaques : `structureDestroyed` avec `plate: true`, équipe défenseuse ; `target.data.plateReward` est disponible **pendant** l'événement (gold/radius/source). Tours : récompenses `data.rewards.localGold/teamGold`.
-- mistral-economy : œil hors inventaire dans `killer.data.heraldEye = { expiresAt }`, actif via `useHeraldEye(world, owner)` (consomme si valide). Il manque encore une commande client d'objet actif dans le protocole ; l'intégrateur doit raccorder l'UI/commande.
+- mistral-economy : contrat de votre branche distante vérifié : œil hors inventaire `data.heraldEye = { expiresAt }`, expiration nettoyée à chaque tick ; les demandes `data.economy.colossusCall = { team, x, y }` sont désormais consommées une seule fois par objectives. `useHeraldEye(world, owner)` reste disponible pour les appels directs/tests. Aucun import de fichiers economy non encore présents sur main.
 - mistral-economy : `data.leviathanBuff = { expiresAt, recallSeconds: 4 }`, supprimé à la mort/expiration. `data.elderBuff` suit la même durée sans rappel.
-- codex-champions : buffs `dragon_<element>` cumulables/permanents, `soul_<element>`, `blue_buff`, `red_buff`, `red_slow`, `scuttle_speed`, `grub_siege`, `elder`, `leviathan`. Paramètres explicites via `addBuff`. Le mock utilise `data.pveBuffs` et recalcule ses bonus uniquement ; l'API réelle doit gérer les stats/CC (dont ténacité chemtech) sans exécuter le mock. Les effets d'âme restent dans `world-ai/objective-effects.ts`, avec les API centrales de dégâts/soins/boucliers.
+- codex-champions : buffs `dragon_<element>` cumulables/permanents, `soul_<element>`, `blue_buff`, `red_buff`, `red_slow`, `scuttle_speed`, `grub_siege`, `elder`, `leviathan`. Paramètres explicites via `addBuff`. Le wrapper appelle votre API réelle, y compris la ténacité chemtech et les ralentissements ; réapplication des bonus permanents à la réanimation. Les effets d'âme restent dans `world-ai/objective-effects.ts`, avec les API centrales de dégâts/soins/boucliers.
 - L'équilibrage d'une partie de 25–30 minutes à huit humains dépend des autres domaines et devra être validé en intégration.
 
 ## Contrats modifiés / API disponibles
@@ -32,6 +32,9 @@ Session : 2026-11-13, branche `codex-objectives`.
 - Données de récompenses accessibles par imports directs, pas de modification du barrel partagé.
 
 ## Validation
-- Node 24.22.3 : `npm run typecheck`, `npm test`, `npm run build`.
-- Après récupération des API serveur : 95 tests (dont nouvelles régressions PvE) ; test d'intégration du combat sans double attaque et scénario de trente minutes à pas accéléré de 0,2 s. Ce test vérifie stabilité et défense, pas la fidélité d'équilibrage à 30 Hz avec joueurs.
+- Node 24.22.3 : `npm run typecheck`, `npm test`, `npm run build`. Tests réseau exécutés hors sandbox (écoute de port local interdite dans le sandbox).
+- Après récupération des API serveur, champions, FX et client : suite complète de 374 tests (dont 33 tests PvE) ; test d'intégration du combat sans double attaque et scénario de trente minutes à pas accéléré de 0,2 s. Ce test vérifie stabilité et défense, pas la fidélité d'équilibrage à 30 Hz avec joueurs.
 - Aucune dépendance ou asset ajouté. Le build client signale seulement son bundle >500 Ko déjà présent hors domaine.
+
+## Livraison
+- Les nouvelles règles AGENTS.md récupérées avec main imposent une PR `pr/codex-objectives` ; revue/merge réservés à Fable. Aucun push sur main effectué. Le premier essai local d'intégration a été arrêté après les tests ; ses correctifs ont été réalisés sur codex-objectives.

@@ -78,19 +78,18 @@ describe('effets des six âmes', () => {
   function combatants() {
     const { world, champion } = setup();
     const enemy = createChampion(world, { playerId: 'e', name: 'Ennemi', team: 'red', championId: 'grondak', summoners: ['flash', 'smite'], pos: { ...champion.pos } });
-    champion.hp = champion.stats.maxHp = 5000; enemy.hp = enemy.stats.maxHp = 5000;
     return { world, champion, enemy, state: getObjectiveState(world)! };
   }
   it('infernal : explosion avec cooldown sans boucle de dégâts', () => {
     const { world, champion, enemy, state } = combatants(); state.teams.blue.soul = 'infernal';
     applyDamage(world, { source: champion, target: enemy, amount: 1, type: 'true' });
-    const after = enemy.hp; expect(after).toBeLessThan(4990);
+    const after = enemy.hp; expect(after).toBeLessThan(enemy.stats.maxHp - 10);
     applyDamage(world, { source: champion, target: enemy, amount: 1, type: 'true' }); expect(enemy.hp).toBe(after - 1);
   });
   it('océan : soin après avoir touché un champion', () => {
-    const { world, champion, enemy, state } = combatants(); state.teams.blue.soul = 'ocean'; champion.hp = 2000;
+    const { world, champion, enemy, state } = combatants(); state.teams.blue.soul = 'ocean'; champion.hp = champion.stats.maxHp * 0.4; const initial = champion.hp;
     applyDamage(world, { source: champion, target: enemy, amount: 1, type: 'true' }); world.step(1);
-    expect(champion.hp).toBeGreaterThan(2000);
+    expect(champion.hp).toBeGreaterThan(initial);
   });
   it('montagne : bouclier renouvelable hors combat', () => {
     const { world, champion, state } = combatants(); state.teams.blue.soul = 'mountain'; world.step(); expect(champion.shield).toBeGreaterThan(180);
@@ -104,10 +103,35 @@ describe('effets des six âmes', () => {
   it('hextech : dégâts et ralentissement en chaîne', () => {
     const { world, champion, enemy, state } = combatants(); state.teams.blue.soul = 'hextech'; const speed = enemy.stats.moveSpeed;
     applyDamage(world, { source: champion, target: enemy, amount: 1, type: 'true' }); world.step();
-    expect(enemy.hp).toBe(4919); expect(enemy.stats.moveSpeed).toBeCloseTo(speed * 0.6);
+    expect(enemy.hp).toBe(enemy.stats.maxHp - 81); expect(enemy.stats.moveSpeed).toBeCloseTo(speed * 0.6);
   });
   it('chemtech : amplification sous 50 % de PV', () => {
-    const { world, champion, enemy, state } = combatants(); state.teams.blue.soul = 'chemtech'; champion.hp = 2000;
-    applyDamage(world, { source: champion, target: enemy, amount: 100, type: 'true' }); expect(enemy.hp).toBeCloseTo(4889);
+    const { world, champion, enemy, state } = combatants(); state.teams.blue.soul = 'chemtech'; champion.hp = champion.stats.maxHp * 0.4;
+    applyDamage(world, { source: champion, target: enemy, amount: 100, type: 'true' }); expect(enemy.hp).toBeCloseTo(enemy.stats.maxHp - 111);
+  });
+});
+
+describe('raccordements des objectifs', () => {
+  it('consomme une demande d’invocation economy une seule fois et expire l’œil', () => {
+    const { world, champion } = setup();
+    champion.data.economy = { colossusCall: { team: 'blue', x: 7900, y: 4100 } };
+    world.step(); world.step();
+    expect([...world.query('monster')].filter(e => e.subtype === 'summoned_herald')).toHaveLength(1);
+    expect((champion.data.economy as { colossusCall: unknown }).colossusCall).toBeNull();
+    champion.data.heraldEye = { expiresAt: world.time + 1 }; world.step(1);
+    expect(champion.data.heraldEye).toBeUndefined(); expect(useHeraldEye(world, champion)).toBe(false);
+  });
+  it('expose les timers dans le snapshot et les buffs élémentaires aux champions réanimés', async () => {
+    const { buildSnapshot } = await import('../src/net/snapshot.ts');
+    const { getBuff } = await import('../src/combat/buffs.ts');
+    const { world, champion } = setup();
+    expect(buildSnapshot(world, 'p', 'blue', []).objectiveTimers?.dragon).toBe(scaled(TIMERS.dragonFirstSpawn));
+    champion.dead = true;
+    const state = getObjectiveState(world)!; state.teams.blue.dragons = ['infernal', 'infernal'];
+    champion.dead = false; world.events.emit({ type: 'respawn', target: champion.id, pos: { ...champion.pos } });
+    expect(getBuff(champion, 'dragon_infernal')?.stacks).toBe(2);
+    const ad = champion.stats.ad;
+    world.events.emit({ type: 'respawn', target: champion.id, pos: { ...champion.pos } });
+    expect(champion.stats.ad).toBe(ad); // pas de double cumul à la reconnexion/réanimation.
   });
 });

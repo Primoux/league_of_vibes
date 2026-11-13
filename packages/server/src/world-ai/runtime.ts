@@ -1,7 +1,8 @@
-/** Dégâts centralisés et attaques déléguées au combat réel ; adaptateur provisoire pour les buffs. */
+/** Adaptation des paramètres PvE aux API centrales de dégâts et de buffs. */
 import { dist2, type DamageType, type Stats } from '@lov/shared';
 import type { Entity, World } from '../world.ts';
 import { applyDamage as coreDamage } from '../combat/damage.ts';
+import { addBuff as coreBuff, type BuffParams } from '../combat/buffs.ts';
 export const stats = (hp: number, ad: number, armor = 0, range = 125, speed = 0, attackSpeed = 1): Stats => ({
   maxHp: hp, hpRegen: 0, maxMana: 0, manaRegen: 0, ad, ap: 0, armor, mr: armor,
   attackSpeed, attackRange: range, moveSpeed: speed, critChance: 0, abilityHaste: 0, lifesteal: 0, armorPen: 0, magicPen: 0,
@@ -10,18 +11,29 @@ export interface DamageRequest { source: Entity; target: Entity; amount: number;
 export interface BuffOptions { duration: number; source?: Entity; stacks?: number; params?: Record<string, number> }
 interface Apis { applyDamage: (world: World, request: DamageRequest) => void; addBuff: (world: World, target: Entity, id: string, options: BuffOptions) => void }
 export const isStructure = (e: Entity): boolean => e.kind === 'tower' || e.kind === 'inhibitor' || e.kind === 'nexus';
-const fallback: Apis = {
+const defaults: Apis = {
   applyDamage(world, request) { coreDamage(world, request); },
   addBuff(world, target, id, options) {
-    const buffs = (target.data.pveBuffs ??= {}) as Record<string, { expiresAt: number; stacks: number; params?: Record<string, number> }>;
-    buffs[id] = { expiresAt: world.time + options.duration, stacks: options.stacks ?? 1, params: options.params };
-    world.events.emit({ type: 'buffApplied', target: target.id, buffId: id, duration: options.duration, source: options.source?.id });
+    if (target.dead) return;
+    const raw = options.params ?? {};
+    const flat: Partial<Stats> = {}; const percent: Partial<Stats> = {};
+    const keys = ['ad', 'ap', 'armor', 'mr', 'abilityHaste', 'moveSpeed', 'manaRegen', 'attackRange'] as const;
+    for (const key of keys) { if (raw[key]) flat[key] = raw[key]; if (raw[`${key}Percent`]) percent[key] = raw[`${key}Percent`]; }
+    if (raw.attackSpeed) percent.attackSpeed = raw.attackSpeed;
+    const permanent = id.startsWith('dragon_') || (id.startsWith('soul_') && !id.endsWith('_speed') && !id.endsWith('_slow')) || id === 'grub_siege';
+    const params: BuffParams = { ...raw, statMods: flat, statPercentMods: percent, persistOnDeath: permanent, tenacity: (raw.tenacity ?? 0) * (options.stacks ?? 1) };
+    const source = permanent ? undefined : options.source;
+    // maxStacks borne l'ajout de l'API au total autoritaire fourni par le domaine.
+    coreBuff(world, target, id, { ...options, source, params, definition: {
+      name: id.startsWith('dragon_') ? 'Faveur élémentaire' : id.startsWith('soul_') ? 'Âme élémentaire' : id === 'leviathan' ? 'Puissance du Léviathan' : id === 'elder' ? 'Fureur ancestrale' : id === 'blue_buff' ? 'Éveil azur' : id === 'red_buff' ? 'Braise écarlate' : 'Faveur de la Faille',
+      maxStacks: Math.max(1, options.stacks ?? 1), ...(raw.slow ? { kind: 'cc', cc: 'slow' } : {}),
+    } });
   },
 };
 const apis = new WeakMap<World, Apis>();
-export function configurePveApis(world: World, overrides: Partial<Apis>): void { apis.set(world, { ...fallback, ...overrides }); }
-export function applyDamage(world: World, request: DamageRequest): void { (apis.get(world) ?? fallback).applyDamage(world, request); }
-export function addBuff(world: World, target: Entity, id: string, options: BuffOptions): void { (apis.get(world) ?? fallback).addBuff(world, target, id, options); }
+export function configurePveApis(world: World, overrides: Partial<Apis>): void { apis.set(world, { ...defaults, ...overrides }); }
+export function applyDamage(world: World, request: DamageRequest): void { (apis.get(world) ?? defaults).applyDamage(world, request); }
+export function addBuff(world: World, target: Entity, id: string, options: BuffOptions): void { (apis.get(world) ?? defaults).addBuff(world, target, id, options); }
 export function inRange(a: Entity, b: Entity, range: number): boolean { return dist2(a.pos, b.pos) <= (range + b.radius) ** 2; }
 export function nearest(world: World, source: Entity, range: number, predicate: (e: Entity) => boolean): Entity | undefined {
   let best: Entity | undefined; let distance = range * range;

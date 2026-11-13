@@ -19,7 +19,7 @@ export function spawnWave(world: World, count: number): void {
       const def = MINIONS[type]; const hp = def.hp + growth * (type === 'cannon' ? 45 : 20);
       world.spawn({ kind: 'minion', subtype: type, team, radius: 35, pos: { x: start.x - (next.x - start.x) / length * index * 75, y: start.y - (next.y - start.y) / length * index * 75 }, hp, mana: 0,
         stats: stats(hp, def.ad + growth * 1.5, def.armor + growth, def.range, def.speed, def.attackSpeed),
-        data: { pveCombat: true, minion: { lane, waypoint: 1, aggroUntil: 0 } satisfies MinionState, rewards: { gold: def.gold + (type === 'cannon' ? Math.min(30, growth * 3) : growth * 0.2), xp: def.xp, lastHitOnly: true, xpRadius: 1400 } } });
+        data: { pveCombat: true, xpReward: def.xp, minion: { lane, waypoint: 1, aggroUntil: 0 } satisfies MinionState, rewards: { gold: def.gold + (type === 'cannon' ? Math.min(30, growth * 3) : growth * 0.2), xp: def.xp, lastHitOnly: true, xpRadius: 1400 } } });
     });
   }
 }

@@ -19,7 +19,7 @@ export function spawnMonster(world: World, type: MonsterType, pos: Vec2, leash: 
   const hp = Math.round(def.hp * growth);
   return world.spawn({ kind: 'monster', subtype: type, team: 'neutral', pos: { ...pos }, radius: extra.epic ? 100 : 55, hp, mana: 0,
     stats: stats(hp, def.ad * growth, def.armor, def.range, type === 'scuttle' ? 200 : 300, 0.75),
-    data: { pveCombat: true, monster: { home: { ...pos }, leash, lastCombat: world.time, resetting: false, ...extra } satisfies MonsterState, rewards: { ...def, smiteRequired: !extra.epic, xpRadius: 1400 } } });
+    data: { pveCombat: true, xpReward: def.xp, xpGlobal: !!extra.epic, monster: { home: { ...pos }, leash, lastCombat: world.time, resetting: false, ...extra } satisfies MonsterState, rewards: { ...def, smiteRequired: !extra.epic, xpRadius: 1400 } } });
 }
 export function aggroMonster(world: World, target: Entity, source: Entity): void {
   const state = target.data.monster as MonsterState | undefined;

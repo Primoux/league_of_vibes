@@ -1,4 +1,5 @@
 import { dist2 } from '@lov/shared';
+import { removeBuff } from '../combat/buffs.ts';
 import { applyHeal, applyShield, timeSinceCombat } from '../combat/damage.ts';
 import type { Entity, World } from '../world.ts';
 import { addBuff, applyDamage } from './runtime.ts';
@@ -46,7 +47,18 @@ export function installObjectiveEffects(world: World, state: ObjectiveState): vo
 export function updateObjectiveEffects(world: World, state: ObjectiveState, dt: number): void {
   for (const champion of world.query('champion')) {
     if (champion.dead || champion.team === 'neutral') continue;
-    const soul = state.teams[champion.team].soul; if (!soul) continue;
+    const progress = state.teams[champion.team];
+    const oceans = progress.dragons.filter(element => element === 'ocean').length;
+    if (oceans) applyHeal(world, { source: champion, target: champion, amount: (champion.stats.maxHp - champion.hp) * 0.025 * oceans * dt / 5, silent: true });
+    const clouds = progress.dragons.filter(element => element === 'cloud').length;
+    const outOfCombat = clouds > 0 && timeSinceCombat(world, champion) > 5;
+    if (outOfCombat && champion.data.cloudOocStacks !== clouds) {
+      champion.data.cloudOocStacks = clouds;
+      addBuff(world, champion, 'dragon_cloud_ooc', { duration: 1e9, params: { moveSpeedPercent: 0.04 * clouds } });
+    } else if (!outOfCombat && champion.data.cloudOocStacks) {
+      delete champion.data.cloudOocStacks; removeBuff(world, champion, 'dragon_cloud_ooc');
+    }
+    const soul = progress.soul; if (!soul) continue;
     const active = runtime(champion);
     if (soul === 'ocean' && active.oceanUntil > world.time) {
       applyHeal(world, { source: champion, target: champion, amount: (130 + champion.stats.ap * 0.26 + champion.stats.maxHp * 0.03) * dt / 3, silent: true });
