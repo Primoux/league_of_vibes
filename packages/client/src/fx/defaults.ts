@@ -16,7 +16,7 @@ export function impactBurst(rt: FxRuntime, at: THREE.Vector3, c: FxColors, scale
   _q.set(at.x, 1, at.z);
   flash(rt, _q, 1.6 * scale, c.accentHdr, 0.22);
   rt.ps.emit(rt.s.spark, _q, { count: 14 * scale, shape: 'point', speed: [3, 7], life: [0.2, 0.4], size: [0.06, 0.12], stretch: 0.05, gravity: 6, tint: c.vividHdr });
-  rt.ps.emit(rt.s.glowPop, _q, { count: 4, shape: 'sphere', radius: 0.2, speed: [0.3, 1], life: [0.25, 0.4], size: [0.6 * scale, 1.1 * scale], tint: c.vivid, intensity: 1.6 });
+  rt.ps.emit(rt.s.glowPop, _q, { count: 3, shape: 'sphere', radius: 0.2, speed: [0.3, 1], life: [0.25, 0.4], size: [0.5 * scale, 0.9 * scale], tint: c.vivid, intensity: 1 });
   _q.y = 0;
   shockwave(rt, _q, 1.1 * scale, 0.35, c.vividHdr, 0.1);
 }

@@ -16,7 +16,7 @@ import { INHIBITORS, NEXUS, TOWERS, isInWall, type EntityId, type EntitySnapshot
 import { clock, flushEvents, net, renderTime, snapshots } from '../net/client.ts';
 import { MovePredictor } from '../net/prediction.ts';
 import type { Interpolated } from '../net/snapshots.ts';
-import { store } from '../state.ts';
+import { store, type ClientState } from '../state.ts';
 import { CameraController } from './CameraController.ts';
 import { ClickMarkers } from './ClickMarkers.ts';
 import { HealthBars } from './HealthBars.ts';
@@ -61,7 +61,14 @@ function segmentBlocked(a: Vec2, b: Vec2): boolean {
   return false;
 }
 
+type ClientStateCameraView = ClientState['cameraView'];
+
 let current: GameRenderer | null = null;
+
+/** Tremblement de caméra (voir GameRenderer.shake) ; sans effet avant la création du renderer. */
+export function shakeCamera(intensity: number, duration: number): void {
+  current?.shake(intensity, duration);
+}
 
 /** Instance active du renderer (pour claude-fx / mistral-ui), null avant création. */
 export function getRenderer(): GameRenderer | null {
@@ -255,6 +262,42 @@ export class GameRenderer {
     this.map.setQuality(q);
   }
 
+  /**
+   * Tremblement de caméra (impacts d'ultimes, explosions de structures) : `intensity` en unités de jeu
+   * (≈ 15 léger, 40 fort, max 80), `duration` en secondes.
+   */
+  shake(intensity: number, duration: number): void {
+    this.cam.shake(intensity, duration);
+  }
+
+  private static readonly VIEW_NDC: readonly [number, number][] = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  /** Emprise de la vue au sol (plan y = 0), écrite en place dans `out` (aucune allocation). */
+  private updateCameraView(out: ClientStateCameraView): void {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    this.groundPlane.constant = 0;
+    for (let i = 0; i < 4; i++) {
+      const c = GameRenderer.VIEW_NDC[i]!;
+      this.ndc.set(c[0], c[1]);
+      this.raycaster.setFromCamera(this.ndc, this.camera);
+      const q = out.quad[i]!;
+      const hit = this.raycaster.ray.intersectPlane(this.groundPlane, this.tmpV);
+      if (hit) toGameInto(q, hit);
+      minX = Math.min(minX, q.x);
+      minY = Math.min(minY, q.y);
+      maxX = Math.max(maxX, q.x);
+      maxY = Math.max(maxY, q.y);
+    }
+    out.minX = minX;
+    out.minY = minY;
+    out.maxX = maxX;
+    out.maxY = maxY;
+    out.w = maxX - minX;
+    out.h = maxY - minY;
+  }
+
   /** claude-fx (PostFx) : remplace le rendu final (bloom, FXAA…). `null` = rendu direct. */
   setRenderPipeline(render: (() => void) | null): void {
     this.renderFn = render ?? this.defaultRender;
@@ -397,6 +440,9 @@ export class GameRenderer {
     this.cam.update(dt, selfPos ?? null, s.cameraLocked, s.settings.edgePan, s.settings.cameraSpeed, innerWidth, innerHeight);
     s.cameraCenter.x = this.cam.center.x;
     s.cameraCenter.y = this.cam.center.y;
+    // cam.update() a déplacé la caméra : ses matrices monde doivent être à jour avant de lancer les rayons
+    this.camera.updateMatrixWorld();
+    this.updateCameraView(s.cameraView);
 
     if (selfPos) {
       const st = s.snapshot?.self;

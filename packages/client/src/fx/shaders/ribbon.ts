@@ -23,7 +23,8 @@ uniform float uOpacity;
 varying float vAlpha;
 varying float vSide;
 void main() {
-  float across = 1.0 - vSide * vSide;
+  // max() : pow(x<0) est indéfini en GLSL → NaN, que le bloom étale en grande tache
+  float across = max(0.0, 1.0 - vSide * vSide);
   float core = pow(across, 6.0);
   vec3 col = mix(uColor, uCore, core * vAlpha);
   gl_FragColor = vec4(col, across * vAlpha * uOpacity);
