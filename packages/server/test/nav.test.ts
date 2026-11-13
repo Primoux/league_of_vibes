@@ -48,8 +48,9 @@ describe('NavGrid', () => {
   it('grille réelle : A* rapide sur toute la carte', () => {
     const g = navGrid();
     for (const w of WALLS) {
-      const c = w[0]!;
-      expect(g.walkable(c.x + 10, c.y + 10)).toBe(false);
+      // centroïde (les murs sont convexes) : indépendant de la géométrie exacte de map.ts
+      const c = { x: w.reduce((s, p) => s + p.x, 0) / w.length, y: w.reduce((s, p) => s + p.y, 0) / w.length };
+      expect(g.walkable(c.x, c.y)).toBe(false);
     }
     const t0 = performance.now();
     for (let i = 0; i < 50; i++) g.findPath({ x: 600, y: 600 }, { x: 11400, y: 11400 });
@@ -58,19 +59,27 @@ describe('NavGrid', () => {
   });
 });
 
+/** Boîte englobante d'un mur (les tests ne dépendent pas de la géométrie exacte de map.ts). */
+function wallBox(p: { x: number; y: number }[]): { minX: number; maxX: number; minY: number; maxY: number } {
+  return { minX: Math.min(...p.map((q) => q.x)), maxX: Math.max(...p.map((q) => q.x)), minY: Math.min(...p.map((q) => q.y)), maxY: Math.max(...p.map((q) => q.y)) };
+}
+
 describe('movement', () => {
   it('un champion contourne un mur de la carte pour atteindre sa destination', () => {
     const w = coreWorld();
-    const wall = WALLS[0]!; // rect(2000, 3600, 900, 700)
-    const c = champ(w, 'blue', { x: 1800, y: 3950 });
-    w.commands.push({ playerId: c.champ!.playerId, msg: { t: 'move', pos: { x: wall[1]!.x + 200, y: 3950 } } });
+    const b = wallBox(WALLS[0]!);
+    const from = { x: b.minX - 250, y: (b.minY + b.maxY) / 2 };
+    const to = { x: b.maxX + 200, y: from.y };
+    expect(navGrid().walkable(from.x, from.y) && navGrid().walkable(to.x, to.y)).toBe(true);
+    const c = champ(w, 'blue', from);
+    w.commands.push({ playerId: c.champ!.playerId, msg: { t: 'move', pos: to } });
     let crossed = false;
-    for (let i = 0; i < 30 * 10; i++) {
+    for (let i = 0; i < 30 * 15; i++) {
       w.step();
       if (navGrid().walkable(c.pos.x, c.pos.y) === false) crossed = true;
     }
     expect(crossed).toBe(false);
-    expect(c.pos.x).toBeCloseTo(wall[1]!.x + 200, 0);
+    expect(c.pos.x).toBeCloseTo(to.x, 0);
   });
 
   it('dash : atteint la destination, émet dash, appelle onArrive, s’arrête aux murs', () => {
@@ -84,10 +93,12 @@ describe('movement', () => {
     expect(c.data.dash).toBeUndefined();
     expect(w.events.drain().filter((e) => e.type === 'dash')).toHaveLength(1);
 
-    const d = champ(w, 'blue', { x: 1800, y: 3950 });
-    d.data.dash = { to: { x: 2500, y: 3950 }, speed: 1500 };
+    const b = wallBox(WALLS[0]!);
+    const y = (b.minY + b.maxY) / 2;
+    const d = champ(w, 'blue', { x: b.minX - 250, y });
+    d.data.dash = { to: { x: b.maxX + 300, y }, speed: 1500 };
     run(w, 1);
-    expect(d.pos.x).toBeLessThan(2000);
+    expect(d.pos.x).toBeLessThan(b.minX);
     expect(navGrid().walkable(d.pos.x, d.pos.y)).toBe(true);
   });
 
