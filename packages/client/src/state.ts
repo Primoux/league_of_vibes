@@ -1,8 +1,32 @@
 /**
  * État client partagé (lobby, partie, derniers snapshots). Propriétaire : claude-client.
  * L'UI (mistral-ui) s'y abonne en lecture via useStore(); le rendu (claude-client) et les FX (claude-fx) aussi.
+ *
+ * Champs « à haute fréquence » (hover, cursorGame, selfEntity, camera) : mis à jour par le renderer/input
+ * via `store.setQuiet` (pas de notification à chaque frame). L'UI qui en a besoin à chaque frame les lit
+ * directement dans `store.state` depuis un `renderer.onFrame`, ou réagit aux snapshots (20 Hz).
  */
-import type { DraftState, GameOver, GameStart, LobbyState, Snapshot } from '@lov/shared';
+import type { AbilitySlot, DraftState, EntityId, EntitySnapshot, GameOver, GameStart, LobbyState, Snapshot, SummonerSlot, Vec2 } from '@lov/shared';
+
+export type Quality = 'low' | 'high';
+
+/** Mode de ciblage en cours (cast normal : indicateur affiché, clic gauche pour confirmer). */
+export type Targeting =
+  | { kind: 'ability'; slot: AbilitySlot }
+  | { kind: 'summoner'; slot: SummonerSlot }
+  | { kind: 'attackMove' }
+  | { kind: 'ward' }
+  | null;
+
+export interface Settings {
+  /** Lance le sort immédiatement à l'appui de la touche (vers le curseur / l'entité survolée). */
+  quickCast: boolean;
+  quality: Quality;
+  /** Déplacement de la caméra quand la souris touche le bord de l'écran. */
+  edgePan: boolean;
+  /** Vitesse de défilement caméra (unités de jeu / s). */
+  cameraSpeed: number;
+}
 
 export interface ClientState {
   connected: boolean;
@@ -11,12 +35,46 @@ export interface ClientState {
   lobby: LobbyState | null;
   draft: DraftState | null;
   game: GameStart | null;
+  /**
+   * Dernier snapshot reçu, avec `entities` = vue COMPLÈTE fusionnée (les deltas sont appliqués par net/).
+   * `events` = événements de CE snapshot uniquement.
+   */
   snapshot: Snapshot | null;
   result: GameOver | null;
   error: string | null;
+  /** Le serveur envoie `loading` : timestamp serveur de fin du chargement. */
+  loadingEndsAt: number | null;
+
+  // --- en jeu (claude-client)
+  /** Entité du joueur local dans le dernier snapshot. */
+  selfEntity: EntitySnapshot | null;
+  /** Entité survolée par la souris (id), null sinon. */
+  hover: EntityId | null;
+  /** Position jeu du curseur sur le sol, null si hors carte. */
+  cursorGame: Vec2 | null;
+  /** Ciblage en cours (indicateur de sort à afficher par claude-fx). */
+  targeting: Targeting;
+  /** Caméra verrouillée sur le champion (Y). */
+  cameraLocked: boolean;
+  /** Centre de la caméra (coordonnées jeu), mis à jour chaque frame en silence (cadre de la minimap). */
+  cameraCenter: Vec2;
+  /** Demande de déplacement caméra (clic minimap…) : incrémenter `seq` pour une nouvelle demande. */
+  cameraFocus: { pos: Vec2; seq: number } | null;
+
+  // --- écrans transmis à l'UI par l'input
+  shopOpen: boolean;
+  scoreboardOpen: boolean; // maintenu tant que Tab est enfoncé
+  statsOpen: boolean;
+  settingsOpen: boolean;
+
+  settings: Settings;
+  /** Latence aller-retour estimée (ms), si disponible. */
+  rtt: number | null;
 }
 
 type Listener = (s: ClientState) => void;
+
+const DEFAULT_SETTINGS: Settings = { quickCast: false, quality: 'high', edgePan: true, cameraSpeed: 3000 };
 
 class Store {
   state: ClientState = {
@@ -29,6 +87,20 @@ class Store {
     snapshot: null,
     result: null,
     error: null,
+    loadingEndsAt: null,
+    selfEntity: null,
+    hover: null,
+    cursorGame: null,
+    targeting: null,
+    cameraLocked: true,
+    cameraCenter: { x: 1500, y: 1500 },
+    cameraFocus: null,
+    shopOpen: false,
+    scoreboardOpen: false,
+    statsOpen: false,
+    settingsOpen: false,
+    settings: loadSettings(),
+    rtt: null,
   };
   private listeners = new Set<Listener>();
 
@@ -37,9 +109,30 @@ class Store {
     this.listeners.forEach((l) => l(this.state));
   }
 
+  /** Mise à jour sans notification (champs à haute fréquence). Mutation en place : aucune allocation. */
+  setQuiet<K extends keyof ClientState>(key: K, value: ClientState[K]): void {
+    this.state[key] = value;
+  }
+
+  setSettings(patch: Partial<Settings>): void {
+    const settings = { ...this.state.settings, ...patch };
+    localStorageSet('lov.settings', JSON.stringify(settings));
+    this.set({ settings });
+  }
+
   subscribe(l: Listener): () => void {
     this.listeners.add(l);
     return () => this.listeners.delete(l);
+  }
+}
+
+function loadSettings(): Settings {
+  const raw = localStorageGet('lov.settings');
+  if (!raw) return { ...DEFAULT_SETTINGS };
+  try {
+    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
   }
 }
 
@@ -48,6 +141,13 @@ function localStorageGet(k: string): string | null {
     return localStorage.getItem(k);
   } catch {
     return null;
+  }
+}
+function localStorageSet(k: string, v: string): void {
+  try {
+    localStorage.setItem(k, v);
+  } catch {
+    /* stockage indisponible */
   }
 }
 

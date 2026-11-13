@@ -98,6 +98,86 @@ export class EventBus {
   }
 }
 
+/** Contexte mutable passé aux hooks de dégâts (avant mitigation). Voir combat/damage.ts. */
+export interface DamageContext {
+  source: Entity | undefined;
+  /** Champion (ou entité) crédité : le propriétaire de la source si `source.data.owner` est défini. */
+  credit: Entity | undefined;
+  target: Entity;
+  /** Montant brut avant résistances ; un hook peut le modifier (0 = annulé). */
+  amount: number;
+  type: import('@lov/shared').DamageType;
+  ability?: string;
+  isAutoAttack: boolean;
+  crit: boolean;
+  /** Pénétration additionnelle (flat) et en pourcentage (0..1) pour ce coup. */
+  flatPen: number;
+  percentPen: number;
+  /** Multiplicateur final appliqué après résistances (ex. réduction de dégâts 0.7). */
+  multiplier: number;
+}
+
+export interface HealContext {
+  source: Entity | undefined;
+  target: Entity;
+  amount: number;
+}
+
+export interface AttackContext {
+  attacker: Entity;
+  target: Entity;
+  /** Dégâts physiques de base (AD) ; modifiable. Le crit multiplie ce montant. */
+  amount: number;
+  crit: boolean;
+  critMultiplier: number;
+  /** Dégâts bonus ajoutés après le crit (on-hit), dans le même événement `damage`. */
+  bonus: number;
+  damageType: import('@lov/shared').DamageType;
+}
+
+/**
+ * Points d'extension de la simulation : les systèmes des autres agents s'y enregistrent dans leur `init(world)`
+ * au lieu d'éditer les systèmes de claude-server. Tous les tableaux sont exécutés dans l'ordre d'enregistrement.
+ */
+export interface WorldHooks {
+  /** Avant mitigation : modifier ctx.amount / multiplier / pen (Exhaust, fortification, passif de Nyx, stase...). */
+  beforeDamage: ((ctx: DamageContext, world: World) => void)[];
+  /** Après application (dealt = PV + bouclier retirés). */
+  afterDamage: ((ctx: DamageContext, dealt: number, world: World) => void)[];
+  /** Modifie un soin (anti-soin, amplification). */
+  beforeHeal: ((ctx: HealContext, world: World) => void)[];
+  /** Retourne true pour empêcher une mort (l'entité doit alors avoir hp > 0, ex. stase / ange gardien). */
+  preventDeath: ((target: Entity, killer: Entity | undefined, world: World) => boolean)[];
+  /** Prime d'or d'un kill (mistral-economy). Le premier hook qui retourne un nombre gagne. */
+  bounty: ((victim: Entity, killer: Entity | undefined, assists: Entity[], world: World) => number | undefined)[];
+  /** Durée de mort d'un champion (s). Le premier hook qui retourne un nombre gagne ; sinon formule par défaut. */
+  respawnTime: ((victim: Entity, world: World) => number | undefined)[];
+  /** false = l'entité ne peut pas se déplacer ce tick (root, stun, canalisation...). */
+  canMove: ((e: Entity, world: World) => boolean)[];
+  /** false = l'entité ne peut pas auto-attaquer (stun, désarmement, blind géré via beforeAttackHit...). */
+  canAttack: ((e: Entity, world: World) => boolean)[];
+  /** false = la cible n'est pas ciblable par `attacker` (invulnérable, stase, untargetable...). */
+  isTargetable: ((target: Entity, attacker: Entity, world: World) => boolean)[];
+  /** Avant l'impact d'une auto-attaque : modifier amount/crit/bonus (passifs d'AA, buff rouge, tours...). */
+  beforeAttackHit: ((ctx: AttackContext, world: World) => void)[];
+  /** Après l'impact d'une auto-attaque (on-hit : appliquer des buffs, cumuls...). */
+  afterAttackHit: ((ctx: AttackContext, dealt: number, world: World) => void)[];
+}
+
+const emptyHooks = (): WorldHooks => ({
+  beforeDamage: [],
+  afterDamage: [],
+  beforeHeal: [],
+  preventDeath: [],
+  bounty: [],
+  respawnTime: [],
+  canMove: [],
+  canAttack: [],
+  isTargetable: [],
+  beforeAttackHit: [],
+  afterAttackHit: [],
+});
+
 export interface System {
   name: string;
   /** Appelé une fois au démarrage de la partie (spawn des structures, abonnements EventBus...). */
@@ -110,6 +190,8 @@ export class World {
   events = new EventBus();
   /** Commandes joueurs reçues depuis le dernier tick ; lisibles par tous les systèmes, vidées en fin de tick. */
   commands: QueuedCommand[] = [];
+  /** Points d'extension (voir WorldHooks). */
+  hooks: WorldHooks = emptyHooks();
   tick = 0;
   time = 0; // secondes de jeu
   winner: Team | null = null;
@@ -130,7 +212,15 @@ export class World {
   }
 
   remove(id: EntityId): void {
+    const e = this.entities.get(id);
+    if (e?.champ && this.players.get(e.champ.playerId) === id) this.players.delete(e.champ.playerId);
     this.entities.delete(id);
+  }
+
+  /** Teste tous les hooks booléens : false si l'un d'eux refuse. */
+  allow<A extends unknown[]>(fns: ((...args: [...A, World]) => boolean)[], ...args: A): boolean {
+    for (const fn of fns) if (!fn(...args, this)) return false;
+    return true;
   }
 
   get(id: EntityId | undefined): Entity | undefined {

@@ -3,7 +3,6 @@ import { CHAMPION_LIST, TICK_DT, dist, getChampion, type AbilitySlot, type Champ
 import { World, createChampion, type Entity } from '../src/world.ts';
 import { createSystems } from '../src/systems/index.ts';
 import { canAttack, canMove, hasCC, recalculateStats } from '../src/combat/buffs.ts';
-import { applyDamage } from '../src/combat/damage.ts';
 import { castAbility } from '../src/abilities/engine.ts';
 import { grantXP, xpForLevel } from '../src/systems/leveling.ts';
 import { cast, game, advance } from './champion-helpers.ts';
@@ -17,21 +16,18 @@ const LOADOUTS: Record<ChampionClass, string[]> = {
   support: ['amplifying_tome', 'ruby_crystal', 'boots'],
 };
 interface DuelResult { winner: string | null; seconds: number; damage: [number, number]; hp: [number, number] }
-/** Deterministic integration harness. Combat is still a stub, so it injects confirmed AA hits
- * through the public damage API, enforcing range, AS, CC and windup. No random crit rolls.
- */
+/** Deterministic integration harness using the real combat, movement, vision and champion systems.
+ * Standard class loadouts have no random crit chance; both AIs alternate initiative each tick. */
 export function simulateDuel(a: string, b: string, level: number): DuelResult {
   const world = new World(createSystems());
   const champions = [a, b].map((id, i) => {
-    const e = createChampion(world, { playerId: `p${i}`, name: id, championId: id, team: i ? 'red' : 'blue', summoners: ['flash', 'ignite'], pos: { x: 1000 + i * 400, y: 1000 } });
+    const e = createChampion(world, { playerId: `p${i}`, name: id, championId: id, team: i ? 'red' : 'blue', summoners: ['flash', 'ignite'], pos: { x: 6000 + i * 400, y: 1000 } });
     grantXP(world, e, xpForLevel(level));
     e.champ!.abilityLevels = level === 6 ? { Q: 3, W: 1, E: 1, R: 1 } : { Q: 5, W: 3, E: 1, R: 2 };
     e.champ!.skillPoints = 0; e.champ!.items = [...LOADOUTS[getChampion(id).class], null, null, null];
     recalculateStats(world, e); e.hp = e.stats.maxHp; e.mana = e.stats.maxMana;
     return e;
   }) as [Entity, Entity];
-  const nextAttack = [0, 0];
-  const windups: { source: Entity; target: Entity; at: number }[] = [];
   world.init();
   for (let tick = 0; tick < 30 * 35 && champions.every((e) => !e.dead); tick++) {
     // Alternate initiative per tick to avoid giving one side a permanent lethal-hit priority.
@@ -44,18 +40,8 @@ export function simulateDuel(a: string, b: string, level: number): DuelResult {
         if (castAbility(world, source, { t: 'cast', slot, targetId: ally ? source.id : target.id, targetPos: { ...target.pos } }, false)) break;
         if (def.targeting === 'self') continue;
       }
-      if (canAttack(source) && !source.data.dash && dist(source.pos, target.pos) <= source.stats.attackRange + source.radius + target.radius && world.time >= nextAttack[index]!) {
-        world.events.emit({ type: 'autoAttack', source: source.id, target: target.id, ranged: getChampion(source.champ!.championId).ranged });
-        windups.push({ source, target, at: world.time + getChampion(source.champ!.championId).attackWindup / source.stats.attackSpeed });
-        nextAttack[index] = world.time + 1 / source.stats.attackSpeed;
-      } else if (canMove(source) && !source.data.dash && dist(source.pos, target.pos) > source.stats.attackRange + source.radius + target.radius) source.moveTarget = { ...target.pos };
-    }
-    for (let i = windups.length - 1; i >= 0; i--) {
-      const attack = windups[i]!;
-      if (world.time < attack.at) continue;
-      windups.splice(i, 1);
-      if (!attack.source.dead && !attack.target.dead && canAttack(attack.source) && !hasCC(attack.source, 'blind') && dist(attack.source.pos, attack.target.pos) <= attack.source.stats.attackRange + attack.source.radius + attack.target.radius + 100)
-        applyDamage(world, { source: attack.source, target: attack.target, amount: attack.source.stats.ad, type: 'physical' });
+      if (canAttack(source) && !source.data.dash) source.attackTarget = target.id;
+      else if (canMove(source) && !source.data.dash && dist(source.pos, target.pos) > source.stats.attackRange + source.radius + target.radius) source.moveTarget = { ...target.pos };
     }
     world.step(TICK_DT);
     world.events.drain(); // Simulate snapshots; do not retain unbounded events in long duels.

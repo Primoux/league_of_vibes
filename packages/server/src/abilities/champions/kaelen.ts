@@ -1,5 +1,5 @@
 import { addBuff } from '../../combat/buffs.ts';
-import { applyShield } from '../../combat/damage.ts';
+import { applyShield } from '../effects.ts';
 import { cc, hit, param, type AbilityHandler } from '../context.ts';
 import { enemiesInRadius, startDash } from '../primitives.ts';
 export const kaelen: Record<'Q' | 'W' | 'E' | 'R', AbilityHandler> = {

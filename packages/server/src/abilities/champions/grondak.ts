@@ -1,5 +1,5 @@
 import { getChampion } from '@lov/shared';
-import { applyShield } from '../../combat/damage.ts';
+import { applyShield } from '../effects.ts';
 import { addBuff, getBuff, removeBuff } from '../../combat/buffs.ts';
 import { cc, hit, line, param, type AbilityHandler } from '../context.ts';
 import { delayedArea, distWithin, enemiesInRadius, startDash } from '../kitUtils.ts';
@@ -11,7 +11,7 @@ export const grondak: Record<'Q' | 'W' | 'E' | 'R', AbilityHandler> = {
     for (const enemy of enemiesInRadius(ctx.world, ctx.source, ctx.source.pos, ctx.def.radius!)) cc(ctx, enemy, 'taunt', param(ctx, 'taunt'));
   },
   E(ctx) {
-    startDash(ctx.world, ctx.source, ctx.target!.pos, { fxKey: ctx.def.fxKey, speed: ctx.def.speed!, onEnd: () => {
+    startDash(ctx.world, ctx.source, ctx.target!.pos, { fxKey: ctx.def.fxKey, speed: ctx.def.speed!, target: ctx.target, onEnd: () => {
       if (distWithin(ctx.source, ctx.target!, 200)) { hit(ctx, ctx.target!); cc(ctx, ctx.target!, 'stun', param(ctx, 'stun')); }
     } });
   },

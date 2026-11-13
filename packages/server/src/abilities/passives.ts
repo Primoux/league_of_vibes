@@ -2,9 +2,9 @@ import { dist, dist2, getChampion } from '@lov/shared';
 import { addBuff, breakInvisibility, getBuff, getBuffs, removeBuff } from '../combat/buffs.ts';
 import { applyDamage, applyHeal } from '../combat/damage.ts';
 import { registerDamageModifier } from './combatHooks.ts';
-import { atRank, scaling } from './context.ts';
+import { scaling } from './context.ts';
 import { enemiesInRadius, isUnit } from './primitives.ts';
-import type { Entity, World } from '../world.ts';
+import type { DamageContext, Entity, World } from '../world.ts';
 import { updateGranite } from './champions/grondak.ts';
 interface PassiveState { attacks: number; momentum: number; lastPos: { x: number; y: number } }
 interface Bleed { source: number; stacks: number; expires: number; nextTick: number }
@@ -34,19 +34,22 @@ function addBleed(world: World, source: Entity, target: Entity): void {
 export function initPassives(world: World): void {
   if (initialized.has(world)) return;
   initialized.add(world);
+  const beforeHp = new WeakMap<DamageContext, number>();
+  world.hooks.beforeDamage.push((ctx) => { beforeHp.set(ctx, ctx.target.hp); });
   registerDamageModifier(world, (context) => {
-    const { source, target } = context;
+    const source = context.credit ?? context.source, target = context.target;
+    if (!source) return;
     const frostShield = getBuff(target, 'ilyra_e');
     if (frostShield && (frostShield.shieldRemaining ?? 0) > 0 && source.team !== target.team)
       addBuff(world, source, 'slow', { duration: 1, source: frostShield.source, params: { amount: .2 } });
     if (!source.champ || source.team === target.team) return;
     const id = source.champ.championId, passive = getChampion(id).passive.params!;
-    if (id === 'nyx' && (context.ability === undefined || context.ability.startsWith('nyx_'))) {
+    if (id === 'nyx' && (context.isAutoAttack || context.ability?.startsWith('nyx_'))) {
       let isolated = true;
       for (const ally of world.entities.values()) if (ally.id !== target.id && !ally.dead && ally.team === target.team && isUnit(ally) && dist2(ally.pos, target.pos) <= Number(passive.isolationRadius) ** 2) { isolated = false; break; }
       if (isolated) context.amount *= 1 + Number(passive.amp);
     }
-    if (context.ability !== undefined) return;
+    if (!context.isAutoAttack) return;
     if (id === 'kaelen' && (state(source).attacks + 1) % Number(passive.everyN) === 0) context.amount *= 1 + Number(passive.bonus);
     if (id === 'sable') {
       if (getBuff(source, 'sable_e', source.id)) {
@@ -58,19 +61,20 @@ export function initPassives(world: World): void {
     }
   });
   world.events.on('autoAttack', ({ source }) => { const e = world.get(source); if (e) breakInvisibility(world, e); });
-  world.events.on('damage', (event) => {
-    const source = world.get(event.source), target = world.get(event.target);
+  world.hooks.afterDamage.push((context, dealt) => {
+    const source = context.credit ?? context.source, target = context.target;
+    const hpLost = Math.min(beforeHp.get(context) ?? dealt, Math.max(0, (beforeHp.get(context) ?? target.hp) - target.hp));
+    const event = { amount: dealt, ability: context.ability, crit: context.crit };
     if (!source || !target) return;
     // Nyx records actual health damage, including damage from allies, never shield absorption/overkill.
-    if (event.ability !== 'nyx_r') for (const mark of getBuffs(target)) if (mark.id === 'nyx_r') mark.params.stored = Number(mark.params.stored ?? 0) + event.amount;
+    if (event.ability !== 'nyx_r') for (const mark of getBuffs(target)) if (mark.id === 'nyx_r') mark.params.stored = Number(mark.params.stored ?? 0) + hpLost;
     if (!source.champ || target.dead || source.team === target.team) return;
     const id = source.champ.championId, passive = getChampion(id).passive.params!;
-    if (event.ability === undefined) {
-      breakInvisibility(world, source);
+    if (context.isAutoAttack) {
       state(source).attacks++;
       if (id === 'kaelen' && state(source).attacks % Number(passive.everyN) === 0) applyHeal(world, { source, target: source, amount: event.amount * Number(passive.heal) });
-      if (id === 'corvin') markCorvin(world, source, target);
-      if (id === 'tharox' && state(source).momentum >= 100) {
+      if (id === 'corvin' && target.hp > 0) markCorvin(world, source, target);
+      if (id === 'tharox' && target.hp > 0 && state(source).momentum >= 100) {
         state(source).momentum = 0;
         applyDamage(world, { source, target, amount: target.stats.maxHp * Number(passive.bonusTargetMaxHp), type: 'physical', ability: 'tharox_p' });
         addBuff(world, target, 'slow', { duration: Number(passive.slowDuration ?? 1.5), source, params: { amount: Number(passive.slow) }, definition: { fxKey: 'tharox_p' } });
@@ -85,10 +89,10 @@ export function initPassives(world: World): void {
         }
       }
     }
-    if (event.amount <= 0) return;
+    if (event.amount <= 0 || target.hp <= 0) return;
     if (id === 'sable' && target.champ) addBuff(world, source, 'sable_p_speed', { source, duration: Number(passive.duration), params: { statPercentMods: { moveSpeed: Number(passive.moveSpeed) } }, definition: { fxKey: 'sable_p' } });
     if (id === 'corvin' && event.ability === 'corvin_q') markCorvin(world, source, target);
-    if (id === 'vrenna' && (event.ability === undefined || (event.ability.startsWith('vrenna_') && event.ability !== 'vrenna_p'))) addBleed(world, source, target);
+    if (id === 'vrenna' && (context.isAutoAttack || (event.ability?.startsWith('vrenna_') && event.ability !== 'vrenna_p'))) addBleed(world, source, target);
     if (id === 'ilyra' && event.ability?.startsWith('ilyra_') && !getBuff(target, 'ilyra_frost_immunity', source.id)) {
       const buff = addBuff(world, target, 'ilyra_frost', { duration: Number(passive.markDuration ?? 4), source, definition: { kind: 'debuff', maxStacks: Number(passive.stacks), fxKey: 'ilyra_p' } });
       if (buff && buff.stacks >= Number(passive.stacks)) {
@@ -109,7 +113,7 @@ export function initPassives(world: World): void {
 }
 export function updatePassives(world: World, _dt: number): void {
   for (const e of world.entities.values()) {
-    if (e.dead) { if (e.champ) state(e).momentum = 0; delete e.data.vrennaBleeds; continue; }
+    if (e.dead) { if (e.champ) { state(e).momentum = 0; state(e).attacks = 0; state(e).lastPos = { ...e.pos }; } delete e.data.vrennaBleeds; continue; }
     if (e.champ?.championId === 'grondak') updateGranite({ world, source: e });
     if (e.champ?.championId === 'tharox') {
       const s = state(e);

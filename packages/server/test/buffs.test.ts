@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { World, createChampion } from '../src/world.ts';
 import { buffsSystem } from '../src/systems/buffs.ts';
 import { addBuff, getBuff, hasCC, recalculateStats, registerStatSource } from '../src/combat/buffs.ts';
-import { applyDamage, applyHeal, applyShield } from '../src/combat/damage.ts';
+import { applyDamage, applyHeal, applyShield } from '../src/abilities/effects.ts';
 const setup = () => {
   const world = new World([buffsSystem]);
   const e = createChampion(world, { playerId: 'p', name: 'Test', team: 'blue', championId: 'grondak', summoners: ['flash', 'ignite'], pos: { x: 1000, y: 1000 } });
@@ -63,5 +63,32 @@ describe('Buffs and damage contract', () => {
       world.step(); world.step();
       expect(e.stats.ad).toBe(expected);
     } finally { unsubscribe(); }
+  });
+});
+
+describe('Core-server integration', () => {
+  it('slows non-champion units without accumulating modifiers or altering their base stats', () => {
+    const { world, e } = setup();
+    const minion = world.spawn({ kind: 'minion', team: 'red', pos: { x: 2000, y: 1000 }, hp: 100, mana: 0, radius: 30, stats: { ...e.stats, maxHp: 100, moveSpeed: 300 } });
+    addBuff(world, minion, 'slow', { duration: 1, params: { amount: .4 } });
+    expect(minion.stats.moveSpeed).toBe(180);
+    world.step(.5); expect(minion.stats.moveSpeed).toBe(180);
+    world.step(.5); expect(minion.stats.moveSpeed).toBe(300);
+  });
+  it('registers CC and stasis with the server movement/attack/targeting hooks', () => {
+    const { world, e } = setup(); world.init();
+    addBuff(world, e, 'root', { duration: 1 });
+    expect(world.allow(world.hooks.canMove, e)).toBe(false);
+    expect(world.allow(world.hooks.canAttack, e)).toBe(true);
+    e.data.stasis = true;
+    expect(world.allow(world.hooks.isTargetable, e, e)).toBe(false);
+    expect(applyDamage(world, { source: e, target: e, amount: 100, type: 'true' })).toBe(0);
+  });
+  it('allows taunted units to attack only their forced target', () => {
+    const { world, e } = setup(); world.init();
+    const taunter = world.spawn({ kind: 'champion', team: 'red', pos: { x: 1300, y: 1000 }, hp: 100, mana: 0, radius: 65, stats: { ...e.stats } });
+    addBuff(world, e, 'taunt', { duration: 1, source: taunter }); world.step();
+    expect(e.attackTarget).toBe(taunter.id);
+    expect(world.allow(world.hooks.canAttack, e)).toBe(true);
   });
 });

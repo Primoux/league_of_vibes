@@ -1,6 +1,8 @@
 import { ITEMS, clamp, getChampion, statAtLevel, type Stats } from '@lov/shared';
 import { BUFFS } from '../../../shared/src/data/buffs.ts';
 import type { BuffDef, CCType } from '@lov/shared';
+import { removeShield } from './damage.ts';
+import { cancelAttack } from '../systems/combat.ts';
 import type { Entity, World } from '../world.ts';
 
 export interface BuffParams {
@@ -54,21 +56,25 @@ export const hasBuff = (e: Entity, id: string): boolean => !!getBuff(e, id);
 export const hasCC = (e: Entity, cc: CCType): boolean => getBuffs(e).some((b) => b.remaining > 0 && b.def.cc === cc);
 const hardCC = (e: Entity): boolean => ['stun', 'knockup', 'suppress', 'fear', 'taunt'].some((c) => hasCC(e, c as CCType));
 export const canAct = (e: Entity): boolean => !e.dead && !hardCC(e) && !e.data.stasis;
-export const canMove = (e: Entity): boolean => canAct(e) && !hasCC(e, 'root') && !e.data.casting && !e.data.channeling;
-export const canAttack = (e: Entity): boolean => canAct(e) && !e.data.casting && !e.data.channeling;
+export const canMove = (e: Entity): boolean => !e.dead && !e.data.stasis && !['stun', 'knockup', 'suppress', 'fear', 'root'].some((c) => hasCC(e, c as CCType))
+  && (!hasCC(e, 'taunt') || e.data.tauntForcedMove === true) && !e.data.casting && !e.data.channeling;
+export const canAttack = (e: Entity): boolean => !e.dead && !e.data.stasis && !['stun', 'knockup', 'suppress', 'fear'].some((c) => hasCC(e, c as CCType)) && !e.data.casting && !e.data.channeling;
 export const canCast = (e: Entity): boolean => canAct(e) && !hasCC(e, 'silence') && !e.data.casting && !e.data.channeling;
 export function getTenacity(e: Entity): number {
   let remaining = 1 - clamp(Number(e.data.itemTenacity ?? 0), 0, 0.9);
   for (const b of getBuffs(e)) remaining *= 1 - clamp(b.params.tenacity ?? 0, 0, 0.9);
   return clamp(1 - remaining, 0, 0.9);
 }
-function syncFlags(e: Entity): void {
+function syncFlags(world: World, e: Entity): void {
   const buffs = getBuffs(e);
   e.data.invisible = buffs.some((b) => b.id === 'invisible' || b.params.invisible);
   e.data.ghosted = buffs.some((b) => b.params.ghosted);
   e.data.revealed = buffs.some((b) => b.params.revealed);
+  e.data.ghost = e.data.ghosted;
+  e.data.revealedUntil = Math.max(-Infinity, ...buffs.filter((b) => b.params.revealed).map((b) => world.time + b.remaining));
 }
 export function addBuff(world: World, target: Entity, buffId: string, opts: BuffOptions): BuffInstance | undefined {
+  initBuffs(world);
   if (target.dead || !Number.isFinite(opts.duration) || opts.duration <= 0) return;
   const source = typeof opts.source === 'number' ? opts.source : opts.source?.id;
   const def: BuffDef = { id: buffId, name: buffId, kind: 'buff', ...BUFFS[buffId], ...opts.definition };
@@ -84,8 +90,8 @@ export function addBuff(world: World, target: Entity, buffId: string, opts: Buff
     buff = { id: buffId, source, remaining: duration, duration, stacks: Math.min(def.maxStacks ?? 1, opts.stacks ?? 1), params: { ...opts.params }, def };
     getBuffs(target).push(buff);
   }
-  syncFlags(target);
-  if (target.champ) recalculateStats(world, target);
+  syncFlags(world, target);
+  recalculateStats(world, target);
   world.events.emit({ type: 'buffApplied', target: target.id, buffId, source, duration, stacks: buff.stacks, fxKey: def.fxKey ?? buffId });
   return buff;
 }
@@ -94,12 +100,12 @@ export function removeBuff(world: World, target: Entity, buffId: string, source?
   for (let i = buffs.length - 1; i >= 0; i--) {
     const b = buffs[i]!;
     if (b.id !== buffId || (source !== undefined && b.source !== source)) continue;
-    target.shield = Math.max(0, target.shield - (b.shieldRemaining ?? 0));
+    if (typeof b.params.shieldId === 'string') removeShield(target, b.params.shieldId);
     buffs.splice(i, 1);
     world.events.emit({ type: 'buffRemoved', target: target.id, buffId, fxKey: b.def.fxKey ?? buffId });
   }
-  syncFlags(target);
-  if (target.champ) recalculateStats(world, target);
+  syncFlags(world, target);
+  recalculateStats(world, target);
 }
 export function cleanse(world: World, e: Entity): void {
   for (const b of [...getBuffs(e)]) {
@@ -123,12 +129,24 @@ export function getStatMods(e: Entity): StatModifiers {
   }
   return { flat, percent, tenacity: getTenacity(e) };
 }
+/** Keeps changing minion/monster base stats separate from temporary modifiers. */
+export function setBaseStats(world: World, e: Entity, stats: Stats): void {
+  if (e.champ) return;
+  if (getBuffs(e).length) e.data.buffBaseStats = { ...stats };
+  else Object.assign(e.stats, stats);
+  recalculateStats(world, e);
+}
 export function recalculateStats(world: World, e: Entity): void {
-  if (!e.champ) return;
-  const def = getChampion(e.champ.championId);
+  const def = e.champ ? getChampion(e.champ.championId) : undefined;
+  if (!def && getBuffs(e).length === 0) {
+    const original = e.data.buffBaseStats as Stats | undefined;
+    if (original) { Object.assign(e.stats, original); e.hp = Math.min(e.hp, e.stats.maxHp); delete e.data.buffBaseStats; }
+    return;
+  }
+  const baseStats = def?.baseStats ?? (e.data.buffBaseStats ??= { ...e.stats }) as Stats;
   const { flat = {}, percent = {} } = getStatMods(e);
-  e.data.baseAd = statAtLevel(def.baseStats.ad, def.perLevel.ad ?? 0, e.champ.level);
-  for (const id of e.champ.items) if (id && ITEMS[id]) mergeStats(flat, ITEMS[id].stats);
+  e.data.baseAd = def ? statAtLevel(def.baseStats.ad, def.perLevel.ad ?? 0, e.champ!.level) : baseStats.ad;
+  for (const id of e.champ?.items ?? []) if (id && ITEMS[id]) mergeStats(flat, ITEMS[id].stats);
   let tenacity = 0;
   for (const fn of statSources) {
     const mods = fn(world, e);
@@ -138,34 +156,19 @@ export function recalculateStats(world: World, e: Entity): void {
     tenacity = 1 - (1 - tenacity) * (1 - (mods.tenacity ?? 0));
   }
   e.data.itemTenacity = tenacity;
-  for (const key of Object.keys(def.baseStats) as (keyof Stats)[]) {
-    const base = statAtLevel(def.baseStats[key], def.perLevel[key] ?? 0, e.champ.level);
+  for (const key of Object.keys(baseStats) as (keyof Stats)[]) {
+    const base = def ? statAtLevel(baseStats[key], def.perLevel[key] ?? 0, e.champ!.level) : baseStats[key];
     e.stats[key] = (base + (flat[key] ?? 0)) * (1 + (percent[key] ?? 0));
   }
   let slow = 0;
   for (const b of getBuffs(e)) if (b.def.cc === 'slow') slow = Math.max(slow, Number(b.params.amount ?? b.params.slow ?? 0));
   e.stats.moveSpeed = Math.max(0, e.stats.moveSpeed * (1 - clamp(slow, 0, 0.99)));
-  e.stats.attackSpeed = clamp(e.stats.attackSpeed, 0.1, 2.5);
+  e.stats.attackSpeed = e.stats.attackSpeed > 0 ? clamp(e.stats.attackSpeed, 0.1, 2.5) : 0;
   e.stats.critChance = clamp(e.stats.critChance, 0, 1);
   e.stats.maxHp = Math.max(1, e.stats.maxHp);
   e.stats.maxMana = Math.max(0, e.stats.maxMana);
   e.hp = Math.min(e.hp, e.stats.maxHp);
   e.mana = clamp(e.mana, 0, e.stats.maxMana);
-}
-/** Consume shields with the earliest expiry first, then any shield owned by another system. */
-export function absorbShield(world: World, e: Entity, amount: number): number {
-  let left = Math.min(amount, e.shield);
-  const absorbed = left;
-  const buckets = getBuffs(e).filter((b) => (b.shieldRemaining ?? 0) > 0).sort((a, b) => a.remaining - b.remaining);
-  for (const b of buckets) {
-    const used = Math.min(left, b.shieldRemaining!);
-    b.shieldRemaining! -= used;
-    left -= used;
-    // Keep the empty bucket until expiry: associated effects (e.g. frost shield) still have a duration.
-    if (left <= 0) break;
-  }
-  e.shield = Math.max(0, e.shield - absorbed);
-  return amount - absorbed;
 }
 export function strongestParam(e: Entity, key: string): number {
   let out = 0;
@@ -173,6 +176,7 @@ export function strongestParam(e: Entity, key: string): number {
   return out;
 }
 export function updateBuffs(world: World, dt: number): void {
+  initBuffs(world);
   for (const e of world.entities.values()) {
     const buffs = getBuffs(e);
     for (let i = buffs.length - 1; i >= 0; i--) {
@@ -180,11 +184,51 @@ export function updateBuffs(world: World, dt: number): void {
       b.remaining -= dt;
       if (b.remaining <= 1e-8 || (e.dead && b.params.persistOnDeath !== true)) removeBuff(world, e, b.id, b.source);
     }
-    if (e.champ) recalculateStats(world, e);
-    // Enforce controls even with the bootstrap movement system.
-    if (!canMove(e)) { e.moveTarget = undefined; e.path = undefined; }
-    if (!canAttack(e) || hasCC(e, 'blind')) e.attackTarget = undefined;
+    if (e.champ || buffs.length || e.data.buffBaseStats) recalculateStats(world, e);
+    e.data.tauntForcedMove = false;
     const taunt = buffs.find((b) => b.def.cc === 'taunt');
-    if (taunt && !e.dead && world.get(taunt.source) && !world.get(taunt.source)!.dead) e.attackTarget = taunt.source;
+    const taunter = world.get(taunt?.source);
+    if (taunter && !taunter.dead && canAttack(e)) {
+      e.attackTarget = taunter.id;
+      e.data.tauntForcedMove = true;
+      const outOfRange = Math.hypot(taunter.pos.x - e.pos.x, taunter.pos.y - e.pos.y) > e.stats.attackRange + e.radius + taunter.radius;
+      e.moveTarget = outOfRange ? { ...taunter.pos } : undefined;
+      e.path = undefined;
+    }
+    if (!canMove(e)) { e.moveTarget = undefined; e.path = undefined; }
+    if (!canAttack(e)) { cancelAttack(e); e.attackTarget = undefined; }
+
   }
+}
+
+const initialized = new WeakSet<World>();
+/** Controls and mitigation plug into the server's hooks; no edits to another system. */
+export function initBuffs(world: World): void {
+  if (initialized.has(world)) return;
+  initialized.add(world);
+  world.hooks.canMove.push((e) => canMove(e));
+  world.hooks.canAttack.push((e) => canAttack(e));
+  world.hooks.isTargetable.push((e) => !e.data.stasis);
+  world.hooks.beforeAttackHit.push((ctx) => { if (hasCC(ctx.attacker, 'blind')) { ctx.amount = 0; ctx.bonus = 0; } });
+  world.hooks.beforeDamage.push((ctx) => {
+    if (!Number.isFinite(ctx.amount) || ctx.target.data.stasis) { ctx.amount = 0; return; }
+    const source = ctx.credit ?? ctx.source;
+    const parry = getBuff(ctx.target, 'kaelen_w');
+    if (parry && source?.champ && source.team !== ctx.target.team) {
+      removeBuff(world, ctx.target, parry.id, parry.source);
+      ctx.amount = 0;
+      if (Math.hypot(source.pos.x - ctx.target.pos.x, source.pos.y - ctx.target.pos.y) <= 250 + source.radius + ctx.target.radius)
+        addBuff(world, source, 'stun', { duration: Number(parry.params.stun ?? 1), source: ctx.target });
+      return;
+    }
+    if (ctx.type !== 'true') {
+      ctx.multiplier *= 1 - Math.min(.95, source ? strongestParam(source, 'damageDealtReduction') : 0);
+      ctx.multiplier *= 1 - Math.min(.95, strongestParam(ctx.target, 'damageReduction'));
+    }
+  });
+  world.hooks.afterDamage.push((ctx) => {
+    const source = ctx.credit ?? ctx.source;
+    if (source?.champ && ctx.target.champ && source.team !== ctx.target.team) ctx.target.data.lastChampionDamageAt = world.time;
+  });
+  world.hooks.beforeHeal.push((ctx) => { ctx.amount *= 1 - Math.min(1, strongestParam(ctx.target, 'grievous')); });
 }

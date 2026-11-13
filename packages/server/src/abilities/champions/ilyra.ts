@@ -1,4 +1,4 @@
-import { applyShield } from '../../combat/damage.ts';
+import { applyShield } from '../effects.ts';
 import { cc, hit, line, param, type AbilityHandler } from '../context.ts';
 import { delayedArea, enemiesInRadius, spawnZone } from '../primitives.ts';
 export const ilyra: Record<'Q' | 'W' | 'E' | 'R', AbilityHandler> = {

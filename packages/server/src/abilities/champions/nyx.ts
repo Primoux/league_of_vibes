@@ -1,5 +1,5 @@
 import { addBuff, getBuff, removeBuff } from '../../combat/buffs.ts';
-import { applyDamage } from '../../combat/damage.ts';
+import { applyDamage } from '../effects.ts';
 import { cc, hit, param, scaling, type AbilityHandler } from '../context.ts';
 import { blink, schedule } from '../primitives.ts';
 export const nyx: Record<'Q' | 'W' | 'E' | 'R', AbilityHandler> = {

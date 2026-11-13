@@ -76,7 +76,7 @@ export const levelingSystem: System = {
     for (const e of world.query('champion')) {
       if (e.dead || !e.champ) continue;
       e.data.xpRewarded = false;
-      if (e.hp < e.stats.maxHp) applyHeal(world, { source: e, target: e, amount: e.stats.hpRegen / 5 * dt });
+      if (e.hp < e.stats.maxHp) applyHeal(world, { source: e, target: e, amount: e.stats.hpRegen / 5 * dt, silent: true });
       if (getChampion(e.champ.championId).resource !== 'none') e.mana = Math.min(e.stats.maxMana, e.mana + e.stats.manaRegen / 5 * dt);
     }
   },

@@ -1,7 +1,7 @@
 import { SUMMONERS, dist2, type ClientMsg, type SummonerId, type SummonerSlot } from '@lov/shared';
 import { addBuff, canAct, cleanse, hasCC } from '../combat/buffs.ts';
-import { applyDamage, applyHeal, applyShield } from '../combat/damage.ts';
-import { blink, schedule, validLanding, validPoint } from '../abilities/primitives.ts';
+import { applyDamage, applyHeal, applyShield } from '../abilities/effects.ts';
+import { blink, isVisibleTarget, schedule, validLanding, validPoint } from '../abilities/primitives.ts';
 import type { Entity, System, World } from '../world.ts';
 interface TeleportChannel { until: number; target: Entity; from: { x: number; y: number }; interrupted: boolean }
 interface SummonerState { channel?: TeleportChannel }
@@ -31,7 +31,7 @@ export function castSummoner(world: World, e: Entity, command: Extract<ClientMsg
     if (id === 'teleport') {
       if (target.team !== e.team || !['tower', 'minion', 'ward', 'inhibitor', 'nexus'].includes(target.kind)) return false;
     } else {
-      if (target.team === e.team || target.data.invisible) return false;
+      if (target.team === e.team || !isVisibleTarget(world, e, target)) return false;
       if (id === 'smite' ? !['monster', 'minion'].includes(target.kind) : target.kind !== 'champion') return false;
     }
   }

@@ -1,9 +1,17 @@
 import { MAP_SIZE, WALLS, clamp, dist, dist2, moveTowards, pointInPolygon, type Vec2 } from '@lov/shared';
 import { canAct, hasCC } from '../combat/buffs.ts';
+import { isVisibleTo } from '../systems/vision.ts';
+import { movementSystem, type DashData } from '../systems/movement.ts';
 import type { Entity, World } from '../world.ts';
 
 export const isUnit = (e: Entity): boolean => ['champion', 'minion', 'monster'].includes(e.kind);
-export const isEnemy = (source: Entity, target: Entity): boolean => !target.dead && source.id !== target.id && source.team !== target.team && isUnit(target) && !target.data.stasis;
+export const isEnemy = (source: Entity, target: Entity): boolean => !target.dead && target.hp > 0 && source.id !== target.id && source.team !== target.team && isUnit(target) && !target.data.stasis;
+export function isVisibleTarget(world: World, source: Entity, target: Entity): boolean {
+  if (source.team === target.team) return true;
+  if (Number(target.data.revealedUntil ?? -Infinity) > world.time || target.data.revealed) return true;
+  if (target.data.invisible) return false;
+  return isVisibleTo(target, source.team);
+}
 export const validPoint = (p: Vec2 | undefined): p is Vec2 => !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
 export function direction(from: Vec2, to: Vec2, fallback = 0): Vec2 {
   const d = dist(from, to);
@@ -48,7 +56,7 @@ export interface ZoneOptions {
   follow?: Entity; invisible?: boolean; onTick: (zone: Entity, elapsed: number) => void; onEnd?: () => void;
 }
 interface Zone { entity: Entity; options: ZoneOptions; start: number; next: number; expires: number }
-export interface DashState {
+export interface DashState extends DashData {
   from: Vec2; to: Vec2; speed: number; duration: number; remaining: number; fxKey: string;
   /** Integration: movement may own advancement by setting handlesDashes=true on its System. */
   unstoppable?: boolean;
@@ -56,7 +64,7 @@ export interface DashState {
 interface Dash { source: Entity; data: DashState; previous: Vec2; hit: Set<number>; options: DashOptions }
 export interface DashOptions {
   fxKey: string; speed: number; width?: number; stopOnFirst?: boolean; unstoppable?: boolean;
-  crossWalls?: boolean; onHit?: (target: Entity) => void; onEnd?: () => void;
+  crossWalls?: boolean; target?: Entity; onHit?: (target: Entity) => void; onEnd?: () => void;
 }
 interface Runtime { tasks: Task[]; projectiles: Map<number, Projectile>; zones: Map<number, Zone>; dashes: Map<number, Dash> }
 const runtimes = new WeakMap<World, Runtime>();
@@ -152,13 +160,42 @@ export function startDash(world: World, source: Entity, desired: Vec2, options: 
     }
   }
   const duration = dist(from, to) / Math.max(1, options.speed);
-  const data: DashState = { from, to, speed: options.speed, duration, remaining: duration, fxKey: options.fxKey, unstoppable: options.unstoppable };
-  runtime(world).dashes.set(source.id, { source, data, options, previous: { ...from }, hit: new Set() });
+  const usesMovement = world.systems.includes(movementSystem);
+  const data: DashState = { from, to, speed: options.speed, duration, remaining: duration, fxKey: options.fxKey, unstoppable: options.unstoppable,
+    ignoreWalls: options.crossWalls, targetId: options.target?.id, stopDistance: options.target ? 0 : undefined };
+  const dash: Dash = { source, data, options, previous: { ...from }, hit: new Set() };
+  data.onArrive = () => { resolveDashHits(world, dash); finishDash(world, dash); };
+  runtime(world).dashes.set(source.id, dash);
   source.data.dash = data;
   source.moveTarget = undefined; source.path = undefined;
   source.anim = 'dash';
-  world.events.emit({ type: 'dash', source: source.id, from, to: { ...to }, duration, fxKey: options.fxKey });
+  if (!usesMovement) world.events.emit({ type: 'dash', source: source.id, from, to: { ...to }, duration, fxKey: options.fxKey });
 }
+function finishDash(world: World, dash: Dash): void {
+  if (!runtime(world).dashes.delete(dash.source.id)) return;
+  if (dash.source.data.dash === dash.data) delete dash.source.data.dash;
+  if (!dash.source.dead) dash.source.anim = 'idle';
+  dash.options.onEnd?.();
+}
+function resolveDashHits(world: World, dash: Dash): void {
+  if (!dash.options.onHit) return;
+  const e = dash.source, from = dash.previous, to = { ...e.pos };
+  const hits: { target: Entity; t: number }[] = [];
+  for (const target of world.entities.values()) {
+    if (!isEnemy(e, target) || dash.hit.has(target.id)) continue;
+    const t = segmentHit(from, to, target.pos, (dash.options.width ?? e.radius * 2) / 2 + target.radius);
+    if (t !== undefined) hits.push({ target, t });
+  }
+  hits.sort((a, b) => a.t - b.t || a.target.id - b.target.id);
+  for (const { target, t } of hits) {
+    dash.hit.add(target.id);
+    if (dash.options.stopOnFirst) e.pos = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+    dash.options.onHit(target);
+    if (dash.options.stopOnFirst) { finishDash(world, dash); break; }
+  }
+  dash.previous = { ...e.pos };
+}
+
 export function tether(world: World, source: Entity, target: Entity, duration: number, breakRange: number, onComplete: () => void): void {
   const start = world.time;
   const check = (): void => {
@@ -225,23 +262,16 @@ export function updatePrimitives(world: World, dt: number): void {
     }
     if (world.time + 1e-8 >= zone.expires) removeZone(world, zone.entity.id);
   }
-  const movementOwnsDashes = world.systems.some((s) => s.name === 'movement' && (s as { handlesDashes?: boolean }).handlesDashes === true);
-  for (const dash of rt.dashes.values()) {
+  const movementOwnsDashes = world.systems.includes(movementSystem);
+  for (const dash of [...rt.dashes.values()]) {
     const { source: e, data, options: o } = dash;
-    if (e.dead || !world.get(e.id) || (!data.unstoppable && (!canAct(e) || hasCC(e, 'root')))) {
-      rt.dashes.delete(e.id); delete e.data.dash; if (!e.dead) e.anim = 'idle'; continue;
+    if (e.dead || !world.get(e.id) || e.data.dash !== data || (!data.unstoppable && (!canAct(e) || hasCC(e, 'root')))) {
+      rt.dashes.delete(e.id); if (e.data.dash === data) delete e.data.dash; if (!e.dead) e.anim = 'idle'; continue;
     }
-    if (!movementOwnsDashes) { e.pos = moveTowards(e.pos, data.to, data.speed * dt); data.remaining = Math.max(0, data.remaining - dt); }
-    let stop = false;
-    if (o.onHit) for (const target of world.entities.values()) {
-      if (!isEnemy(e, target) || dash.hit.has(target.id)) continue;
-      if (segmentHit(dash.previous, e.pos, target.pos, (o.width ?? e.radius * 2) / 2 + target.radius) === undefined) continue;
-      dash.hit.add(target.id); o.onHit(target);
-      if (o.stopOnFirst) { stop = true; break; }
-    }
-    dash.previous = { ...e.pos };
-    if (stop || data.remaining <= 1e-8 || dist2(e.pos, data.to) < 1) {
-      rt.dashes.delete(e.id); delete e.data.dash; e.anim = 'idle'; o.onEnd?.();
-    }
+    if (!movementOwnsDashes) {
+      e.pos = moveTowards(e.pos, data.to, data.speed * dt); data.remaining = Math.max(0, data.remaining - dt);
+      resolveDashHits(world, dash);
+      if (data.remaining <= 1e-8 || dist2(e.pos, data.to) < 1) finishDash(world, dash);
+    } else resolveDashHits(world, dash);
   }
 }

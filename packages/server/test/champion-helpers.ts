@@ -7,6 +7,7 @@ import { movementSystem } from '../src/systems/movement.ts';
 import { grantXP, xpForLevel } from '../src/systems/leveling.ts';
 import { castAbility } from '../src/abilities/engine.ts';
 import { applyDamage } from '../src/combat/damage.ts';
+const hitsByWorld = new WeakMap<World, { ability?: string; target: number; amount: number }[]>();
 export function game(id: string, level = 6) {
   const world = new World([buffsSystem, summonersSystem, abilitiesSystem, movementSystem]);
   const source = createChampion(world, { playerId: 'p1', name: id, championId: id, team: 'blue', summoners: ['flash', 'ignite'], pos: { x: 1000, y: 1000 } });
@@ -14,6 +15,9 @@ export function game(id: string, level = 6) {
   grantXP(world, source, xpForLevel(level)); grantXP(world, target, xpForLevel(level));
   source.champ!.abilityLevels = { Q: 1, W: 1, E: 1, R: level >= 6 ? 1 : 0 };
   world.init(); world.events.drain();
+  const hits: { ability?: string; target: number; amount: number }[] = [];
+  hitsByWorld.set(world, hits);
+  world.hooks.afterDamage.push((ctx, amount) => { hits.push({ ability: ctx.ability, target: ctx.target.id, amount }); });
   return { world, source, target };
 }
 export function advance(world: World, seconds: number): void {
@@ -24,10 +28,11 @@ export function cast(world: World, source: Entity, slot: AbilitySlot, target?: E
   return castAbility(world, source, { t: 'cast', slot, targetId: target?.id, targetPos: { ...point } });
 }
 export function auto(world: World, source: Entity, target: Entity, crit = false): number {
-  return applyDamage(world, { source, target, amount: source.stats.ad * (crit ? 1.75 : 1), type: 'physical', crit });
+  world.events.emit({ type: 'autoAttack', source: source.id, target: target.id, ranged: false, crit });
+  return applyDamage(world, { source, target, amount: source.stats.ad * (crit ? 1.75 : 1), type: 'physical', crit, isAutoAttack: true });
 }
 export function damage(world: World, ability?: string, target?: Entity): number {
-  return world.events.pending.filter((ev) => ev.type === 'damage' && (!ability || ev.ability === ability) && (!target || ev.target === target.id)).reduce((sum, ev) => sum + (ev.type === 'damage' ? ev.amount : 0), 0);
+  return (hitsByWorld.get(world) ?? []).filter((ev) => (!ability || ev.ability === ability) && (!target || ev.target === target.id)).reduce((sum, ev) => sum + ev.amount, 0);
 }
 export function dummy(world: World, source: Entity, pos = { x: 1400, y: 1000 }, stats: Partial<Stats> = {}): Entity {
   return world.spawn({ kind: 'minion', team: 'red', pos, radius: 30, hp: 10000, mana: 0, stats: { ...source.stats, maxHp: 10000, armor: 0, mr: 0, ...stats } });

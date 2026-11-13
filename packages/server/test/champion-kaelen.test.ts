@@ -19,7 +19,7 @@ describe('Kaelen', () => {
   it('E dashes and scales its shield from bonus AD', () => {
     const { world, source, target } = game('kaelen');
     const off = registerStatSource((_w, e) => e === source ? { flat: { ad: 25 } } : undefined);
-    try { world.step(); cast(world, source, 'E', target); expect(source.shield).toBeCloseTo(85); advance(world, .4); expect(source.pos.x).toBe(1250); advance(world, 2); expect(source.shield).toBe(0); } finally { off(); }
+    try { world.step(); cast(world, source, 'E', target); expect(source.shield).toBeCloseTo(85); advance(world, .4); expect(source.pos.x).toBeGreaterThan(1100); expect(source.pos.x).toBeLessThanOrEqual(1250); advance(world, 2); expect(source.shield).toBe(0); } finally { off(); }
   });
   it('R deals more damage to a wounded champion', () => {
     const full = game('kaelen'); cast(full.world, full.source, 'R', full.target); advance(full.world, .5);

@@ -3,7 +3,8 @@ import { breakInvisibility, canCast, hasCC } from '../combat/buffs.ts';
 import { cooldownWithHaste } from '../systems/leveling.ts';
 import type { Entity, World } from '../world.ts';
 import { atRank, type CastContext } from './context.ts';
-import { endpoint, isUnit, validPoint, updatePrimitives } from './primitives.ts';
+import { cancelAttack } from '../systems/combat.ts';
+import { endpoint, isUnit, isVisibleTarget, validPoint, updatePrimitives } from './primitives.ts';
 import { CHAMPION_ABILITIES } from './registry.ts';
 import { initPassives, updatePassives } from './passives.ts';
 
@@ -21,19 +22,11 @@ export function abilityState(e: Entity): AbilityState {
 }
 const isSlot = (slot: string): slot is AbilitySlot => ['Q', 'W', 'E', 'R'].includes(slot);
 export const isMobility = (targeting: string): boolean => targeting === 'dash' || targeting === 'targetedDash';
-function canSee(source: Entity, target: Entity): boolean {
-  if (source.team === target.team) return true;
-  if (target.data.invisible && !target.data.revealed) return false;
-  const visibility = target.data.visibleTo;
-  if (visibility instanceof Set) return visibility.has(source.team);
-  if (Array.isArray(visibility)) return visibility.includes(source.team);
-  return true; // Bootstrap vision is not implemented yet.
-}
 function resolveTarget(world: World, source: Entity, slot: AbilitySlot, targetId?: number): Entity | undefined {
   const id = source.champ!.championId;
   const ally = (id === 'ilyra' && slot === 'E') || (id === 'solenne' && (slot === 'W' || slot === 'E'));
   const target = targetId === undefined && ally ? source : world.get(targetId);
-  if (!target || target.dead || target.data.stasis || !canSee(source, target)) return;
+  if (!target || target.dead || target.data.stasis || !isVisibleTarget(world, source, target) || !world.allow(world.hooks.isTargetable, target, source)) return;
   if (ally) return target.team === source.team && target.kind === 'champion' ? target : undefined;
   if (id === 'nyx' && slot === 'E') return (isUnit(target) || target.kind === 'ward') && target.id !== source.id ? target : undefined;
   if (target.team === source.team || !isUnit(target)) return;
@@ -76,7 +69,7 @@ export function castAbility(world: World, source: Entity, command: CastCommand, 
   const desired = target?.pos ?? command.targetPos ?? source.pos;
   const point: Vec2 = def.targeting === 'skillshot' || def.targeting === 'cone' ? { ...desired } : endpoint(source.pos, desired, def.range);
   state.pending = undefined;
-  source.moveTarget = undefined; source.path = undefined; source.attackTarget = undefined;
+  source.moveTarget = undefined; source.path = undefined; source.attackTarget = undefined; cancelAttack(source);
   breakInvisibility(world, source);
   if (getChampion(c.championId).resource !== 'none') source.mana -= cost;
   if (!recast) c.cooldowns[slot] = cooldownWithHaste(atRank(def.cooldown, rank), source.stats.abilityHaste);
@@ -128,7 +121,7 @@ export function updateAbilities(world: World, dt: number): void {
     const pending = abilityState(e).pending;
     if (!pending) continue;
     const target = world.get(pending.targetId);
-    if (!target || target.dead || !canSee(e, target)) { abilityState(e).pending = undefined; e.moveTarget = undefined; continue; }
+    if (!target || target.dead || !isVisibleTarget(world, e, target)) { abilityState(e).pending = undefined; e.moveTarget = undefined; continue; }
     if (!castAbility(world, e, pending, false) && canCast(e)) e.moveTarget = { ...target.pos };
   }
   updatePrimitives(world, dt);

@@ -1,5 +1,5 @@
 import { addBuff } from '../../combat/buffs.ts';
-import { applyHeal } from '../../combat/damage.ts';
+import { applyHeal } from '../effects.ts';
 import { cc, hit, line, param, type AbilityHandler } from '../context.ts';
 import { distWithin, direction, enemiesInRadius, startDash } from '../kitUtils.ts';
 export const vrenna: Record<'Q' | 'W' | 'E' | 'R', AbilityHandler> = {
@@ -21,7 +21,7 @@ export const vrenna: Record<'Q' | 'W' | 'E' | 'R', AbilityHandler> = {
   E(ctx) { startDash(ctx.world, ctx.source, ctx.point, { fxKey: ctx.def.fxKey, speed: ctx.def.speed!, crossWalls: true, onEnd() {
     for (const target of enemiesInRadius(ctx.world, ctx.source, ctx.source.pos, ctx.def.radius!)) { hit(ctx, target); cc(ctx, target, 'slow', param(ctx, 'slowDuration'), param(ctx, 'slow')); }
   } }); },
-  R(ctx) { startDash(ctx.world, ctx.source, ctx.target!.pos, { fxKey: ctx.def.fxKey, speed: ctx.def.speed!, crossWalls: true, onEnd() {
+  R(ctx) { startDash(ctx.world, ctx.source, ctx.target!.pos, { fxKey: ctx.def.fxKey, speed: ctx.def.speed!, crossWalls: true, target: ctx.target, onEnd() {
     if (distWithin(ctx.source, ctx.target!, 200)) { hit(ctx, ctx.target!); cc(ctx, ctx.target!, 'knockup', param(ctx, 'knockup')); }
   } }); },
 };

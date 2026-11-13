@@ -1,5 +1,5 @@
 import { addBuff } from '../../combat/buffs.ts';
-import { applyHeal, applyShield } from '../../combat/damage.ts';
+import { applyHeal, applyShield } from '../effects.ts';
 import { cc, hit, line, param, type AbilityHandler } from '../context.ts';
 import { alliesInRadius, delayedArea } from '../primitives.ts';
 import type { Entity } from '../../world.ts';
