@@ -31,7 +31,7 @@ import {
   type Team,
   type Vec2,
 } from '@lov/shared';
-import { createChampionView, type ProceduralChampionView } from '../../render/champions/index.ts';
+import { createChampionView, type AnimatedChampionView } from '../../render/champions/index.ts';
 import { store } from '../../state.ts';
 import { fxBus } from '../FxBus.ts';
 import type { FxHost } from '../core/host.ts';
@@ -45,7 +45,8 @@ const ALLY_TARGETED = new Set(['ilyra_e', 'solenne_w', 'solenne_e']);
 
 interface Dummy {
   actor: SimActor;
-  view: ProceduralChampionView;
+  view: AnimatedChampionView;
+  championId: string;
   anim: string;
 }
 
@@ -124,7 +125,7 @@ export function startFxLab(): void {
     const actor = sim.spawn(championId, team, pos);
     const view = createChampionView({ id: actor.id, subtype: championId, team })!;
     scene.add(view.object3d);
-    const d: Dummy = { actor, view, anim: '' };
+    const d: Dummy = { actor, view, championId, anim: '' };
     dummies.set(actor.id, d);
     return d;
   };
@@ -140,7 +141,7 @@ export function startFxLab(): void {
   const main = targets[0]!;
 
   const useChampion = (champ: ChampionDef): void => {
-    if (caster.view.colors.def.id === champ.id) return;
+    if (caster.championId === champ.id) return;
     unmount(caster);
     caster = mount(champ.id, 'blue', P.caster);
   };
@@ -338,7 +339,7 @@ export function startFxLab(): void {
       spamAcc += dt;
       while (spamAcc > 0.5) {
         spamAcc -= 0.5;
-        castAbility(caster.view.colors.def, SLOTS[1 + Math.floor(Math.random() * 4)]!);
+        castAbility(CHAMPIONS[caster.championId]!, SLOTS[1 + Math.floor(Math.random() * 4)]!);
       }
     }
     sim.update(dt);

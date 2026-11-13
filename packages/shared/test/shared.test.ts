@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { CHAMPION_LIST, CAMPS, INHIBITORS, MAP_SIZE, TOWERS, isInWall, mirror } from '../src/index.ts';
 
 describe('shared data', () => {
-  it('a 10 champions avec 4 sorts + passif et des ids uniques', () => {
-    expect(CHAMPION_LIST).toHaveLength(10);
-    expect(new Set(CHAMPION_LIST.map((c) => c.id)).size).toBe(10);
+  it('a 11 champions avec 4 sorts + passif et des ids uniques', () => {
+    expect(CHAMPION_LIST).toHaveLength(11);
+    expect(new Set(CHAMPION_LIST.map((c) => c.id)).size).toBe(11);
     for (const c of CHAMPION_LIST) {
       expect(Object.keys(c.abilities).sort()).toEqual(['E', 'Q', 'R', 'W']);
       expect(c.abilities.R.maxRank).toBe(3);

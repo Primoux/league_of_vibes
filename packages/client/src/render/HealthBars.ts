@@ -110,7 +110,8 @@ interface Label {
   sprite: THREE.Sprite;
   canvas: HTMLCanvasElement;
   tex: THREE.CanvasTexture;
-  text: string;
+  level: number;
+  name: string;
 }
 
 export class HealthBars {
@@ -180,8 +181,7 @@ export class HealthBars {
     this.color.setXYZ(i, c.r, c.g, c.b);
 
     if (e.kind === 'champion') {
-      const text = `${e.level ?? 1}|${e.champ?.name ?? ''}`;
-      const label = this.label(e.id, text);
+      const label = this.label(e.id, e.level ?? 1, e.champ?.name ?? '');
       label.sprite.position.set(wx, wy + L.h, wz);
       label.sprite.visible = true;
       this.usedLabels.add(e.id);
@@ -207,7 +207,7 @@ export class HealthBars {
     this.labels.delete(id);
   }
 
-  private label(id: EntityId, text: string): Label {
+  private label(id: EntityId, levelNum: number, name: string): Label {
     let l = this.labels.get(id);
     if (!l) {
       const canvas = document.createElement('canvas');
@@ -222,12 +222,14 @@ export class HealthBars {
       sprite.center.set(0.5, -0.15);
       sprite.scale.set(192 * this.labelK, 48 * this.labelK, 1);
       this.scene.add(sprite);
-      l = { sprite, canvas, tex, text: '' };
+      l = { sprite, canvas, tex, level: -1, name: '' };
       this.labels.set(id, l);
     }
-    if (l.text !== text) {
-      l.text = text;
-      const [level, name] = text.split('|');
+    // redessinée seulement si le niveau ou le nom change (aucune allocation sinon)
+    if (l.level !== levelNum || l.name !== name) {
+      l.level = levelNum;
+      l.name = name;
+      const level = String(levelNum);
       const ctx = l.canvas.getContext('2d')!;
       ctx.clearRect(0, 0, 256, 64);
       ctx.font = '600 26px system-ui, sans-serif';

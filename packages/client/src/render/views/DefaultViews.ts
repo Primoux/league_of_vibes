@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import { CHAMPIONS, type DragonElement, type EntitySnapshot } from '@lov/shared';
+import { MelenchonView } from '../champions/melenchon.ts';
 import { minionModel } from '../models/minions.ts';
 import { monsterModel } from '../models/monsters.ts';
 import { inhibitorModel, nexusModel, towerModel, wardModel } from '../models/structures.ts';
@@ -118,12 +119,15 @@ let dragonElement: DragonElement | undefined;
 export function setDragonElement(e: DragonElement | undefined): void {
   dragonElement = e;
 }
+export function getDragonElement(): DragonElement | undefined {
+  return dragonElement;
+}
 
 /** Vue par défaut selon le type d'entité (null = pas de vue : projectiles et zones sont gérés par les FX). */
 export function defaultViewFor(snap: EntitySnapshot): EntityView | null {
   switch (snap.kind) {
     case 'champion':
-      return championPlaceholder(snap);
+      return snap.subtype === 'melenchon' ? new MelenchonView(false, snap.team) : championPlaceholder(snap);
     case 'minion':
       return minionModel(snap.subtype, snap.team);
     case 'tower':
