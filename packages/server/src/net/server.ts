@@ -89,7 +89,13 @@ export function createGameServer(opts: GameServerOptions): Promise<GameServer> {
     createReadStream(file).pipe(res);
   });
 
-  const wss = new WebSocketServer({ server: http, path: WS_PATH, maxPayload: 8 * 1024 });
+  // permessage-deflate : les snapshots JSON se compressent ~10x (≈ 12 Ko/s par client dans le pire cas mesuré).
+  const wss = new WebSocketServer({
+    server: http,
+    path: WS_PATH,
+    maxPayload: 8 * 1024,
+    perMessageDeflate: { threshold: 512, zlibDeflateOptions: { level: 3 }, serverNoContextTakeover: false, clientNoContextTakeover: true },
+  });
 
   const janitor = setInterval(() => {
     const now = Date.now();
