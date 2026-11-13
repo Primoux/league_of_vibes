@@ -46,3 +46,4 @@ Session : 2026-11-13, branche `codex-objectives`.
 
 - Correction d'intégration autorisée par l’utilisateur : la fixture `economy.test.ts` exclut les quatre systèmes PvE. Ses événements/récompenses sont déjà simulés explicitement ; toutes ses assertions sont conservées. Cela évite de lancer de vraies vagues pendant ses simulations économiques de 10–30 minutes. Les tests PvE et le test d'endurance utilisent toujours les vrais systèmes.
 - Validation finale après isolation de la fixture économique : 473 tests / 47 fichiers, typecheck et build verts.
+- PR #14 ouverte : https://github.com/Primoux/league_of_vibes/pull/14. Première CI : 472/473 passent ; seul le délai de 30 s du test d'endurance est dépassé (35 s sur runner). Délai porté à 60 s sans modifier la simulation ni ses assertions. Le benchmark distinct reste inchangé : CI à 1,25 ms/tick, 19 Ko/s compressés.

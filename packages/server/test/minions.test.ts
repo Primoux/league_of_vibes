@@ -59,5 +59,6 @@ describe('intégration PvE', () => {
     for (let i = 0; i < 9000; i++) { world.step(0.2); world.events.drain(); }
     expect(world.winner).toBeNull(); expect([...world.query('nexus')].every(e => !e.dead)).toBe(true);
     expect(world.entities.size).toBeLessThan(1000);
-  }, 30000);
+  // Scénario d'endurance, pas un benchmark : le budget par tick est testé dans perf.test.ts.
+  }, 60000);
 });
