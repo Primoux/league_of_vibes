@@ -20,6 +20,7 @@ import { solenneModel } from './models/solenne.ts';
 import { tharoxModel } from './models/tharox.ts';
 import { vrennaModel } from './models/vrenna.ts';
 import { zephyrModel } from './models/zephyr.ts';
+import { master67Model } from './models/master67.ts';
 
 export { ProceduralChampionView, setRespawnHook } from './ChampionView.ts';
 
@@ -34,6 +35,7 @@ const MODELS: Record<string, ChampionModelDef> = {
   corvin: corvinModel,
   nyx: nyxModel,
   solenne: solenneModel,
+  master67: master67Model,
 };
 
 /** Contrat commun aux modèles articulés et aux caricatures originales. */
