@@ -266,3 +266,9 @@
   .lov-shop-detail { display: none; }
   .lov-teamframes { display: none; }
 }
+
+/* objets actifs et charges de balise */
+.lov-inventory .slot.active { cursor: pointer; box-shadow: 0 0 0 1px var(--teal), 0 0 0.5em rgba(62, 230, 200, 0.35); }
+.lov-inventory .slot.active:hover { filter: brightness(1.2); }
+.lov-inventory .slot .cd-num { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 800; font-size: 0.8em; background: rgba(0, 0, 0, 0.6); color: #fff; }
+.lov-inventory .slot .charges { position: absolute; top: 0; right: 0.1em; font-size: 0.55em; font-weight: 800; color: var(--gold-hi); text-shadow: 0 0 2px #000, 0 0 2px #000; }

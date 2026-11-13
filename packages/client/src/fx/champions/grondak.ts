@@ -190,6 +190,7 @@ registerFx('grondak_e', {
     rt.after(duration, () => {
       if (!rt.entities.pos(e.source, pos)) pos.copy(to);
       shockwave(rt, pos, 1.6, 0.4, c.accentHdr, 0.14);
+      rt.shake(pos, 15, 0.2);
       rockBurst(rt, pos, 10, 1, [0.12, 0.24]);
       dustRing(rt, pos, 0.6, 12);
       flash(rt, _v.set(pos.x, 1.1, pos.z), 2.4, c.accentHdr, 0.25);
@@ -231,6 +232,7 @@ registerFx('grondak_r_telegraph', {
 /** Éruption de l'ultime : anneau de grands pics, débris projetés en l'air, nuage de poussière. */
 function erupt(rt: FxRuntime, center: THREE.Vector3, r: number, c: FxColors): void {
   flash(rt, _v.set(center.x, 0.5, center.z), r * 1.4, c.accentHdr, 0.35);
+  rt.shake(center, 40, 0.45);
   shockwave(rt, center, r * 1.15, 0.6, c.accentHdr, 0.25);
   const n = 14;
   for (let i = 0; i < n; i++) {

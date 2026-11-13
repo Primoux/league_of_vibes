@@ -4,7 +4,6 @@
  */
 import * as THREE from 'three';
 import { CHAMPIONS, type EntitySnapshot } from '@lov/shared';
-import { impactBurst } from '../defaults.ts';
 import { ProjectileFx, flash, shockwave } from '../effects/primitives.ts';
 import type { FxColors, FxRuntime } from '../core/FxRuntime.ts';
 import { rng } from '../core/rng.ts';
@@ -55,9 +54,18 @@ export function homingShot(
   );
 }
 
+/**
+ * Impact d'auto-attaque à distance : volontairement sobre (plusieurs par seconde en combat).
+ * Un empilement de halos HDR sature en blanc sous le bloom.
+ */
+function aaImpact(rt: FxRuntime, at: THREE.Vector3, c: FxColors, crit: boolean): void {
+  flash(rt, at, crit ? 1.1 : 0.7, c.vivid, 0.14);
+  rt.ps.emit(rt.s.spark, at, { count: crit ? 10 : 5, shape: 'point', speed: [2, 4], life: [0.12, 0.22], size: [0.04, 0.07], stretch: 0.04, tint: c.vividHdr });
+  if (crit) shockwave(rt, _at.set(at.x, 0, at.z), 1, 0.25, c.vivid, 0.08);
+}
+
 function genericRanged(rt: FxRuntime, e: Ev<'autoAttack'>, from: THREE.Vector3, c: FxColors): void {
-  const size = e.crit ? 0.55 : 0.38;
-  homingShot(rt, e, from, c.vividHdr, c.accentHdr, size, (at) => impactBurst(rt, at, c, e.crit ? 0.8 : 0.45));
+  homingShot(rt, e, from, c.vivid, c.accent, e.crit ? 0.45 : 0.3, (at) => aaImpact(rt, at, c, !!e.crit));
 }
 
 function genericMelee(rt: FxRuntime, e: Ev<'autoAttack'>, at: THREE.Vector3, c: FxColors): void {

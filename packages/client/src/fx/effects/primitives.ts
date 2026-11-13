@@ -41,7 +41,7 @@ export interface TelegraphOptions {
 
 /** Télégraphie au sol qui se remplit pendant `duration`, puis disparaît rapidement. */
 export function telegraph(rt: FxRuntime, center: THREE.Vector3, radius: number, duration: number, color: THREE.Color, o: TelegraphOptions = {}): GroundDecal {
-  const d = rt.acquireDecal().setColor(color, o.color2 ?? color);
+  const d = rt.acquireDecal().setColor(rt.groundColor(color), rt.groundColor(o.color2 ?? color));
   if (o.shape === 'rect' && o.to) d.rect(center, o.to, o.width ?? radius);
   else if (o.shape === 'cone' && o.to) d.cone(center, o.to, radius, o.halfAngle ?? 0.5);
   else d.circle(center, radius);
@@ -108,7 +108,7 @@ export interface ZoneOptions {
 /** Zone persistante (blizzard, nuée, aura) : fondu d'entrée/sortie + motif animé + particules. */
 export function zone(rt: FxRuntime, at: THREE.Vector3, radius: number, duration: number, color: THREE.Color, o: ZoneOptions = {}): void {
   const center = at.clone();
-  const d = rt.acquireDecal().setColor(color).circle(center, radius);
+  const d = rt.acquireDecal().setColor(rt.groundColor(color)).circle(center, radius);
   d.u.uFill.value = o.fill ?? 0.18;
   d.u.uPattern.value = o.pattern ?? 0.6;
   d.u.uEdge.value = 0.1;
