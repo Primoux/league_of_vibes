@@ -60,7 +60,7 @@ export interface ChampionDef {
   ranged: boolean;
   resource: 'mana' | 'energy' | 'none';
   baseStats: Stats;
-  perLevel: Partial<Stats>; // croissance linéaire simplifiée
+  perLevel: Partial<Stats>; // croissance appliquée via statAtLevel
   attackWindup: number; // fraction de l'attaque avant l'impact (0.25 typique)
   projectileSpeed?: number; // auto-attaques à distance
   passive: AbilityDef;
@@ -90,6 +90,8 @@ export interface SummonerDef {
   name: string;
   description: string;
   cooldown: number;
+  /** Paramètres de gameplay résolus par le serveur (source de vérité). */
+  params?: Record<string, number>;
   targeting: Targeting;
   range: number;
   fxKey: string;

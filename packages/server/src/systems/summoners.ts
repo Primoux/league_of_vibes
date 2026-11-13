@@ -36,15 +36,16 @@ export function castSummoner(world: World, e: Entity, command: Extract<ClientMsg
     }
   }
   if (id === 'flash' && !validPoint(command.targetPos)) return false;
+  const p = def.params ?? {};
   const from = { ...e.pos };
   c.cooldowns[slot] = def.cooldown; // Summoner spells are not reduced by ability haste.
   switch (id) {
     case 'flash': blink(world, e, command.targetPos!, def.range, def.fxKey); break;
     case 'ignite': {
       const victim = target!;
-      addBuff(world, victim, 'ignite', { duration: 5, source: e, params: { grievous: .4 } });
-      const perTick = (50 + 20 * c.level) / 5;
-      for (let i = 1; i <= 5; i++) schedule(world, i, () => {
+      addBuff(world, victim, 'ignite', { duration: p.duration!, source: e, params: { grievous: p.grievous! } });
+      const perTick = (p.baseDamage! + p.damagePerLevel! * c.level) / p.duration!;
+      for (let i = 1; i <= p.duration!; i++) schedule(world, i, () => {
         if (!victim.dead && world.get(victim.id)) applyDamage(world, { source: e, target: victim, amount: perTick, type: 'true', ability: 'sum_ignite' });
       });
       break;
@@ -53,26 +54,26 @@ export function castSummoner(world: World, e: Entity, command: Extract<ClientMsg
       const allies = [...world.query('champion')].filter((a) => a.id !== e.id && a.team === e.team && !a.dead && dist2(a.pos, e.pos) <= def.range ** 2);
       allies.sort((a, b) => a.hp / a.stats.maxHp - b.hp / b.stats.maxHp || a.id - b.id);
       for (const ally of [e, ...(allies[0] ? [allies[0]] : [])]) {
-        applyHeal(world, { source: e, target: ally, amount: 80 + c.level * 15 });
-        addBuff(world, ally, 'sum_heal_speed', { duration: 1, source: e, params: { statPercentMods: { moveSpeed: .3 } }, definition: { fxKey: def.fxKey } });
+        applyHeal(world, { source: e, target: ally, amount: p.baseHeal! + c.level * p.healPerLevel! });
+        addBuff(world, ally, 'sum_heal_speed', { duration: p.speedDuration!, source: e, params: { statPercentMods: { moveSpeed: p.speed! } }, definition: { fxKey: def.fxKey } });
       }
       break;
     }
-    case 'barrier': applyShield(world, { source: e, target: e, amount: 105 + 20 * c.level, duration: 2.5, buffId: 'sum_barrier', fxKey: def.fxKey }); break;
-    case 'exhaust': addBuff(world, target!, 'exhaust', { duration: 3, source: e, params: { amount: .3, damageDealtReduction: .4 } }); break;
+    case 'barrier': applyShield(world, { source: e, target: e, amount: p.baseShield! + p.shieldPerLevel! * c.level, duration: p.duration!, buffId: 'sum_barrier', fxKey: def.fxKey }); break;
+    case 'exhaust': addBuff(world, target!, 'exhaust', { duration: p.duration!, source: e, params: { amount: p.slow!, damageDealtReduction: p.damageReduction! } }); break;
     case 'teleport':
-      state(e).channel = { until: world.time + 4, target: target!, from: { ...e.pos }, interrupted: false };
+      state(e).channel = { until: world.time + p.channelDuration!, target: target!, from: { ...e.pos }, interrupted: false };
       e.data.channeling = true;
       e.moveTarget = undefined; e.path = undefined; e.attackTarget = undefined;
       e.anim = 'channel';
-      world.events.emit({ type: 'areaEffect', source: e.id, fxKey: 'sum_teleport_channel', pos: { ...target!.pos }, radius: 150, duration: 4 });
+      world.events.emit({ type: 'areaEffect', source: e.id, fxKey: 'sum_teleport_channel', pos: { ...target!.pos }, radius: 150, duration: p.channelDuration! });
       break;
     case 'smite':
-      applyDamage(world, { source: e, target: target!, amount: 600, type: 'true', ability: 'sum_smite' });
-      if (target!.kind === 'monster') applyHeal(world, { source: e, target: e, amount: e.stats.maxHp * .1 });
+      applyDamage(world, { source: e, target: target!, amount: p.damage!, type: 'true', ability: 'sum_smite' });
+      if (target!.kind === 'monster') applyHeal(world, { source: e, target: e, amount: e.stats.maxHp * p.healMaxHp! });
       break;
-    case 'ghost': addBuff(world, e, 'sum_ghost', { duration: 10, source: e, params: { ghosted: true, statPercentMods: { moveSpeed: .24 + .16 * (c.level - 1) / 17 } }, definition: { fxKey: def.fxKey } }); break;
-    case 'cleanse': cleanse(world, e); addBuff(world, e, 'cleanse', { duration: 3, source: e, params: { tenacity: .65 } }); break;
+    case 'ghost': addBuff(world, e, 'sum_ghost', { duration: p.duration!, source: e, params: { ghosted: true, statPercentMods: { moveSpeed: p.speedMin! + (p.speedMax! - p.speedMin!) * (c.level - 1) / 17 } }, definition: { fxKey: def.fxKey } }); break;
+    case 'cleanse': cleanse(world, e); addBuff(world, e, 'cleanse', { duration: p.duration!, source: e, params: { tenacity: p.tenacity! } }); break;
   }
   world.events.emit({ type: 'summonerCast', source: e.id, spell: id, from, to: id === 'flash' ? { ...e.pos } : target ? { ...target.pos } : undefined, targetId: target?.id, fxKey: def.fxKey });
   return true;

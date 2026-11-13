@@ -46,7 +46,7 @@ export function applyDamage(world: World, opts: DamageOptions): number {
     target.data.lastChampionDamageAt = world.time;
     source.data.lastChampionCombatAt = world.time;
   }
-  world.events.emit({ type: 'damage', source: source.id, target: target.id, amount: actual, damageType: opts.type, ability: opts.ability, crit: opts.crit });
+  world.events.emit({ type: 'damage', source: source.id, target: target.id, amount: actual, damageType: opts.type, ability: opts.ability, crit: context.crit });
   if (target.hp <= 0 && !target.dead) {
     target.dead = true;
     target.anim = 'death';

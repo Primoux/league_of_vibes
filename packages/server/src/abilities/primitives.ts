@@ -39,7 +39,7 @@ export function segmentHit(from: Vec2, to: Vec2, pos: Vec2, radius: number): num
 interface Task { at: number; run: () => void; cancelled: boolean; owner?: Entity; cancelOnDeath?: boolean }
 export interface ProjectileOptions {
   source: Entity; from?: Vec2; to: Vec2; speed: number; width: number; fxKey: string;
-  pierce?: boolean; stopOnChampion?: boolean; onlyChampions?: boolean; target?: Entity;
+  pierce?: boolean; stopOnChampion?: boolean; onlyChampions?: boolean; target?: Entity; homingTo?: Entity;
   onHit: (target: Entity, projectile: Entity) => void; onEnd?: (pos: Vec2) => void;
 }
 interface Projectile { entity: Entity; options: ProjectileOptions; hit: Set<number>; end: Vec2; finished: boolean }
@@ -193,6 +193,7 @@ export function updatePrimitives(world: World, dt: number): void {
       if (o.target.dead || !world.get(o.target.id)) { finishProjectile(world, rt, p); continue; }
       p.end = { ...o.target.pos };
     }
+    if (o.homingTo && world.get(o.homingTo.id)) p.end = { ...o.homingTo.pos };
     const from = e.pos, to = moveTowards(from, p.end, o.speed * dt);
     const hits: { target: Entity; t: number }[] = [];
     for (const target of world.entities.values()) {

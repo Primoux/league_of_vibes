@@ -66,6 +66,7 @@ function syncFlags(e: Entity): void {
   const buffs = getBuffs(e);
   e.data.invisible = buffs.some((b) => b.id === 'invisible' || b.params.invisible);
   e.data.ghosted = buffs.some((b) => b.params.ghosted);
+  e.data.revealed = buffs.some((b) => b.params.revealed);
 }
 export function addBuff(world: World, target: Entity, buffId: string, opts: BuffOptions): BuffInstance | undefined {
   if (target.dead || !Number.isFinite(opts.duration) || opts.duration <= 0) return;
@@ -126,6 +127,7 @@ export function recalculateStats(world: World, e: Entity): void {
   if (!e.champ) return;
   const def = getChampion(e.champ.championId);
   const { flat = {}, percent = {} } = getStatMods(e);
+  e.data.baseAd = statAtLevel(def.baseStats.ad, def.perLevel.ad ?? 0, e.champ.level);
   for (const id of e.champ.items) if (id && ITEMS[id]) mergeStats(flat, ITEMS[id].stats);
   let tenacity = 0;
   for (const fn of statSources) {
