@@ -1,6 +1,19 @@
 # Progress — codex-champions
 
-Date : 2026-11-13. Branche de travail : `codex-champions`.
+Date : 2026-11-13. Branche de travail actuelle : `feat/champion-melenchon` (extension demandée par l'utilisateur).
+
+## Extension : Mélenchon
+
+- La PR #2 des dix kits est fusionnée. Cette nouvelle PR ne contient que le champion satirique et son intégration ; synchronisation avec `main` jusqu'à `c9ca246` (modèles/FX de la PR #3 inclus).
+- Mage mana complet : Indignation permanente (trois impacts espacés, bouclier et vitesse), Q projectile/slow, W zone retardée/silence, E blink/bouclier/hologramme explosif au départ, R « La République, c’est moi ! » interruptible, dégâts/provocation/bouclier. Valeurs et descriptions dans shared.
+- Modèle original sans texture importée : cheveux gris en arrière, lunettes rectangulaires, nez marqué, costume marine, cravate rouge, dossier et index accusateur. Gestes Q/R, marche, respiration, mort/réapparition et aura du buff R ; hologramme translucide. Budget testé <14 000 triangles, géométries partagées dans chaque modèle, ressources libérées à dispose.
+- FX : micro projectile, amendements, clone bleu au point de départ, télégraphies et onde tricolore avec pancarte de l'ultime. La pancarte n'apparaît qu'à l'impact confirmé par le serveur, pas au début d'une incantation interrompue.
+- Démo autonome `?melenchonlab`, portrait/silhouette, Q/W/E/R, marche et contrôles caméra ; disponible également dans le labo FX commun et le draft.
+- L'utilisateur a explicitement demandé un modèle ressemblant, ce qui autorise cette extension aux fichiers client/FX en plus du domaine serveur initial. Intégration additive isolée dans des commits `contract:` : main (démo), DefaultViews (secours), fabrique de modèles (interface AnimatedChampionView conservant les opérations existantes), index FX et type de vue dans fxlab. Aucun nouveau message réseau ni champ de protocole, aucune dépendance npm.
+- Validation : typecheck, tests headless et build. Tests spécifiques de gameplay, ciblage, interruptions, expiration du passif et ressources du modèle ; 110 duels déterministes (55 paires × deux niveaux), 44 sorts vérifiés pour coûts/CD. Le navigateur distant ne peut pas accéder au serveur local et refuse les URL fichier : pas de validation WebGL interactive revendiquée. Silhouette/portrait inspectés avec un rendu CPU local de la géométrie, puis affinés.
+- Assets procéduraux documentés dans ASSETS.md. Pas de photo, son ou asset tiers ajouté. L'équilibrage compétitif reste à confirmer en partie humaine.
+
+## Historique : dix champions initiaux
 
 ## Fait
 - **M1** : moteur de sorts serveur autoritaire. Validation des rangs, ressources, cooldowns, CC, visibilité, cible et portée ; approche automatique des cibles hors portée, annulable par un nouvel ordre. Incantations interruptibles, animations `cast_Q/W/E/R`, haste, recasts et charges.
