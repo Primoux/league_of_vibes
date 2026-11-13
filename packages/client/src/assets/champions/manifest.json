@@ -1,0 +1,68 @@
+{
+  "generator": "OpenAI image generation (built-in)",
+  "useCase": "stylized-concept",
+  "processing": "WebP encoding, 512 × 512, quality 86; no creative retouching",
+  "artDirection": "Standalone square champion selection portraits: painterly sculptural fantasy forms, high thumbnail readability, centered three-quarter bust, dark atmospheric backdrop, warm key/cool rim lights, palette from champion data, no typography/UI/logo or external character design.",
+  "portraits": [
+    {
+      "id": "grondak",
+      "file": "grondak.webp",
+      "prompt": "Grondak: a massive granite stone golem, angular rocky face, deep amber glowing eyes and amber magma cracks, huge shoulders, gray brown stone armor, no human skin. Palette warm granite gray, charcoal and amber."
+    },
+    {
+      "id": "tharox",
+      "file": "tharox.webp",
+      "prompt": "Tharox: a powerful anthropomorphic armored wild boar warrior, dark brown fur, broad boar snout, large curved ivory tusks, ember orange eyes, rough tawny fur mantle and heavy shoulder armor. Palette dark brown, tan and fiery red orange."
+    },
+    {
+      "id": "kaelen",
+      "file": "kaelen.webp",
+      "prompt": "Kaelen: a mysterious solar knight in ornate original gold plate armor, face fully enclosed by a steel helmet with a narrow dark visor and golden circlet, navy blue crest and tabard, luminous white golden greatsword edge visible. Palette antique gold, midnight blue and brilliant white."
+    },
+    {
+      "id": "vrenna",
+      "file": "vrenna.webp",
+      "prompt": "Vrenna: a fierce adult nomad woman warrior, athletic build, dark braided hair, warm olive skin, crimson leather armor, cream scarf, weathered golden spear visible beside her head. Windy steppe dust. Palette dark red, cream and gold."
+    },
+    {
+      "id": "ilyra",
+      "file": "ilyra.webp",
+      "prompt": "Ilyra: an adult elegant frost sorceress with long white silver hair, pale skin, icy blue eyes, crown of pointed ice shards, deep blue robes with pale ice armor, crystal-tipped staff and three small ice shards orbiting her. Palette ice blue, navy and white."
+    },
+    {
+      "id": "zephyr",
+      "file": "zephyr.webp",
+      "prompt": "Zephyr: an adult unstable arcane wizard, pointed violet hood and flowing violet cloak, mysterious shadowed face with bright cyan eyes, huge cyan arcane gauntlets and floating small crystals, mischievous confidence. Palette bright violet, near black purple and electric cyan."
+    },
+    {
+      "id": "sable",
+      "file": "sable.webp",
+      "prompt": "Sable: an adult desert gunslinger woman with warm tan skin, a broad-brimmed dark brown hat, amber eyes, a sand colored scarf over the lower face, long brown duster and a copper-barreled original fantasy rifle visible at the shoulder. Palette sand gold, chocolate brown and warm orange."
+    },
+    {
+      "id": "corvin",
+      "file": "corvin.webp",
+      "prompt": "Corvin: a mysterious adult raven archer, black feather mantle, hood, angular dark silver beaked mask covering the face, luminous green eyes in the mask, dark recurve bow edge and a raven silhouette. Palette blue-black charcoal, silver gray and spectral green."
+    },
+    {
+      "id": "nyx",
+      "file": "nyx.webp",
+      "prompt": "Nyx: a faceless hooded shadow assassin, deep dark indigo hood and drifting purple shadow veils, no visible skin, only two narrow hot pink eyes, curved daggers with sharp pink glowing edges. Palette near-black navy, purple and hot pink."
+    },
+    {
+      "id": "solenne",
+      "file": "solenne.webp",
+      "prompt": "Solenne: an adult serene dawn priestess with long blonde hair, warm fair skin, luminous ivory and amber robes, floating golden circular solar halo behind her head, staff topped by a sun disk, tiny cyan light accents. Palette warm ivory, amber gold and soft cyan."
+    },
+    {
+      "id": "melenchon",
+      "file": "melenchon.webp",
+      "prompt": "A recognisable affectionate satirical fantasy-game caricature of Jean-Luc Mélenchon: older broad-faced French man, gray hair combed back with high forehead, thin rectangular metal glasses, heavy dark brows and prominent nose, navy suit, white shirt and red tie, indignant expression and one index finger raised, a subtle tricolor magical aura. Preserve his recognizable face rather than a generic politician. Palette navy, white, red and a little pale cyan."
+    },
+    {
+      "id": "master67",
+      "file": "master67.webp",
+      "prompt": "67 Master: an ORIGINAL adult fantasy streetwear trickster, not a real person, medium brown skin, short dark curly hair, broad playful grin, oversized violet hoodie with cyan trims, fingerless cuffs, exactly TWO anatomically coherent bare hands held palms UP in front of him, one hand higher and the other lower like a seesaw. Above the palms float a small glowing cyan numeral 6 and a glowing violet numeral 7. Streetwise magic sage, fun and expressive. Palette violet #8061ff, cyan #35e6e0, near-black navy. His hands and his face all stay comfortably inside the central square."
+    }
+  ]
+}
