@@ -329,6 +329,8 @@ export function startFxLab(): void {
   });
 
   let spamAcc = 0;
+  let stressAcc = 0;
+  const stress = params.get('stress') === '1';
   let moveFlip = 0;
   const simulate = (dt: number): void => {
     clock += dt;
@@ -339,6 +341,21 @@ export function startFxLab(): void {
     if (moving && Math.floor(clock / 1.5) !== moveFlip) {
       moveFlip = Math.floor(clock / 1.5);
       for (const t of targets) sim.moveTo(t.actor.id, { x: t.actor.home.x + (moveFlip % 2 ? 250 : -250), y: t.actor.home.y + (moveFlip % 2 ? 150 : -150) });
+    }
+    if (stress) {
+      // tous les champions lancent des sorts en continu (charge de teamfight)
+      stressAcc += dt;
+      while (stressAcc > 0.25) {
+        stressAcc -= 0.25;
+        const all = [...dummies.values()];
+        const d = all[Math.floor(Math.random() * all.length)]!;
+        const slot = (['Q', 'W', 'E', 'R'] as const)[Math.floor(Math.random() * 4)]!;
+        const foes = all.filter((o) => o.actor.team !== d.actor.team);
+        const target = foes[Math.floor(Math.random() * foes.length)] ?? main;
+        const t = sim.entity(target.actor.id);
+        sim.cast(d.actor.id, slot, target.actor, t ? { ...t.pos } : P.main);
+        if (Math.random() < 0.3) sim.attack(d.actor.id, target.actor.id);
+      }
     }
     if (spam) {
       spamAcc += dt;
@@ -387,6 +404,7 @@ export function startFxLab(): void {
       const info = renderer.info;
       stats.textContent =
         `fps            ${(fpsFrames / fpsAcc).toFixed(0)}\n` +
+        `FX cpu/frame   ${fx.stats.updateMs.toFixed(2)} ms\n` +
         `effets actifs  ${fx.runtime.activeEffects}\n` +
         `projectiles    ${fx.dispatcher.inFlight}\n` +
         `particules ém. ${fx.runtime.ps.emitted}\n` +

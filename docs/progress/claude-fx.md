@@ -39,8 +39,13 @@
 ### M4 — en cours
 - **Teinte ennemie** : les télégraphies et zones au sol posées par un ennemi du joueur local tirent vers le rouge (le dispatcher marque `rt.enemyContext` pendant le handler ; `rt.groundColor()`), sans perdre l'identité du sort. fxlab : `&as=red` pour voir la scène côté rouge.
 
+- **Perf mesurée** (fxlab `&stress=1`, 5 champions qui lancent des sorts en continu, profil d'allocations par échantillonnage CDP) : **~0,1 ms de CPU FX par frame**, allocations négligeables (les sites qui retiennent de la mémoire sont dans le lab, pas dans les FX).
+- **Optimisations GPU** : systèmes de débris instanciés masqués quand vides (plus de draw call ni de passe d'ombre au repos), lots de particules et chiffres flottants remis à zéro dès que tout est mort (le vertex shader ne retraite plus des milliers d'instances mortes après un combat), passe FXAA retirée (MSAA ×4 sur la cible HDR). Au repos : 50 → 38 draw calls dans le lab.
+- **Vérifié en partie réelle** (serveur `SKIP_DRAFT=1 DEV_LOBBY=1` + client `?autoplay`, touches simulées par CDP) : modèles, passif, sort Q clavier → serveur → FX, aucune exception.
+- Lisibilité : passif de Grondak (présent la plupart du temps hors combat) rendu discret ; couleurs des chiffres de dégâts saturées.
+
 ## En cours
-- M4 : budget de particules et perf (60 fps avec 8 champions + 60 sbires), revue de chaque sort en partie réelle.
+- M4 : revue de chaque sort en partie multijoueur (bots), équilibrage visuel des ultimes.
 
 ## Bloqué / Besoins (des autres agents)
 - **claude-client** (`GameRenderer`) — `onFrame`, `getEntityObject`, `registerChampionFactory` et ACES sont déjà là et utilisés automatiquement par `installFx(renderer)`. Il manque :
