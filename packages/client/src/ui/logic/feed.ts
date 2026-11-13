@@ -5,7 +5,7 @@
  * affichés tels quels via ANNOUNCE_TEXT (clés libres : minionsSpawn, leviathanSpawn...).
  */
 import type { DragonElement, EntityId, EntitySnapshot, GameEvent, MonsterType, Team } from '@lov/shared';
-import { DRAGON_LABEL, MONSTER_LABEL } from './format.ts';
+import { DRAGON_LABEL, MONSTER_LABEL, SOUL_LABEL } from './format.ts';
 
 /** Ce que l'UI sait d'une unité pour l'afficher. */
 export interface UnitRef {
@@ -58,9 +58,13 @@ export const ANNOUNCE_TEXT: Record<string, string> = {
   leviathanSpawn: 'Le Léviathan a émergé des profondeurs',
   inhibitorRespawn: 'Un inhibiteur s’est reconstruit',
   dragonSoul: 'Âme du drake obtenue',
-  victory: 'Victoire',
-  defeat: 'Défaite',
+  // clés émises par codex-objectives
+  herald_summoned: 'Le Colosse du Rift charge !',
+  inhibitor_respawn: 'Un inhibiteur s’est reconstruit',
 };
+
+/** Clés serveur volontairement ignorées : déjà dérivées des événements (doublons) ou gérées par l'écran de fin. */
+const SKIPPED_KEYS = new Set(['objective_taken', 'victory', 'defeat', 'first_blood', 'kill', 'multikill', 'ace']);
 
 const MULTI = ['', '', 'Double élimination !', 'Triple élimination !', 'Quadra élimination !', 'Penta élimination !'];
 const SPREE: Record<number, string> = { 3: 'Série meurtrière', 4: 'Massacre', 5: 'Déchaîné', 6: 'Inarrêtable', 7: 'Divin', 8: 'Légendaire' };
@@ -132,6 +136,14 @@ export class FeedTracker {
           break;
         }
         case 'announcement': {
+          if (SKIPPED_KEYS.has(e.key)) break;
+          if (e.key === 'dragon_soul' || e.key === 'dragonSoul') {
+            const el = e.params?.element;
+            const ally = e.team === this.myTeam;
+            const soul = typeof el === 'string' && el in SOUL_LABEL ? `Âme ${SOUL_LABEL[el as DragonElement]}` : 'Âme du drake';
+            announce.push({ key: this.nextKey++, title: ally ? `Votre équipe obtient l’${soul} !` : `L’équipe ennemie obtient l’${soul}`, subtitle: 'Le Drake Ancien se réveillera bientôt', tone: ally ? 'ally' : 'enemy', priority: 6, element: typeof el === 'string' && el in SOUL_LABEL ? (el as DragonElement) : undefined });
+            break;
+          }
           const title = ANNOUNCE_TEXT[e.key] ?? (typeof e.params?.text === 'string' ? e.params.text : null);
           if (!title) break;
           const tone: AnnounceTone = e.team ? (e.team === this.myTeam ? 'ally' : 'enemy') : 'neutral';

@@ -1,7 +1,7 @@
 import { ITEMS, type EntityId, type ItemDef } from '@lov/shared';
 import { describe, expect, it } from 'vitest';
 import { FeedTracker, trimFeed, type UnitRef } from '../src/ui/logic/feed.ts';
-import { formatClock, formatCooldown, formatGoldShort, formatKdaRatio, formatRanks, formatStat } from '../src/ui/logic/format.ts';
+import { buffName, formatClock, formatCooldown, formatGoldShort, formatKdaRatio, formatRanks, formatStat, isDebuff } from '../src/ui/logic/format.ts';
 import { canRankUp, hastedCooldown, sortScoreRows, type ScoreRow } from '../src/ui/logic/game.ts';
 import { canBuy, filterItems, quoteItem } from '../src/ui/logic/shop.ts';
 
@@ -25,6 +25,15 @@ describe('format', () => {
     expect(formatRanks([6, 5.5, 5])).toBe('6 / 5,5 / 5');
     expect(formatStat('critChance', 0.25, true)).toBe('+25 %');
     expect(formatStat('attackSpeed', 0.65)).toBe('0,65');
+  });
+  it('nomme les buffs (registre, drakes, âmes, repli)', () => {
+    expect(buffName('stun')).toBe('Étourdissement');
+    expect(isDebuff('stun')).toBe(true);
+    expect(isDebuff('haste')).toBe(false);
+    expect(buffName('dragon_ocean')).toBe('Drake océanique');
+    expect(buffName('soul_infernal')).toBe('Âme infernale');
+    expect(buffName('blue_buff')).toBe('Gardien d’azur');
+    expect(buffName('ilyra_frost')).toBe('Ilyra frost');
   });
 });
 
@@ -132,6 +141,16 @@ describe('kill feed et annonces', () => {
     expect(o.announce[0]!.title).toBe('L’équipe ennemie a vaincu : Drake infernal');
     expect(o.announce[0]!.tone).toBe('enemy');
     expect(t.process([{ type: 'structureDestroyed', target: 50, kind: 'tower', team: 'red', plate: true }], 40).feed).toHaveLength(0);
+  });
+
+  it('annonces de codex-objectives : âme, colosse, doublons ignorés', () => {
+    const t = new FeedTracker('blue', lookup);
+    const soul = t.process([{ type: 'announcement', key: 'dragon_soul', team: 'blue', params: { element: 'infernal' } }], 10);
+    expect(soul.announce[0]!.title).toBe('Votre équipe obtient l’Âme infernale !');
+    expect(soul.announce[0]!.element).toBe('infernal');
+    expect(t.process([{ type: 'announcement', key: 'herald_summoned', team: 'red' }], 11).announce[0]!.tone).toBe('enemy');
+    expect(t.process([{ type: 'announcement', key: 'objective_taken', team: 'red', params: { monster: 'dragon' } }], 12).announce).toHaveLength(0);
+    expect(t.process([{ type: 'announcement', key: 'victory', team: 'red' }], 13).announce).toHaveLength(0);
   });
 
   it('élague le feed', () => {

@@ -272,3 +272,60 @@
 .lov-inventory .slot.active:hover { filter: brightness(1.2); }
 .lov-inventory .slot .cd-num { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 800; font-size: 0.8em; background: rgba(0, 0, 0, 0.6); color: #fff; }
 .lov-inventory .slot .charges { position: absolute; top: 0; right: 0.1em; font-size: 0.55em; font-weight: 800; color: var(--gold-hi); text-shadow: 0 0 2px #000, 0 0 2px #000; }
+
+/* ============================================================ effets d'interface (« juice ») */
+/* montée de niveau : double onde dorée + bannière */
+.lov-lvlup { position: absolute; inset: 0; pointer-events: none; }
+.lov-lvlup .ring { position: absolute; inset: 0.2em; border-radius: 50%; border: 0.18em solid var(--gold-hi); box-shadow: 0 0 1.2em rgba(246, 220, 148, 0.9), inset 0 0 1em rgba(246, 220, 148, 0.6); animation: lov-lvl-ring 1.1s var(--ease) forwards; }
+.lov-lvlup .ring.r2 { border-color: var(--teal); box-shadow: 0 0 1.2em rgba(62, 230, 200, 0.9); animation-delay: 0.15s; opacity: 0; }
+@keyframes lov-lvl-ring { 0% { transform: scale(0.85); opacity: 1; } 100% { transform: scale(1.9); opacity: 0; } }
+.lov-lvlup b { position: absolute; left: 50%; bottom: 105%; white-space: nowrap; font-family: var(--font-display); font-weight: 800; font-size: 1.05em; letter-spacing: 0.12em; text-transform: uppercase;
+  background: linear-gradient(180deg, #fff8e0, var(--gold-hi) 50%, var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 0.4em rgba(246, 220, 148, 0.8));
+  animation: lov-lvl-text 1.8s var(--ease) forwards; }
+@keyframes lov-lvl-text { 0% { opacity: 0; transform: translate(-50%, 0.8em) scale(0.7); } 18% { opacity: 1; transform: translate(-50%, 0) scale(1.1); } 30% { transform: translate(-50%, 0) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -1.2em); } }
+
+/* or gagné : chiffres qui s'envolent depuis le compteur */
+.lov-gold { position: relative; }
+.lov-gold-floats { position: absolute; left: 50%; bottom: 100%; pointer-events: none; }
+.lov-gold-floats b { position: absolute; left: 0; bottom: 0; transform: translateX(-50%); white-space: nowrap; font-weight: 900; font-size: 1.05em; color: var(--gold-hi); text-shadow: 0 0 0.4em rgba(246, 220, 148, 0.9), 0 1px 2px #000; animation: lov-gold-up 1.4s var(--ease) forwards; }
+@keyframes lov-gold-up { 0% { opacity: 0; transform: translate(-50%, 0.6em) scale(0.6); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 100% { opacity: 0; transform: translate(-50%, -2.6em) scale(1); } }
+
+/* objet acheté : éclat lumineux sur la case */
+.lov-newitem { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; box-shadow: inset 0 0 0 2px var(--gold-hi), 0 0 1em rgba(246, 220, 148, 0.9);
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 250, 220, 0.85) 50%, transparent 70%) no-repeat; background-size: 250% 100%; animation: lov-newitem 0.9s ease-out forwards; }
+@keyframes lov-newitem { 0% { background-position: 150% 0; opacity: 1; } 70% { opacity: 1; } 100% { background-position: -100% 0; opacity: 0; } }
+
+/* PV bas : vignette rouge pulsante */
+.lov-lowhp { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 12vmin rgba(200, 20, 30, 0.45); animation: lov-lowhp 1.6s ease-in-out infinite; }
+.lov-lowhp.l2 { box-shadow: inset 0 0 18vmin rgba(220, 20, 30, 0.6); animation-duration: 0.9s; }
+@keyframes lov-lowhp { 50% { opacity: 0.45; } }
+
+/* âme du drake dans le score */
+.lov-score-side .drakes .soul { margin: 0 0.2em; padding: 0 0.45em; font-family: var(--font-display); font-weight: 800; font-size: 0.75em; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; border-radius: 99px; border: 1px solid var(--c); background: radial-gradient(circle, color-mix(in srgb, var(--c) 55%, transparent), transparent 80%); box-shadow: 0 0 0.8em var(--c); animation: lov-soul 2.4s ease-in-out infinite; }
+@keyframes lov-soul { 50% { box-shadow: 0 0 1.4em var(--c); } }
+
+/* timers d'objectifs (au-dessus de la minimap) */
+.lov-obj-timers span { display: inline-flex; align-items: center; gap: 0.35em; }
+.lov-obj-timers span svg { color: #c79bff; }
+.lov-obj-timers .t-dragon svg, .lov-obj-timers .t-elder_dragon svg { color: #ff8a4c; }
+.lov-obj-timers .t-leviathan svg { color: #59d8ff; }
+.lov-obj-timers span.soon { border-color: var(--gold-hi); color: var(--text); box-shadow: 0 0 0.8em rgba(246, 220, 148, 0.35); animation: lov-blink 1.2s ease-in-out infinite; }
+.lov-obj-timers span.soon b { color: var(--gold-hi); }
+
+/* ============================================================ chat */
+.lov-chat { position: absolute; left: 0.8em; bottom: 11.5em; width: 26em; display: flex; flex-direction: column; gap: 0.3em; font-size: 0.85em; }
+.lov-chat-lines { display: flex; flex-direction: column; gap: 0.15em; max-height: 12em; overflow: hidden; }
+.lov-chat.open .lov-chat-lines { overflow-y: auto; pointer-events: auto; padding: 0.4em; background: rgba(5, 7, 15, 0.72); border: 1px solid var(--line); border-radius: 4px; scrollbar-width: thin; }
+.lov-chat-line { display: block; text-shadow: 0 1px 2px #000, 0 0 3px #000; animation: lov-feed-in 0.25s var(--ease); line-height: 1.45; }
+.lov-chat-line > * { margin-right: 0.3em; }
+.lov-chat-line svg.lov-portrait { display: inline-block; vertical-align: -0.3em; }
+.lov-chat-line .tag { font-size: 0.8em; color: var(--muted); }
+.lov-chat-line b { font-weight: 700; }
+.lov-chat-line b small { font-weight: 500; color: var(--muted); }
+.lov-chat-line.ally b { color: #8cc2ff; }
+.lov-chat-line.enemy b { color: #ff9a9a; }
+.lov-chat-line .txt { color: #f1ede2; word-break: break-word; }
+.lov-chat-input { display: flex; gap: 0.4em; pointer-events: auto; animation: lov-rise 0.15s var(--ease); }
+.lov-chat-input .scope { font: inherit; font-size: 0.82em; font-weight: 700; padding: 0 0.7em; border-radius: 3px; border: 1px solid var(--blue); background: rgba(18, 48, 95, 0.85); color: #cfe4ff; cursor: pointer; }
+.lov-chat-input .scope.all { border-color: var(--gold); background: rgba(60, 45, 10, 0.85); color: var(--gold-hi); }
+.lov-chat-input input { flex: 1; font: inherit; color: var(--text); background: rgba(3, 5, 12, 0.88); border: 1px solid var(--gold); border-radius: 3px; padding: 0.45em 0.7em; outline: none; box-shadow: 0 0 1em rgba(217, 178, 95, 0.2); }

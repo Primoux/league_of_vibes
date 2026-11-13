@@ -1,9 +1,6 @@
 /**
- * Vue « monde » côté UI : cache d'entités (applique les snapshots delta + `removed`), kill feed, annonces,
- * état des panneaux et pont caméra. Propriétaire : mistral-ui.
- *
- * Si claude-client expose plus tard un cache d'entités fusionné dans le store, il suffira de remplacer
- * `applySnapshot` par une lecture de ce cache.
+ * Vue « monde » côté UI : cache d'entités (vue complète fournie par net/), kill feed, annonces, chat
+ * et effets d'interface (« juice » : montée de niveau, or gagné, objet acheté). Propriétaire : mistral-ui.
  */
 import { CHAMPIONS, type EntityId, type EntitySnapshot, type GameEvent, type Snapshot, type Team, type Vec2 } from '@lov/shared';
 import { store, type ClientState } from '../../state.ts';
@@ -28,6 +25,56 @@ export interface UiState {
   announce: Announcement | null;
 }
 export const ui = new MiniStore<UiState>({ feed: [], announce: null });
+
+/** Messages de chat (événements `chat` du serveur, déjà filtrés par équipe côté serveur). */
+export interface ChatLine {
+  key: number;
+  at: number; // Date.now() de réception
+  playerId: string;
+  text: string;
+  teamOnly: boolean;
+}
+export const chat = new MiniStore<{ lines: ChatLine[]; open: boolean; all: boolean }>({ lines: [], open: false, all: false });
+
+/** Effets d'interface déclenchés par les événements du joueur local. `seq` change = rejouer l'animation. */
+export interface Juice {
+  levelSeq: number;
+  level: number;
+  golds: { key: number; amount: number }[];
+  boughtSeq: number;
+  boughtItem: string | null;
+}
+export const juice = new MiniStore<Juice>({ levelSeq: 0, level: 1, golds: [], boughtSeq: 0, boughtItem: null });
+let juiceKey = 1;
+let pendingGold = 0;
+let goldTimer: ReturnType<typeof setTimeout> | null = null;
+
+function flushGold(): void {
+  goldTimer = null;
+  const amount = Math.round(pendingGold);
+  pendingGold = 0;
+  if (amount < 15) return; // or passif : pas d'effet
+  const key = juiceKey++;
+  juice.set({ golds: [...juice.state.golds, { key, amount }].slice(-4) });
+  setTimeout(() => juice.set({ golds: juice.state.golds.filter((g) => g.key !== key) }), 1400);
+}
+
+function onSelfEvents(events: readonly GameEvent[]): void {
+  const me = store.state.snapshot?.self?.entityId ?? store.state.game?.entityId;
+  for (const e of events) {
+    if (e.type === 'chat') {
+      chat.set({ lines: [...chat.state.lines, { key: juiceKey++, at: Date.now(), playerId: e.playerId, text: e.text, teamOnly: e.teamOnly }].slice(-40) });
+      continue;
+    }
+    if (me === undefined) continue;
+    if (e.type === 'levelUp' && e.target === me) juice.set({ levelSeq: juice.state.levelSeq + 1, level: e.level });
+    else if (e.type === 'itemBought' && e.target === me) juice.set({ boughtSeq: juice.state.boughtSeq + 1, boughtItem: e.itemId });
+    else if (e.type === 'goldGain' && e.target === me) {
+      pendingGold += e.amount;
+      if (!goldTimer) goldTimer = setTimeout(flushGold, 250);
+    }
+  }
+}
 
 /** Minimap -> caméra (claude-client lit `cameraFocus` et déverrouille la caméra). */
 export function focusCamera(pos: Vec2): void {
@@ -92,6 +139,7 @@ const ANNOUNCE_MS = 3200;
 function reset(): void {
   entities.clear();
   champMemo.clear();
+  chat.set({ lines: [], open: false });
   tracker = null;
   announceQueue.length = 0;
   ui.set({ feed: [], announce: null });
@@ -139,6 +187,7 @@ export function applySnapshot(snap: Snapshot, team: Team, full = true): void {
 }
 
 export function pushEvents(events: readonly GameEvent[], time: number): void {
+  onSelfEvents(events);
   if (!tracker) return;
   const { feed, announce } = tracker.process(events, time);
   if (feed.length) ui.set({ feed: trimFeed([...ui.state.feed, ...feed], time) });
