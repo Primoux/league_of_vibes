@@ -23,11 +23,14 @@ function recommended(cls: ChampionClass | undefined): ItemDef[] {
   if (!cls) return [];
   const wanted = CLASS_STATS[cls];
   const score = (i: ItemDef) => Object.keys(i.stats).filter((k) => wanted.includes(k as keyof Stats)).length;
-  return ITEM_LIST.filter((i) => i.category !== 'trinket' && (score(i) > 0 || i.category === 'consumable' || i.category === 'boots'))
+  return SHOP_LIST.filter((i) => i.category !== 'trinket' && (score(i) > 0 || i.category === 'consumable' || i.category === 'boots'))
     .sort((a, b) => score(b) - score(a) || b.cost - a.cost)
     .slice(0, 14)
     .sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category) || a.cost - b.cost);
 }
+
+/** Objets achetables (`shop: false` = donné par un objectif, ex. Œil du colosse). */
+const SHOP_LIST = ITEM_LIST.filter((i) => i.shop !== false);
 
 const VERDICT_TEXT: Record<ShopVerdict, string> = {
   ok: 'Acheter',
@@ -62,7 +65,7 @@ function ShopPanel() {
   }, []);
 
   const reco = useMemo(() => recommended(d.cls), [d.cls]);
-  const list = query ? filterItems(ITEM_LIST, query, 'all') : tab === 'reco' ? reco : filterItems(ITEM_LIST, '', tab);
+  const list = query ? filterItems(SHOP_LIST, query, 'all') : tab === 'reco' ? reco : filterItems(SHOP_LIST, '', tab);
   const selected = sel ? ITEMS[sel] : undefined;
 
   const buy = (id: string) => {
@@ -203,7 +206,7 @@ function groupByCategory(list: ItemDef[]): [ItemCategory, ItemDef[]][] {
 function Detail({ item, inv, gold, canShop, onBuy, onPick }: { item: ItemDef; inv: (string | null)[]; gold: number; canShop: boolean; onBuy: (id: string) => void; onPick: (id: string) => void }) {
   const q = quoteItem(item.id, inv, ITEMS);
   const v = canBuy(item, inv, gold, canShop, ITEMS);
-  const into = buildsInto(item.id, ITEM_LIST);
+  const into = buildsInto(item.id, SHOP_LIST);
   return (
     <div class="lov-shop-det">
       {into.length > 0 && (
