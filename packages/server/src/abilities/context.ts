@@ -24,7 +24,9 @@ export function hit(ctx: CastContext, target: Entity, multiplier = 1, type = ctx
   return applyDamage(ctx.world, { source: ctx.source, target, amount: scaling(ctx.source, ctx.def.damage, ctx.rank, target) * ctx.amplification * multiplier, type, ability: ctx.def.id });
 }
 export function cc(ctx: CastContext, target: Entity, type: 'stun' | 'root' | 'knockup' | 'taunt' | 'slow', duration: number, amount?: number): void {
-  addBuff(ctx.world, target, type, { source: ctx.source, duration, params: { amount }, definition: { fxKey: ctx.def.fxKey } });
+  // Independent slow durations, including two spells cast by the same champion.
+  const id = type === 'slow' ? `${ctx.def.id}_slow` : type;
+  addBuff(ctx.world, target, id, { source: ctx.source, duration, params: { amount }, definition: { kind: 'cc', cc: type, fxKey: ctx.def.fxKey } });
 }
 export function line(ctx: CastContext, onHit: (target: Entity) => void, options: { pierce?: boolean; stopOnChampion?: boolean; onlyChampions?: boolean; from?: Vec2; to?: Vec2; type?: string; onEnd?: (pos: Vec2) => void } = {}): Entity {
   const from = options.from ?? ctx.source.pos;

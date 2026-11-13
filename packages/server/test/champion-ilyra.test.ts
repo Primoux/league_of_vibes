@@ -31,3 +31,11 @@ describe('Ilyra', () => {
     expect(stuns).toHaveLength(1); expect(getBuff(target, 'ilyra_frost_immunity', source.id)).toBeDefined();
   });
 });
+
+it('keeps W’s stronger slow when Q from the same caster also hits', () => {
+  const { world, source, target } = game('ilyra');
+  cast(world, source, 'W', target); advance(world, .9);
+  expect(target.stats.moveSpeed).toBeCloseTo(165);
+  cast(world, source, 'Q', target); advance(world, .5);
+  expect(target.stats.moveSpeed).toBeCloseTo(165);
+});

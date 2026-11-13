@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { CHAMPION_LIST, TICK_DT, dist, getChampion, type AbilitySlot, type ChampionClass } from '@lov/shared';
 import { World, createChampion, type Entity } from '../src/world.ts';
 import { createSystems } from '../src/systems/index.ts';
@@ -52,10 +52,20 @@ export function simulateDuel(a: string, b: string, level: number): DuelResult {
   }
   return { winner: champions[0].dead ? b : champions[1].dead ? a : null, seconds: world.time, damage: [champions[0].champ!.damageToChampions, champions[1].champ!.damageToChampions], hp: [champions[0].hp, champions[1].hp] };
 }
+const reports: { a: string; b: string; level: number; result: DuelResult }[] = [];
+afterAll(() => {
+  if (process.env.LOV_BALANCE_REPORT !== '1') return;
+  const report = CHAMPION_LIST.map((champion) => {
+    const games = reports.filter((r) => r.a === champion.id || r.b === champion.id);
+    return { champion: champion.id, wins: games.filter((r) => r.result.winner === champion.id).length, draws: games.filter((r) => !r.result.winner).length, games: games.length, maxDps: Math.round(Math.max(...games.map((r) => r.result.damage[r.a === champion.id ? 0 : 1] / r.result.seconds))) };
+  });
+  console.info('BALANCE_REPORT', JSON.stringify(report));
+});
 const pairs = CHAMPION_LIST.flatMap((a, i) => CHAMPION_LIST.slice(i + 1).flatMap((b) => [6, 11].map((level) => [a.id, b.id, level] as const)));
 describe('Champion balance guardrails', () => {
   it.each(pairs)('%s vs %s at level %i with class loadouts', (a, b, level) => {
     const duel = simulateDuel(a, b, level);
+    reports.push({ a, b, level, result: duel });
     expect(duel.seconds).toBeGreaterThan(1);
     expect(duel.damage[0] + duel.damage[1]).toBeGreaterThan(0);
     expect(duel.damage[0] / duel.seconds).toBeLessThan(1500);
