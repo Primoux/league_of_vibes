@@ -38,6 +38,11 @@
 - **`?autoplay`** (dev) : connexion + salle dev + prêt + lancement automatiques. Avec `SKIP_DRAFT=1` côté serveur : partie solo sans clic. Validé de bout en bout avec le vrai serveur.
 - `?stats` : overlay fps / draw calls / triangles (`?stats=log` : aussi dans la console).
 
+### Demandes des autres agents
+- **mistral-economy** : `audio.setListener(() => store.state.cameraCenter)` câblé dans `main.ts` (objet mis à jour en place chaque frame, aucune allocation).
+- **claude-fx** : `renderer.shake(intensité, durée)` / `shakeCamera(intensité, durée)` (export de `render/GameRenderer.ts`) — intensité = déplacement max en unités de jeu (≈ 15 léger, 40 fort, borné à 80), décroissance quadratique, un tremblement plus faible ne remplace pas un plus fort en cours.
+- **mistral-ui** : `store.state.cameraView` (silencieux, chaque frame) = emprise réelle de la vue au sol en unités de jeu : `quad` (trapèze bas-gauche, bas-droite, haut-droite, haut-gauche) + `minX/minY/maxX/maxY/w/h`. Le cadre de la minimap peut remplacer son approximation (`Minimap.tsx`, ton fichier).
+
 ## En cours
 - Rien de bloquant. Pistes : LOD des modèles si besoin (non nécessaire après le batching), mesures fps sur machine réelle.
 
@@ -61,6 +66,7 @@
 - `renderer.aim` (`AimState`, mis à jour chaque frame) et **`registerIndicatorRenderer({ update(aim, dt) })`** pour claude-fx : remplace les indicateurs par défaut. `AimState` = { active, kind, slot, targeting, abilityId, fxKey, origin, cursor, clamped (borné à la portée), range, radius, width, hover, attackRange }.
 - `renderer.fog.canvas` (visibilité, blanc = visible, 192², y du jeu vers le haut) ; `applyFog(material)` pour brouiller un matériau de décor.
 - `terrainHeight(x, y)` (`render/map/geometry.ts`) : hauteur du sol en unités de jeu (poser un FX au sol : `y = terrainHeight * RENDER_SCALE`).
+- `renderer.shake(intensity, duration)` / `shakeCamera(...)` ; `store.state.cameraView` (emprise de la vue au sol).
 - `registerChampionFactory((snap) => ChampionView | null)` (`render/EntityView.ts`, réexporté) ; `ChampionView = { object3d, update(snap, dt), playAnim(name), dispose() }`. Le renderer place `object3d` au sol (y = 0) et règle `rotation.y = facing` (le modèle regarde +x local). Sans fabrique : capsule colorée.
 ### `net` (`net/client.ts`)
 - `fxBus` reçoit les `GameEvent` **synchronisés avec le rendu interpolé** (~100 ms après réception). L'UI peut lire `store.snapshot.events` immédiatement.

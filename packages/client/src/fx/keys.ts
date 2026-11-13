@@ -14,8 +14,8 @@ export interface ResolvedFx {
 }
 
 /**
- * Résolution de la fxKey d'un buff. `shared/data/buffs.ts` (codex-champions) n'existe pas encore :
- * en attendant, la clé est l'id du buff. Remplaçable via `setBuffFxResolver`.
+ * Résolution de la fxKey d'un buff quand l'événement n'en porte pas : l'id du buff par défaut.
+ * (Le serveur renseigne normalement `fxKey` : la clé du sort qui a posé le buff, ou `cc_stun`… du catalogue.)
  */
 let buffFx: (buffId: string) => string = (id) => id;
 export function setBuffFxResolver(fn: (buffId: string) => string): void {
@@ -30,7 +30,7 @@ export function abilityFxKey(championId: string, slot: string): string {
 export function resolveFx(e: GameEvent, out: ResolvedFx): boolean {
   switch (e.type) {
     case 'abilityCast':
-      out.key = abilityFxKey(e.championId, e.slot);
+      out.key = e.fxKey ?? abilityFxKey(e.championId, e.slot);
       out.phase = 'cast';
       return true;
     case 'projectileSpawn':
@@ -50,21 +50,25 @@ export function resolveFx(e: GameEvent, out: ResolvedFx): boolean {
       out.phase = 'dash';
       return true;
     case 'buffApplied':
-      out.key = buffFx(e.buffId);
+      out.key = e.fxKey ?? buffFx(e.buffId);
       out.phase = 'buff';
       return true;
     case 'buffRemoved':
-      out.key = buffFx(e.buffId);
+      out.key = e.fxKey ?? buffFx(e.buffId);
       out.phase = 'buffEnd';
       return true;
     case 'summonerCast':
-      out.key = `sum_${e.spell}`;
+      out.key = e.fxKey ?? `sum_${e.spell}`;
       out.phase = 'summoner';
       return true;
     default:
       return false;
   }
 }
+
+/** Zone de télégraphie d'un sort à effet retardé : le serveur émet `<fxKey>_telegraph` puis `<fxKey>`. */
+export const TELEGRAPH_SUFFIX = '_telegraph';
+export const isTelegraphKey = (key: string): boolean => key.endsWith(TELEGRAPH_SUFFIX);
 
 /** Champion propriétaire d'une fxKey (`ilyra_r_shard` → `ilyra`), ou null. */
 export function championOfKey(key: string): string | null {

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { AllHandlers } from './dispatcher.ts';
 import { ProjectileFx, dashTrail, flash, shockwave, telegraph, zone } from './effects/primitives.ts';
 import type { FxColors, FxRuntime } from './core/FxRuntime.ts';
+import { isTelegraphKey } from './keys.ts';
 
 const _p = new THREE.Vector3();
 const _q = new THREE.Vector3();
@@ -62,12 +63,12 @@ export const defaultFx: AllHandlers = {
   area(rt, e, c) {
     const center = rt.world(e.pos, 0, new THREE.Vector3());
     const radius = rt.scale(e.radius);
-    if (e.duration <= 0.05) return areaBurst(rt, center, radius, c);
-    if (e.duration <= 1.25) {
-      // zone retardée : télégraphie puis explosion
-      telegraph(rt, center, radius, e.duration, c.vivid, { color2: c.vividHdr, onDone: () => areaBurst(rt, center, radius, c) });
+    // zone retardée : le serveur émet d'abord `<clé>_telegraph` (durée = délai), puis `<clé>` à la détonation
+    if (isTelegraphKey(e.fxKey)) {
+      telegraph(rt, center, radius, Math.max(0.1, e.duration), c.vivid, { color2: c.vividHdr });
       return;
     }
+    if (e.duration <= 0.35) return areaBurst(rt, center, radius, c);
     // zone persistante
     zone(rt, center, radius, e.duration, c.vividHdr, {
       fill: 0.12,

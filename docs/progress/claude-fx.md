@@ -24,8 +24,15 @@
 - Nouvelles primitives : `MeshBurstSystem` (pics/débris instanciés : roche, glace), auras annulables par clé (`rt.setAura/endAura`, boucliers), étoiles d'étourdissement, brume.
 - fxlab : vrais modèles (le lanceur prend le modèle du champion joué, 3 cibles rouges), bouton AA, mort/réapparition, rappel ; paramètres `&champ=`, `&close=1|2`, `&cast=…:AA|DIE|RECALL`.
 
+### M3 — en cours
+- **fxlab piloté par la vraie simulation serveur** (`fx/lab/labSim.ts`) : World + systèmes de combat de claude-server et codex-champions importés en lecture seule. Le lab reçoit exactement les événements du jeu (journal affiché dans le panneau) ; champions niveau 18 + un allié pour les sorts de soutien. `synth.ts` (simulation maison) supprimé.
+- FX alignés sur les événements réels : fxKey portée par `abilityCast` / `buffApplied` / `buffRemoved` / `summonerCast` ; zones retardées `<clé>_telegraph` puis `<clé>` ; buffs de sort distingués par `buffId`.
+- **Statuts génériques** (`fx/world/status.ts`), par `buffId`, colorés par le sort : stun, root, slow (`*_slow`), knockup (+ parabole du modèle), taunt, fear, silence, blind, suppress, grievous, invisible (+ modèle translucide), revealed.
+- **Événements du monde** (`fx/world/events.ts`) : chiffres flottants GPU (dégâts physiques/magiques/bruts, crits, dégâts subis en rouge, soins, or — seulement ce qui concerne le joueur local), level-up, âme à la mort, réapparition, canal de rappel (réussi / annulé), destruction de tour / plaque / inhibiteur / nexus, objectifs pris/apparus (couleur d'élément), auras de buffs (bleu, rouge, Léviathan, Ancien), brûlures.
+- **9 sorts d'invocateur** (`fx/summoners.ts`).
+
 ## En cours
-- M3 : modèles et FX dédiés des 8 autres champions, sorts d'invocateur, événements du monde (chiffres de dégâts, level-up, rappel, morts, buffs/CC, objectifs, structures).
+- M3 : modèles et FX dédiés des 8 autres champions.
 
 ## Bloqué / Besoins (des autres agents)
 - **claude-client** (`GameRenderer`) — `onFrame`, `getEntityObject`, `registerChampionFactory` et ACES sont déjà là et utilisés automatiquement par `installFx(renderer)`. Il manque :
@@ -38,6 +45,8 @@
   - Les incantations sont animées à partir de l'événement `abilityCast` (pas besoin de `entity.anim = 'cast_Q'`, mais c'est géré aussi).
   - Boucliers à durée variable (passif de Grondak) : émettre `buffRemoved` quand le bouclier casse, les FX s'arrêtent dessus.
   - Étourdissements : les FX lisent `snap.buffs` (ids `stun`, `knockup`, `suppress`, `taunt`, `fear`) pour l'animation d'étourdissement.
+
+- **codex-objectives** : les buffs posés via `world-ai/runtime.ts` n'ont pas de `fxKey` ; les FX les reconnaissent par `buffId` : `blue_buff`/`blue`, `red_buff`/`red`, `leviathan`/`leviathan_buff`, `elder`/`elder_buff`, `red_burn`, `elder_burn`, `elder_execute`. Merci de garder ces ids (ou de me prévenir).
 
 ## Contrats modifiés / API disponibles
 - `contract:` `client/src/main.ts` (claude-client) : ajout additif de l'entrée `?fxlab` (import dynamique) et `installFx(renderer)` au lieu de `installFx(renderer.scene)`. Le reste du démarrage est inchangé.

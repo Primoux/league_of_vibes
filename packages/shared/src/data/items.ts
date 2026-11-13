@@ -1,17 +1,54 @@
 import type { ItemDef } from '../schema.ts';
 
 /**
- * Objets. Propriétaire : mistral-economy. BOOTSTRAP : quelques exemples ; la liste complète (~30 objets)
- * est décrite dans PLAN.md §8 et docs/plans/mistral-economy.md.
+ * Objets. Propriétaire : mistral-economy. Règles : PLAN.md §8.
+ * `cost` = coût TOTAL de l'objet ; `buildsFrom` = composants (leurs coûts sont déduits à l'achat
+ * et ils sont consommés). Passifs/actifs résolus côté serveur dans `server/src/items/`.
  */
 export const ITEM_LIST: ItemDef[] = [
-  { id: 'doran_blade', name: 'Lame du novice', description: '+8 AD, +80 PV, 2,5 % vol de vie.', category: 'starter', cost: 450, buildsFrom: [], stats: { ad: 8, maxHp: 80, lifesteal: 0.025 }, icon: 'blade_small' },
-  { id: 'doran_ring', name: 'Anneau du novice', description: '+18 AP, +90 PV, régénération de mana.', category: 'starter', cost: 400, buildsFrom: [], stats: { ap: 18, maxHp: 90, manaRegen: 5 }, icon: 'ring_small' },
-  { id: 'health_potion', name: 'Potion de soin', description: 'Rend 120 PV en 15 s.', category: 'consumable', cost: 50, buildsFrom: [], stats: {}, active: { id: 'potion', name: 'Boire', description: 'Rend 120 PV en 15 s.', cooldown: 0 }, maxStacks: 5, icon: 'potion_red' },
-  { id: 'boots', name: 'Bottes', description: '+25 vitesse de déplacement.', category: 'boots', cost: 300, buildsFrom: [], stats: { moveSpeed: 25 }, icon: 'boots' },
+  // ---------------------------------------------------------------- Départ
+  { id: 'doran_blade', name: 'Lame du novice', description: '+8 AD, +80 PV, 2,5 % de vol de vie sur les auto-attaques.', category: 'starter', cost: 450, buildsFrom: [], stats: { ad: 8, maxHp: 80, lifesteal: 0.025 }, icon: 'blade_small' },
+  { id: 'doran_ring', name: 'Anneau du novice', description: '+18 AP, +90 PV, +5 régénération de mana.', category: 'starter', cost: 400, buildsFrom: [], stats: { ap: 18, maxHp: 90, manaRegen: 5 }, icon: 'ring_small' },
+  { id: 'doran_shield', name: 'Bouclier du novice', description: '+80 PV, +6 PV/5 s. Passif : +4 PV à chaque sbire tué.', category: 'starter', cost: 450, buildsFrom: [], stats: { maxHp: 80, hpRegen: 6 }, passive: { id: 'last_hit_heal', name: 'Solidarité', description: '+4 PV à chaque sbire tué.', params: { heal: 4 } }, icon: 'shield_small' },
+  { id: 'hunter_machete', name: 'Machette du chasseur', description: 'Jungle : +10 AD, +8 % vitesse d’attaque, +15 dégâts et +10 PV contre les monstres.', category: 'starter', cost: 450, buildsFrom: [], stats: { ad: 10, attackSpeed: 0.08 }, passive: { id: 'chasseur', name: 'Trophée', description: '+15 dégâts contre les monstres, +10 PV à leur mort.', params: { bonusDamage: 15, heal: 10 } }, icon: 'machete' },
+  { id: 'health_potion', name: 'Potion de soin', description: 'Active : rend 120 PV sur 15 s. 5 charges max.', category: 'consumable', cost: 50, buildsFrom: [], stats: {}, active: { id: 'potion', name: 'Boire', description: 'Rend 120 PV sur 15 s.', cooldown: 0 }, maxStacks: 5, icon: 'potion_red' },
+
+  // ---------------------------------------------------------------- Bottes (uniques : une seule paire)
+  { id: 'boots', name: 'Bottes', description: '+45 vitesse de déplacement.', category: 'boots', cost: 300, buildsFrom: [], stats: { moveSpeed: 45 }, unique: true, icon: 'boots' },
+  { id: 'berserker_greaves', name: 'Bottes de berserker', description: '+45 vitesse, +35 % vitesse d’attaque.', category: 'boots', cost: 1100, buildsFrom: ['boots'], stats: { moveSpeed: 45, attackSpeed: 0.35 }, unique: true, icon: 'boots_as' },
+  { id: 'sorcerer_shoes', name: 'Bottes de sorcier', description: '+45 vitesse, +18 pénétration magique.', category: 'boots', cost: 1100, buildsFrom: ['boots'], stats: { moveSpeed: 45, magicPen: 18 }, unique: true, icon: 'boots_pen' },
+  { id: 'plated_steelcaps', name: 'Solerets d’acier', description: '+45 vitesse, +60 armure.', category: 'boots', cost: 1200, buildsFrom: ['boots'], stats: { moveSpeed: 45, armor: 60 }, unique: true, icon: 'boots_armor' },
+  { id: 'mercury_treads', name: 'Bottes de mercure', description: '+45 vitesse, +30 résistance magique.', category: 'boots', cost: 1250, buildsFrom: ['boots'], stats: { moveSpeed: 45, mr: 30 }, unique: true, icon: 'boots_mr' },
+  { id: 'ionian_lucidity', name: 'Bottes de lucidité', description: '+45 vitesse, +20 hâte de compétence.', category: 'boots', cost: 950, buildsFrom: ['boots'], stats: { moveSpeed: 45, abilityHaste: 20 }, unique: true, icon: 'boots_haste' },
+
+  // ---------------------------------------------------------------- Basiques
   { id: 'long_sword', name: 'Épée longue', description: '+10 AD.', category: 'basic', cost: 350, buildsFrom: [], stats: { ad: 10 }, icon: 'sword' },
   { id: 'amplifying_tome', name: 'Tome amplificateur', description: '+20 AP.', category: 'basic', cost: 400, buildsFrom: [], stats: { ap: 20 }, icon: 'tome' },
   { id: 'ruby_crystal', name: 'Cristal de rubis', description: '+150 PV.', category: 'basic', cost: 400, buildsFrom: [], stats: { maxHp: 150 }, icon: 'ruby' },
-  { id: 'stealth_ward', name: 'Totem de vision', description: 'Trinket : pose une balise invisible (90 s), 2 charges.', category: 'trinket', cost: 0, buildsFrom: [], stats: {}, icon: 'ward' },
+  { id: 'sapphire_crystal', name: 'Pierre de saphir', description: '+250 mana.', category: 'basic', cost: 350, buildsFrom: [], stats: { maxMana: 250 }, icon: 'sapphire' },
+  { id: 'dagger', name: 'Dague', description: '+12 % vitesse d’attaque.', category: 'basic', cost: 300, buildsFrom: [], stats: { attackSpeed: 0.12 }, icon: 'dagger' },
+  { id: 'cloak_agility', name: 'Cape d’agilité', description: '+15 % de chance de critique.', category: 'basic', cost: 600, buildsFrom: [], stats: { critChance: 0.15 }, icon: 'cloak' },
+  { id: 'cloth_armor', name: 'Armure en tissu', description: '+15 armure.', category: 'basic', cost: 300, buildsFrom: [], stats: { armor: 15 }, icon: 'cloth' },
+  { id: 'negatron_cloak', name: 'Cape de négation', description: '+25 résistance magique.', category: 'basic', cost: 450, buildsFrom: [], stats: { mr: 25 }, icon: 'negatron' },
+  { id: 'warhammer', name: 'Marteau de guerre', description: '+25 AD, +10 hâte de compétence.', category: 'basic', cost: 1000, buildsFrom: [], stats: { ad: 25, abilityHaste: 10 }, icon: 'warhammer' },
+  { id: 'blasting_wand', name: 'Baguette explosive', description: '+40 AP.', category: 'basic', cost: 850, buildsFrom: [], stats: { ap: 40 }, icon: 'wand' },
+
+  // ---------------------------------------------------------------- Légendaires
+  { id: 'lame_des_rafales', name: 'Lame des rafales', description: '+40 AD, +20 % crit, +25 % vitesse d’attaque. Active : +40 % vitesse de déplacement pendant 2 s (60 s).', category: 'legendary', cost: 3000, buildsFrom: ['long_sword', 'cloak_agility', 'dagger'], stats: { ad: 40, critChance: 0.2, attackSpeed: 0.25 }, active: { id: 'rafale', name: 'Rafale', description: '+40 % vitesse de déplacement pendant 2 s.', cooldown: 60 }, icon: 'rafale' },
+  { id: 'arc_des_dunes', name: 'Arc des dunes', description: '+30 AD, +35 % vitesse d’attaque, +20 % crit. Passif : vos attaques infligent 20 dégâts bonus.', category: 'legendary', cost: 3000, buildsFrom: ['dagger', 'long_sword', 'cloak_agility'], stats: { ad: 30, attackSpeed: 0.35, critChance: 0.2 }, passive: { id: 'etincelle', name: 'Étincelle', description: 'Auto-attaques : +20 dégâts bonus.', params: { damage: 20 } }, icon: 'dunebow' },
+  { id: 'masse_du_colosse', name: 'Masse du colosse', description: '+45 AD, +300 PV, +10 hâte.', category: 'legendary', cost: 3000, buildsFrom: ['warhammer', 'ruby_crystal'], stats: { ad: 45, maxHp: 300, abilityHaste: 10 }, icon: 'colossus' },
+  { id: 'lame_coeur_sauvage', name: 'Lame cœur-sauvage', description: '+40 AD, +250 PV, 10 % vol de vie.', category: 'legendary', cost: 3200, buildsFrom: ['long_sword', 'ruby_crystal'], stats: { ad: 40, maxHp: 250, lifesteal: 0.1 }, icon: 'wildblade' },
+  { id: 'griffe_de_lombre', name: 'Griffe de l’ombre', description: '+55 AD, +15 pénétration d’armure, +10 hâte. Passif : +10 % dégâts contre les cibles sous 40 % PV.', category: 'legendary', cost: 3000, buildsFrom: ['long_sword', 'warhammer'], stats: { ad: 55, armorPen: 15, abilityHaste: 10 }, passive: { id: 'ombre', name: 'Ténèbres', description: '+10 % dégâts contre les cibles sous 40 % PV.', params: { threshold: 0.4, bonus: 0.1 } }, icon: 'shadowclaw' },
+  { id: 'sceptre_de_lorage', name: 'Sceptre de l’orage', description: '+70 AP, +15 pénétration magique. Passif « Sort-lame » : votre prochaine attaque après un sort inflige +80 % AP dégâts bonus.', category: 'legendary', cost: 2800, buildsFrom: ['blasting_wand', 'amplifying_tome'], stats: { ap: 70, magicPen: 15 }, passive: { id: 'spellblade', name: 'Sort-lame', description: 'Après un sort, prochaine attaque : +80 % AP bonus.', params: { apRatio: 0.8 } }, icon: 'stormstaff' },
+  { id: 'couronne_du_givre', name: 'Couronne du givre', description: '+60 AP, +250 PV, +10 hâte.', category: 'legendary', cost: 2800, buildsFrom: ['blasting_wand', 'ruby_crystal'], stats: { ap: 60, maxHp: 250, abilityHaste: 10 }, icon: 'frostcrown' },
+  { id: 'sablier_eternel', name: 'Sablier éternel', description: '+50 AP, +40 armure. Active : stase pendant 2,5 s (invulnérable, 120 s).', category: 'legendary', cost: 2600, buildsFrom: ['blasting_wand', 'cloth_armor'], stats: { ap: 50, armor: 40 }, active: { id: 'stase', name: 'Stase', description: 'Devient invulnérable et immobile pendant 2,5 s.', cooldown: 120 }, icon: 'hourglass' },
+  { id: 'cuirasse_du_roc', name: 'Cuirasse du roc', description: '+70 armure, +400 PV, +8 PV/5 s.', category: 'legendary', cost: 3000, buildsFrom: ['cloth_armor', 'ruby_crystal', 'cloth_armor'], stats: { armor: 70, maxHp: 400, hpRegen: 8 }, icon: 'rockplate' },
+  { id: 'voile_de_la_nuit', name: 'Voile de la nuit', description: '+60 résistance magique, +350 PV. Passif : bouclier magique de 100 toutes les 40 s.', category: 'legendary', cost: 2900, buildsFrom: ['negatron_cloak', 'ruby_crystal'], stats: { mr: 60, maxHp: 350 }, passive: { id: 'voile', name: 'Voile magique', description: 'Bouclier de 100 contre les dégâts magiques, tous les 40 s.', params: { shield: 100, cooldown: 40 } }, icon: 'nightveil' },
+  { id: 'encensoir_de_laube', name: 'Encensoir de l’aube', description: '+30 AP, +200 PV, +15 hâte. Passif : vos soins sont amplifiés de 20 %. Active : bouclier de 120 sur vous et l’allié le plus proche (90 s).', category: 'legendary', cost: 2300, buildsFrom: ['amplifying_tome', 'ruby_crystal'], stats: { ap: 30, maxHp: 200, abilityHaste: 15 }, passive: { id: 'benediction', name: 'Bénédiction', description: 'Vos soins sont amplifiés de 20 %.', params: { bonus: 0.2 } }, active: { id: 'bouclier_allie', name: 'Protection', description: 'Bouclier de 120 sur vous et l’allié le plus proche pendant 2,5 s.', cooldown: 90 }, icon: 'dawncenser' },
+  { id: 'hache_du_bourreau', name: 'Hache du bourreau', description: '+50 AD, 8 % vol de vie. Passif « Blessure grave » : réduit les soins ennemis de 40 % pendant 3 s.', category: 'legendary', cost: 3000, buildsFrom: ['long_sword', 'warhammer'], stats: { ad: 50, lifesteal: 0.08 }, passive: { id: 'grievous', name: 'Blessure grave', description: 'Vos dégâts réduisent les soins ennemis de 40 % pendant 3 s.', params: { reduction: 0.4, duration: 3 } }, icon: 'executioner' },
+
+  // ---------------------------------------------------------------- Trinkets
+  { id: 'stealth_ward', name: 'Totem de vision', description: 'Trinket : pose une balise invisible (90 s, vision 900 u), détruite en 3 attaques. 2 charges, rechargées toutes les 90 s.', category: 'trinket', cost: 0, buildsFrom: [], stats: {}, icon: 'ward' },
+  { id: 'colossus_eye', name: 'Œil du colosse', description: 'Objet de quête (Colosse du Rift). Active : invoque le Colosse contre la tour ennemie la plus proche.', category: 'trinket', cost: 0, buildsFrom: [], stats: {}, shop: false, active: { id: 'colosse', name: 'Invocation', description: 'Invoque le Colosse du Rift.', cooldown: 0 }, icon: 'eye' },
 ];
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(ITEM_LIST.map((i) => [i.id, i]));

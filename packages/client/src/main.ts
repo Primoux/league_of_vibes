@@ -1,5 +1,5 @@
 import { render, h } from 'preact';
-import { installAudio } from './audio/AudioManager.ts';
+import { audio, installAudio } from './audio/AudioManager.ts';
 import { fxIndicators, installFx, setFxQuality } from './fx/index.ts';
 import { installControls } from './input/controls.ts';
 import { net } from './net/client.ts';
@@ -11,7 +11,9 @@ import { App } from './ui/App.tsx';
 const params = new URLSearchParams(location.search);
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 
-if (params.has('fxlab')) {
+if (params.has('melenchonlab')) {
+  void import('./render/champions/melenchonlab.ts').then((m) => m.startMelenchonLab(canvas));
+} else if (params.has('fxlab')) {
   // Banc d'essai FX sans serveur (claude-fx), chargé à la demande.
   void import('./fx/lab/fxlab.ts').then((m) => m.startFxLab());
 } else if (params.has('maplab')) {
@@ -29,6 +31,8 @@ if (params.has('fxlab')) {
     if (s.settings.quality !== fxQuality) setFxQuality((fxQuality = s.settings.quality));
   });
   installAudio();
+  // écouteur audio = centre de la caméra (objet mis à jour en place chaque frame : aucune allocation)
+  audio.setListener(() => store.state.cameraCenter);
   render(h(App, {}), document.getElementById('ui')!);
   if (params.has('autoplay')) autoplay();
   // Reprise de session après rechargement de page (token en sessionStorage).
