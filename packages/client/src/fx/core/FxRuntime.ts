@@ -9,6 +9,8 @@ import { createStdStyles, type StdStyles } from '../particles/styles.ts';
 import { atlasCell } from '../particles/textures.ts';
 import { GroundDecal } from '../shaders/decal.ts';
 import { Ribbon } from '../shaders/ribbon.ts';
+import { createIceMaterial } from '../shaders/materials.ts';
+import { MeshBurstSystem, rockGeometry, shardGeometry, spikeGeometry } from '../effects/meshBursts.ts';
 import { EntityTracker } from './EntityTracker.ts';
 import type { FxHost } from './host.ts';
 import { paletteForKey } from './palette.ts';
@@ -49,6 +51,14 @@ export function makeVivid(primary: THREE.Color, accent: THREE.Color): THREE.Colo
   return new THREE.Color().setHSL(_hsl.h, Math.max(_hsl.s, 0.35), Math.max(_hsl.l, 0.58));
 }
 
+/** Systèmes de meshes instanciés partagés (créés à la première utilisation). */
+export interface BurstSystems {
+  rockSpikes: MeshBurstSystem;
+  rockDebris: MeshBurstSystem;
+  iceSpikes: MeshBurstSystem;
+  iceDebris: MeshBurstSystem;
+}
+
 export class FxRuntime {
   readonly root = new THREE.Group();
   readonly ps: ParticleSystem;
@@ -64,6 +74,8 @@ export class FxRuntime {
   private readonly sprites: Pool<THREE.Sprite>;
   private readonly activeRibbons = new Set<Ribbon>();
   private readonly activeDecals = new Set<GroundDecal>();
+  private burstSystems: BurstSystems | null = null;
+  private readonly auras = new Map<string, () => void>();
 
   constructor(readonly host: FxHost) {
     this.root.name = 'fx-root';
@@ -91,7 +103,8 @@ export class FxRuntime {
     this.sprites = new Pool(
       () => {
         const sp = new THREE.Sprite(
-          new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }),
+          // depthTest off : un grand éclat traverserait le sol et serait coupé net à l'horizon
+          new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true }),
         );
         sp.renderOrder = 13;
         return sp;
@@ -121,7 +134,42 @@ export class FxRuntime {
     }
     for (const r of this.activeRibbons) r.update(dt, this.host.camera);
     for (const d of this.activeDecals) d.u.uTime.value = this.time;
+    if (this.burstSystems) for (const k in this.burstSystems) this.burstSystems[k as keyof BurstSystems].update(dt);
     this.ps.update(dt);
+  }
+
+  get bursts(): BurstSystems {
+    if (!this.burstSystems) {
+      const stone = new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 });
+      const ice = createIceMaterial();
+      this.burstSystems = {
+        rockSpikes: new MeshBurstSystem(spikeGeometry(5), stone, 96),
+        rockDebris: new MeshBurstSystem(rockGeometry(), stone, 160),
+        iceSpikes: new MeshBurstSystem(shardGeometry(), ice, 96),
+        iceDebris: new MeshBurstSystem(shardGeometry(), ice, 160),
+      };
+      for (const k in this.burstSystems) this.root.add(this.burstSystems[k as keyof BurstSystems].mesh);
+    }
+    return this.burstSystems;
+  }
+
+  /** Enregistre l'annulation d'un effet persistant (bouclier, aura) ; remplace celui de même clé. */
+  setAura(key: string, cancel: () => void): void {
+    this.auras.get(key)?.();
+    this.auras.set(key, cancel);
+  }
+
+  /** Termine l'effet persistant `key` (ex. sur buffRemoved). */
+  endAura(key: string): void {
+    const c = this.auras.get(key);
+    if (!c) return;
+    this.auras.delete(key);
+    c();
+  }
+
+  /** À appeler par l'effet lui-même quand il se termine seul. */
+  forgetAura(key: string, cancel: () => void): void {
+    if (this.auras.get(key) === cancel) this.auras.delete(key);
   }
 
   add(e: Effect): void {

@@ -61,7 +61,7 @@ void main() {
     if (uProgress >= 0.0) {
       float inside = step(along, uProgress);
       float front = 1.0 - smoothstep(0.0, 0.06, abs(along - uProgress));
-      alpha += inside * 0.35 + front * 0.6 * step(0.001, uProgress);
+      alpha += inside * 0.25 + front * 0.6 * step(0.001, uProgress);
       col = mix(uColor, uColor2, inside * 0.5);
     }
   }
