@@ -139,3 +139,34 @@ describe('brouillard et terrain', () => {
     expect(Math.abs(terrainHeight(4000, 4000))).toBeLessThan(1);
   });
 });
+
+describe('tremblement de caméra', () => {
+  it('décale la vue sans toucher au centre, décroît jusqu’à zéro', () => {
+    const c = new CameraController(1);
+    c.jumpTo({ x: 5000, y: 5000 });
+    c.shake(40, 0.5);
+    let maxOff = 0;
+    for (let i = 0; i < 10; i++) {
+      c.update(1 / 60, null, false, false, 0, 1, 1);
+      maxOff = Math.max(maxOff, Math.hypot(c.shakeOffset.x, c.shakeOffset.y));
+    }
+    expect(maxOff).toBeGreaterThan(5);
+    expect(maxOff).toBeLessThanOrEqual(40);
+    expect(c.center).toEqual({ x: 5000, y: 5000 });
+    for (let i = 0; i < 60; i++) c.update(1 / 60, null, false, false, 0, 1, 1);
+    expect(c.shakeOffset).toEqual({ x: 0, y: 0 });
+  });
+
+  it('un tremblement faible ne remplace pas un fort en cours ; amplitude bornée', () => {
+    const c = new CameraController(1);
+    c.shake(1000, 1);
+    let maxOff = 0;
+    for (let i = 0; i < 30; i++) {
+      c.update(1 / 60, null, false, false, 0, 1, 1);
+      if (i === 2) c.shake(5, 2);
+      maxOff = Math.max(maxOff, Math.hypot(c.shakeOffset.x, c.shakeOffset.y));
+    }
+    expect(maxOff).toBeLessThanOrEqual(80);
+    expect(maxOff).toBeGreaterThan(20);
+  });
+});
