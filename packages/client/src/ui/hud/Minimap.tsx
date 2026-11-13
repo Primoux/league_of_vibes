@@ -9,9 +9,14 @@ import { net } from '../../net/client.ts';
 import { getRenderer } from '../../render/GameRenderer.ts';
 import { store } from '../../state.ts';
 import { entities, focusCamera, myTeam, selfEntity, worldTick } from '../game/world.ts';
+import { Glyph } from '../icons/Icons.tsx';
 import { formatClock, MONSTER_LABEL } from '../logic/format.ts';
 import { settings } from '../settings.ts';
 import { useSelect } from '../useStore.ts';
+
+/** Objectifs épiques affichés en liste (les autres timers = camps, dessinés sur la carte). */
+const EPIC: Record<string, string> = { dragon: 'dragon', elder_dragon: 'dragon', grubs: 'grub', herald: 'herald', leviathan: 'leviathan' };
+const CAMP_POS = new Map(CAMPS.map((c) => [c.id, c.pos]));
 
 const RES = 512; // résolution interne du canvas
 const S = RES / MAP_SIZE;
@@ -181,15 +186,17 @@ export function Minimap() {
     if (e.buttons & 1 && !e.altKey) focusCamera(toGame(e));
   };
 
-  const timerList = settings.state.showTimers && timers ? Object.entries(timers).filter(([, at]) => at > time).sort((a, b) => a[1] - b[1]).slice(0, 4) : [];
+  const timerList = settings.state.showTimers && timers ? Object.entries(timers).filter(([k, at]) => k in EPIC && at > time).sort((a, b) => a[1] - b[1]) : [];
 
   return (
     <div class="lov-minimap">
       {timerList.length > 0 && (
         <div class="lov-obj-timers">
           {timerList.map(([k, at]) => (
-            <span key={k}>
-              {MONSTER_LABEL[k as keyof typeof MONSTER_LABEL] ?? k} <b>{formatClock(at - time)}</b>
+            <span key={k} class={`t-${k} ${at - time <= 30 ? 'soon' : ''}`}>
+              <Glyph name={EPIC[k]!} size={13} />
+              {MONSTER_LABEL[k as keyof typeof MONSTER_LABEL] ?? k}
+              <b>{formatClock(at - time)}</b>
             </span>
           ))}
         </div>
@@ -265,14 +272,39 @@ function drawDynamic(g: CanvasRenderingContext2D, now: number, pings: Ping[]): v
     g.fillRect(x - 2.5, y - 2.5, 5, 5);
   }
 
-  // cadre caméra (centre lu en silence dans le store, taille approximative de la vue iso)
-  const c = store.state.cameraCenter;
-  const view = { x: c.x - 1250, y: c.y - 700, w: 2500, h: 1500 };
-  {
-    const [x0, y0] = px({ x: view.x, y: view.y + view.h });
-    g.strokeStyle = 'rgba(255,255,255,0.85)';
+  // cadre caméra : emprise réelle de la vue (trapèze, mise à jour en silence par claude-client)
+  const quad = store.state.cameraView?.quad;
+  if (quad) {
+    g.strokeStyle = 'rgba(255,255,255,0.9)';
     g.lineWidth = 2;
-    g.strokeRect(x0, y0, view.w * S, view.h * S);
+    g.beginPath();
+    quad.forEach((p, i) => (i ? g.lineTo(...px(p)) : g.moveTo(...px(p))));
+    g.closePath();
+    g.stroke();
+  }
+
+  // camps de jungle en réapparition : petit compte à rebours sur la carte
+  const timers = store.state.snapshot?.objectiveTimers;
+  const now0 = store.state.snapshot?.time ?? 0;
+  if (timers && settings.state.showTimers) {
+    g.font = '700 15px Inter, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    for (const [id, at] of Object.entries(timers)) {
+      const pos = CAMP_POS.get(id);
+      if (!pos || at <= now0) continue;
+      const [x, y] = px(pos);
+      const left = at - now0;
+      g.fillStyle = 'rgba(5,7,15,0.82)';
+      g.beginPath();
+      g.arc(x, y, 13, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = left <= 15 ? '#f6dc94' : 'rgba(232,196,106,0.5)';
+      g.lineWidth = 2;
+      g.stroke();
+      g.fillStyle = left <= 15 ? '#f6dc94' : '#cfc9b8';
+      g.fillText(left >= 60 ? `${Math.ceil(left / 60)}m` : String(Math.ceil(left)), x, y + 1);
+    }
   }
 
   // champions (le joueur par-dessus)

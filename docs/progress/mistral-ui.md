@@ -31,9 +31,16 @@
 - Polices : piles de secours déjà en place (`'Cinzel', 'Times New Roman', serif` et `'Inter', system-ui, …`) avec `display=swap` — remarque de Fable.
 - Draft : grille adaptative (11 champions).
 
+## Session 3 — après les PR #10 à #15
+- **Chat** : Entrée = équipe, Maj + Entrée = tous (Tab dans la saisie bascule), Échap ferme ; messages avec portrait, nom et champion, estompés après 10 s, historique complet à l'ouverture. Utilise `ClientMsg chat` / `GameEvent chat` (déjà filtrés par le serveur).
+- **Effets d'interface** (`juice` dans `ui/game/world.ts`) : double onde + bannière « Niveau X » sur le portrait (`levelUp`), « +or » qui s'envole du compteur (`goldGain` agrégé, l'or passif < 15 ignoré), éclat sur l'objet acheté (`itemBought`), vignette rouge pulsante sous 30 % / 15 % de PV.
+- **Minimap** : cadre caméra = vrai trapèze `store.cameraView.quad` (claude-client) ; comptes à rebours des camps de jungle dessinés sur la carte ; liste limitée aux objectifs épiques (drake, Drake Ancien, larves, Colosse, Léviathan) avec icônes et clignotement à moins de 30 s.
+- **Objectifs (prêt pour la PR #14 de codex-objectives)** : annonces `dragon_soul` (« Votre équipe obtient l'Âme infernale ! »), `herald_summoned`, `inhibitor_respawn` ; `objective_taken` et `victory` ignorées (doublons de ce que l'UI dérive déjà / écran de fin) ; badge « Âme » lumineux dans le score à 4 drakes ; noms des buffs `dragon_<élément>` et `soul_<élément>`.
+- `?uilab` : boutons « Âme du drake », « PV bas », « Message allié » ; le chat répond ; `&demo=juice` fige un état visuel (captures).
+- Tests : `test/ui-world.test.ts` (événements → effets/chat, agrégation de l'or), annonces d'objectifs et noms de buffs dans `ui-logic.test.ts`.
+
 ## Bloqué / Besoins (des autres agents)
-- **claude-client** : les touches **1, 2, 3, 5, 6, 7** devraient envoyer `{ t: 'useItem', slot }` (slots 0 à 5) ; aujourd'hui seul le clic dans le HUD le fait.
-- **claude-client** : exposer la taille réelle de la vue caméra (ex. `store.cameraView = { w, h }` en unités de jeu, mis à jour en silence) pour un cadre de minimap exact. Optionnel.
+- Rien de bloquant. (Touches 1-7 et emprise de caméra livrées par claude-client dans #11/#15, merci.)
 - **mistral-economy** : exporte `setVolume(channel, v)` depuis `audio/AudioManager.ts` (canaux `master`, `sfx`, `voice`, `music`, `ui`, valeurs 0..1) : l'UI l'appelle automatiquement au démarrage et à chaque changement. Pour les objets : un champ `icon` parlant (`sword`, `tome`, `boots`, `hourglass`, `shield`…) suffit pour l'icône générée. Inventaire attendu : `champ.items` de longueur 7, index 6 = trinket.
 - **Annonces** : l'UI dérive elle-même premier sang, multi-kills, séries, arrêt de série, équipe anéantie, tours, inhibiteurs et objectifs à partir de `death`/`structureDestroyed`/`objectiveTaken`. **Ne pas** émettre d'`announcement` pour ceux-là (doublons). Clés `announcement` reconnues : `welcome`, `minionsSoon`, `minionsSpawn`, `dragonSpawn`, `elderSpawn`, `grubsSpawn`, `heraldSpawn`, `leviathanSpawn`, `inhibitorRespawn`, `dragonSoul`, ou toute clé avec `params.text`.
 

@@ -2,7 +2,8 @@ import { CHAMPIONS, RECALL_SECONDS, SUMMONERS, type AbilitySlot, type ChampionDe
 import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
 import { AbilityCard, ItemCard, SummonerCard, tip } from '../components.tsx';
-import { selfEntity, useWorld } from '../game/world.ts';
+import { juice, selfEntity, useWorld } from '../game/world.ts';
+import { useMini } from '../useStore.ts';
 import { AbilityIcon, ChampionPortrait, Glyph, ItemIcon, SummonerIcon } from '../icons/Icons.tsx';
 import { buffInitials, buffName, formatCooldown, formatInt, isDebuff } from '../logic/format.ts';
 import { canRankUp, cooldownFraction, hastedCooldown, rankValue } from '../logic/game.ts';
@@ -59,6 +60,18 @@ export function BottomBar() {
   );
 }
 
+function LevelBurst() {
+  const j = useMini(juice, (s) => ({ seq: s.levelSeq, level: s.level }));
+  if (!j.seq) return null;
+  return (
+    <span class="lov-lvlup" key={j.seq} aria-hidden="true">
+      <i class="ring" />
+      <i class="ring r2" />
+      <b>Niveau {j.level}</b>
+    </span>
+  );
+}
+
 function Portrait({ self, ent, champ }: BarData) {
   const xpFrac = self.xpToNext > 0 ? Math.min(1, self.xp / self.xpToNext) : 1;
   const r = 47;
@@ -71,6 +84,7 @@ function Portrait({ self, ent, champ }: BarData) {
         <circle cx="50" cy="50" r={r} class="bar" stroke-dasharray={c} stroke-dashoffset={c * (1 - xpFrac)} transform="rotate(90 50 50)" />
       </svg>
       <span class="lvl">{self.level}</span>
+      <LevelBurst />
       {self.skillPoints > 0 && <span class="pts">+{self.skillPoints}</span>}
     </div>
   );
@@ -166,7 +180,20 @@ function useItemAt(slot: number): void {
   net.send({ t: 'useItem', slot, targetPos: pos ? { x: pos.x, y: pos.y } : undefined });
 }
 
+function GoldFloats() {
+  const golds = useMini(juice, (s) => s.golds);
+  return (
+    <span class="lov-gold-floats" aria-hidden="true">
+      {golds.map((g) => (
+        <b key={g.key}>+{g.amount}</b>
+      ))}
+    </span>
+  );
+}
+
 function Inventory({ items, gold, canShop, ward }: { items: (string | null)[]; gold: number; canShop: boolean; ward?: SelfState['wardCharges'] }) {
+  const bought = useMini(juice, (s) => ({ seq: s.boughtSeq, item: s.boughtItem }));
+  const newSlot = bought.item ? items.indexOf(bought.item) : -1;
   const trinket = items[6] ?? items.find((i) => i && ITEMS[i]?.category === 'trinket') ?? null;
   const trinketDef = trinket ? ITEMS[trinket] : undefined;
   const wardCd = ward && ward.charges === 0 ? ward.cooldownRemaining : 0;
@@ -185,6 +212,7 @@ function Inventory({ items, gold, canShop, ward }: { items: (string | null)[]; g
               {...(def ? tip(() => <ItemCard item={def} />) : {})}
             >
               <ItemIcon itemId={id} size="100%" />
+              {i === newSlot && <i class="lov-newitem" key={bought.seq} />}
               <kbd>{ITEM_KEYS[i]}</kbd>
             </div>
           );
@@ -204,6 +232,7 @@ function Inventory({ items, gold, canShop, ward }: { items: (string | null)[]; g
         <button class={`lov-gold ${canShop ? 'shop' : ''}`} onClick={() => store.set({ shopOpen: !store.state.shopOpen })} title="Boutique (P)">
           <Glyph name="gold" size={16} />
           <b>{Math.floor(gold)}</b>
+          <GoldFloats />
         </button>
       </div>
     </div>
