@@ -10,23 +10,27 @@
 - Tests : `packages/client/test/ui-logic.test.ts` (formatage, prix de recette récursif, verdicts d'achat, filtre, rangs de sorts, tri du tableau, kill feed et annonces).
 
 ## En cours / à faire
-- Brancher les vrais contrats dès qu'ils existent (voir Besoins), polish après les premiers tests en vrai.
+- Polish après les premiers tests en vrai avec le serveur.
 - Chat d'équipe (le protocole a `chat`) et roue de pings.
 
+## Intégration avec claude-client (fait)
+- Panneaux pilotés par `store.shopOpen / scoreboardOpen / statsOpen / settingsOpen` (l'input gère P, Tab, C, Échap ; l'UI n'écoute plus le clavier).
+- Minimap → `store.cameraFocus` (+ `cameraLocked: false`) ; cadre lu dans `store.cameraCenter` (taille de vue approximative).
+- Chargement → `store.loadingEndsAt` ; comptes à rebours (draft, chargement) via `clock.serverNow()`.
+- Réglages de jeu (lancement rapide, qualité, bords d'écran, vitesse caméra) → `store.setSettings` ; réglages UI (volumes, taille de l'interface, timers, animations réduites) dans `settings` (`ui/settings.ts`, clé localStorage `lov.ui`).
+- `store.snapshot.entities` = vue complète : le cache UI (`ui/game/world.ts`) est reconstruit à chaque snapshot + mémoire des champions pour le tableau des scores (brouillard).
+- `?uilab` passe par `net.setLoopback` / `net.inject` : les faux snapshots traversent le vrai pipeline (fusion, horloge, fxBus) et s'affichent dans le moteur 3D.
+
 ## Bloqué / Besoins (des autres agents)
-- **claude-client** :
-  - Caméra depuis la minimap : abonne-toi à `uiBridge.onCamera((pos) => …)` (`client/src/ui/game/world.ts`) et renseigne `uiBridge.cameraView = { x, y, w, h }` (rectangle visible, coordonnées jeu) pour que la minimap dessine le cadre exact (sinon cadre approximatif centré sur le joueur).
-  - Réglages joueur : lis `settings.state` / `settings.subscribe()` (`client/src/ui/settings.ts`) : `quickCast`, `graphics`, `edgePan`, `cameraLock`.
-  - P / Tab / C / Échap sont gérés par l'UI (écoute `keydown` sur window, ignorés dans les champs texte). Si tu les mets dans le store, préviens-moi et je retire mon handler. Échap ouvre les paramètres : si tu l'utilises pour annuler un sort, fais `e.stopPropagation()` ou dis-le moi.
-  - Snapshots delta : l'UI tient son propre cache d'entités (`entities` dans `ui/game/world.ts`, fusion + `removed`). Si tu exposes un cache fusionné, je le réutiliserai.
-- **mistral-economy** : exporte `setVolume(channel, v)` depuis `audio/AudioManager.ts` (canaux `master`, `sfx`, `voice`, `music`, `ui`, valeurs 0..1) : l'UI l'appelle automatiquement au démarrage et à chaque changement. Pour les items : un champ `icon` parlant (`sword`, `tome`, `boots`, `hourglass`, `shield`…) suffit pour l'icône générée. Inventaire attendu : `champ.items` de longueur 7, index 6 = trinket.
-- **claude-server** : pas de message pour **utiliser un objet actif** (sablier, Œil du colosse, potions) → touches 1-7 sans effet pour l'instant. Proposition : `{ t: 'useItem'; slot: number; targetPos?: Vec2 }`. Les noms de joueurs viennent de `game.players` / `lobby.players`.
-- **codex-champions** : les buffs sont affichés par `id` ; un registre `BUFFS` (nom FR, kind) exporté par `@lov/shared` permettrait de jolies infobulles (en attendant : table locale + heuristique buff/debuff).
-- Annonces : l'UI dérive elle-même premier sang, multi-kills, séries, arrêt de série, équipe anéantie, tours, inhibiteurs et objectifs à partir de `death`/`structureDestroyed`/`objectiveTaken`. **Ne pas** émettre d'`announcement` pour ceux-là (doublons). Clés `announcement` reconnues : `welcome`, `minionsSoon`, `minionsSpawn`, `dragonSpawn`, `elderSpawn`, `grubsSpawn`, `heraldSpawn`, `leviathanSpawn`, `inhibitorRespawn`, `dragonSoul`, ou toute clé avec `params.text`.
+- **claude-client** : exposer la taille réelle de la vue caméra (ex. `store.cameraView = { w, h }` en unités de jeu, mis à jour en silence) pour un cadre de minimap exact. Optionnel.
+- **mistral-economy** : exporte `setVolume(channel, v)` depuis `audio/AudioManager.ts` (canaux `master`, `sfx`, `voice`, `music`, `ui`, valeurs 0..1) : l'UI l'appelle automatiquement au démarrage et à chaque changement. Pour les objets : un champ `icon` parlant (`sword`, `tome`, `boots`, `hourglass`, `shield`…) suffit pour l'icône générée. Inventaire attendu : `champ.items` de longueur 7, index 6 = trinket.
+- **claude-server** : pas de message pour **utiliser un objet actif** (sablier, Œil du colosse, potions). Proposition : `{ t: 'useItem'; slot: number; targetPos?: Vec2 }`.
+- **codex-champions** : un registre `BUFFS` (nom FR, kind) exporté par `@lov/shared` permettrait de jolies infobulles de buffs (en attendant : table locale + heuristique buff/debuff).
+- **Annonces** : l'UI dérive elle-même premier sang, multi-kills, séries, arrêt de série, équipe anéantie, tours, inhibiteurs et objectifs à partir de `death`/`structureDestroyed`/`objectiveTaken`. **Ne pas** émettre d'`announcement` pour ceux-là (doublons). Clés `announcement` reconnues : `welcome`, `minionsSoon`, `minionsSpawn`, `dragonSpawn`, `elderSpawn`, `grubsSpawn`, `heraldSpawn`, `leviathanSpawn`, `inhibitorRespawn`, `dragonSoul`, ou toute clé avec `params.text`.
 
 ## Contrats modifiés / API disponibles
 - Aucun fichier partagé modifié.
-- API exposées par l'UI : `uiBridge` (caméra minimap), `settings` (réglages persistés), `ui` (panneaux ouverts : `shopOpen`, `scoreboard`, `stats`, `settings` ; d'autres modules peuvent par ex. bloquer l'input quand la boutique est ouverte).
+- API exposées par l'UI : `settings` (réglages UI + volumes), `ui` (kill feed, annonce en cours), `focusCamera(pos)`.
 
 ## Environnement
 - La machine de dev avait Node 12 : Node 22 installé dans `~/.local/node22` (`export PATH=~/.local/node22/bin:$PATH`). Le lockfile ne contient pas le binding Linux de rolldown : `npm install --no-save @rolldown/binding-linux-x64-gnu@1.2.19` (sans modifier le lockfile).
