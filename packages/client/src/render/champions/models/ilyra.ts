@@ -121,6 +121,8 @@ function uprightStaff(clip: Clip): Clip {
 
 export const ilyraModel: ChampionModelDef = {
   rig: { hipY: 0.9, hipW: 0.11, thigh: 0.45, shin: 0.43, spine: 0.55, shoulderW: 0.23, upperArm: 0.3, forearm: 0.29, neck: 0.16 },
+  dropAngle: -Math.PI / 2,
+  carry: 0,
   ctx: { energy: 0.85, hand: 1 },
   clips: { idle, strike, attackReady, cast, cast_Q: castQ, cast_R: castR, recall: uprightStaff(recall), stunned: uprightStaff(stunned) },
   build(b, c) {
