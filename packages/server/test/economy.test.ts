@@ -107,6 +107,21 @@ describe('economy — or', () => {
     expect(far.champ!.gold).toBeCloseTo(500 + TOWER_GLOBAL_GOLD, 5); // plaque = local seulement
   });
 
+  it('simulation : or total à 10 min cohérent avec une partie LoL-like', () => {
+    const w = makeWorld();
+    const c = addChamp(w, 'blue', { x: 5000, y: 5000 });
+    // 10 min de jeu : un last hit de sbire mêlée toutes les 30 s (vagues)
+    for (let wave = 0; wave < 20; wave++) {
+      const m = dummy(w, 'red', { x: 5050, y: 5000 }, 'minion', 'melee', 100);
+      applyDamage(w, { source: c, target: m, amount: 500, type: 'true' });
+      run(w, 30);
+    }
+    // 500 départ + passif (~56 × 20,4 après 48,75 s) + 20 × 21 de last hits
+    expect(c.champ!.gold).toBeGreaterThan(1900);
+    expect(c.champ!.gold).toBeLessThan(2300);
+    expect(c.champ!.cs).toBe(20);
+  });
+
   it('donne l’or d’équipe des objectifs', () => {
     const w = makeWorld();
     const a = addChamp(w, 'blue', { x: 5000, y: 5000 });
