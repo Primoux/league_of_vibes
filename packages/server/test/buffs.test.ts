@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { World, createChampion } from '../src/world.ts';
 import { buffsSystem } from '../src/systems/buffs.ts';
-import { addBuff, getBuff, hasCC, recalculateStats, registerStatSource } from '../src/combat/buffs.ts';
+import { addBuff, getBuff, getBuffs, hasCC, recalculateStats, registerStatSource } from '../src/combat/buffs.ts';
 import { applyDamage, applyHeal, applyShield } from '../src/abilities/effects.ts';
 const setup = () => {
   const world = new World([buffsSystem]);
@@ -91,4 +91,14 @@ describe('Core-server integration', () => {
     expect(e.attackTarget).toBe(taunter.id);
     expect(world.allow(world.hooks.canAttack, e)).toBe(true);
   });
+});
+
+it('keeps an anonymous buff independent from a sourced buff with the same id', () => {
+  const { world, e } = setup();
+  addBuff(world, e, 'slow', { source: 42, duration: 2, params: { amount: .3 } });
+  addBuff(world, e, 'slow', { duration: 1, params: { amount: .5 } });
+  expect(getBuffs(e).filter((b) => b.id === 'slow')).toHaveLength(2);
+  expect(e.stats.moveSpeed).toBeCloseTo(335 * .5);
+  world.step(1);
+  expect(e.stats.moveSpeed).toBeCloseTo(335 * .7);
 });

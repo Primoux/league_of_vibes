@@ -80,7 +80,7 @@ export function addBuff(world: World, target: Entity, buffId: string, opts: Buff
   const def: BuffDef = { id: buffId, name: buffId, kind: 'buff', ...BUFFS[buffId], ...opts.definition };
   const reducible = def.cc && !['knockup', 'suppress', 'slow', 'grounded'].includes(def.cc);
   const duration = opts.duration * (reducible ? 1 - getTenacity(target) : 1);
-  let buff = getBuff(target, buffId, source);
+  let buff = getBuffs(target).find((b) => b.id === buffId && b.source === source);
   if (buff) {
     buff.remaining = Math.max(buff.remaining, duration);
     buff.duration = Math.max(buff.duration, duration);
@@ -95,11 +95,11 @@ export function addBuff(world: World, target: Entity, buffId: string, opts: Buff
   world.events.emit({ type: 'buffApplied', target: target.id, buffId, source, duration, stacks: buff.stacks, fxKey: def.fxKey ?? buffId });
   return buff;
 }
-export function removeBuff(world: World, target: Entity, buffId: string, source?: number): void {
+export function removeBuff(world: World, target: Entity, buffId: string, source?: number | null): void {
   const buffs = getBuffs(target);
   for (let i = buffs.length - 1; i >= 0; i--) {
     const b = buffs[i]!;
-    if (b.id !== buffId || (source !== undefined && b.source !== source)) continue;
+    if (b.id !== buffId || (source !== undefined && b.source !== (source === null ? undefined : source))) continue;
     if (typeof b.params.shieldId === 'string') removeShield(target, b.params.shieldId);
     buffs.splice(i, 1);
     world.events.emit({ type: 'buffRemoved', target: target.id, buffId, fxKey: b.def.fxKey ?? buffId });
@@ -109,11 +109,11 @@ export function removeBuff(world: World, target: Entity, buffId: string, source?
 }
 export function cleanse(world: World, e: Entity): void {
   for (const b of [...getBuffs(e)]) {
-    if (b.def.cc && b.def.cc !== 'knockup' && b.def.cc !== 'suppress') removeBuff(world, e, b.id, b.source);
+    if (b.def.cc && b.def.cc !== 'knockup' && b.def.cc !== 'suppress') removeBuff(world, e, b.id, b.source ?? null);
   }
 }
 export function breakInvisibility(world: World, e: Entity): void {
-  for (const b of [...getBuffs(e)]) if (b.id === 'invisible' || b.params.invisible) removeBuff(world, e, b.id, b.source);
+  for (const b of [...getBuffs(e)]) if (b.id === 'invisible' || b.params.invisible) removeBuff(world, e, b.id, b.source ?? null);
 }
 function mergeStats(out: Partial<Stats>, add?: Partial<Stats>, stacks = 1): void {
   if (!add) return;
@@ -182,7 +182,7 @@ export function updateBuffs(world: World, dt: number): void {
     for (let i = buffs.length - 1; i >= 0; i--) {
       const b = buffs[i]!;
       b.remaining -= dt;
-      if (b.remaining <= 1e-8 || (e.dead && b.params.persistOnDeath !== true)) removeBuff(world, e, b.id, b.source);
+      if (b.remaining <= 1e-8 || (e.dead && b.params.persistOnDeath !== true)) removeBuff(world, e, b.id, b.source ?? null);
     }
     if (e.champ || buffs.length || e.data.buffBaseStats) recalculateStats(world, e);
     e.data.tauntForcedMove = false;

@@ -10,7 +10,7 @@ Date : 2026-11-13. Branche de travail : `codex-champions`.
 - **M2** : Grondak et Ilyra, quatre sorts et passifs testés ; neuf invocateurs : Flash, Ignite, Heal, Barrier, Exhaust, Teleport, Smite, Ghost, Cleanse. Flash ne laisse pas le rayon du champion dans un mur ; Teleport s'interrompt sur dégâts, CC, ordre ou disparition de la cible.
 - **M3** : les dix kits complets : Grondak, Tharox, Kaelen, Vrenna, Ilyra, Zephyr, Sable, Corvin, Nyx, Solenne. Attaques renforcées, marques, saignement, riposte, trois fentes/rayons, orbe aller-retour, pièges limités, invisibilité, marque de mort et soins/boucliers amplifiés.
 - **M4 — garde-fous** : 90 duels (45 paires × niveaux 6 et 11, équipements par classe), déterministes, sur les vrais systèmes combat/movement/vision. Contrôle des ressources, valeurs finies, dégâts aberrants et répétabilité. 40 tests de coûts/CD des sorts ; descriptions FR alignées sur les paramètres. Cela ne remplace pas l'équilibrage en partie humaine.
-- Dernière validation complète : **320 tests / 31 fichiers**, `npm run typecheck`, `npm test`, `npm run build` verts sur Node 24.22.1. Avertissement de chunk client >500 Ko préexistant, hors de ce domaine.
+- Dernière validation complète : **321 tests / 31 fichiers**, `npm run typecheck`, `npm test`, `npm run build` verts sur Node 24.22.1. Avertissement de chunk client >500 Ko préexistant, hors de ce domaine.
 - Synchronisation avec main jusqu'à `f9b6e369bd6b1f6623ed76d0a2b8979e7d8cb8eb`. Conflits résolus en conservant **strictement l'API damage.ts de claude-server**, et les deux ensembles d'événements partagés. Aucun changement des systèmes des autres domaines.
 - Aucune dépendance ni asset ajouté.
 
