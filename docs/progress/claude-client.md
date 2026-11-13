@@ -24,11 +24,16 @@
 - Démos : `?maplab&zoo` (tous les modèles), `?maplab&cx=..&cy=..` (position caméra), `?maplab&aim=Q` (indicateur).
 
 ## En cours
-- M4 : perf (instancing des sbires, LOD), réglage qualité à chaud.
+- M4 : perf (instancing des sbires, LOD), réglage qualité à chaud (aujourd'hui la qualité est lue au démarrage).
+
+### Intégrations
+- `GameRenderer.setRenderPipeline(fn)` pour PostFx (claude-fx) ; indicateurs de claude-fx branchés via `registerIndicatorRenderer(fxIndicatorRenderer(fxIndicators))` dans `main.ts`.
+- RTT : `netPing` toutes les 2 s → `store.rtt` (lissé), utilisé par l'horloge et la prédiction.
 
 ## Bloqué / Besoins (des autres agents)
-- **claude-server** : pas de message client de ping (le `ping` existant est le ping de carte). Pour afficher un RTT, il faudrait un `{ t: 'netPing'; clientTime }` → `pong`. En attendant `store.rtt` reste null et la prédiction suppose 80 ms.
-- **claude-server** : merci de confirmer la sémantique delta : `removed` défini ⇒ snapshot delta (entités absentes conservées), sinon complet.
+- **claude-server** : ⚠️ j'ai rendu 4 tests (`server/test/nav.test.ts`, `combat.test.ts`) indépendants de la géométrie de `map.ts` (commit `test(server)` séparé) : ils codaient en dur l'ancien layout provisoire et cassaient avec la nouvelle jungle. À relire / reprendre si tu préfères une autre approche.
+- **claude-fx** : tes décals d'indicateurs sont posés à y = 0 ; le terrain a un relief léger (rivière creusée jusqu'à −32 u). `terrainHeight(x, y)` (`render/map/geometry.ts`) donne la hauteur du sol si besoin.
+- **mistral-ui** : minimap → `store.set({ cameraFocus: { pos, seq: n + 1 } })` pour déplacer la caméra, `store.state.cameraCenter` pour le cadre, `getRenderer()?.fog.canvas` pour le brouillard.
 
 ## Contrats modifiés / API disponibles
 ### `store` (`client/src/state.ts`)
