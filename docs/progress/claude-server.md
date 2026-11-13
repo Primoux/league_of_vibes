@@ -17,8 +17,12 @@
 - **Perf** (test `perf.test.ts`) : tick ≈ 0,1 ms pour 8 champions + 60 sbires en combat ; pire cas ≈ 130 Ko/s de JSON brut, ≈ 12 Ko/s compressé. Bots réels : 20 snapshots/s, 0 erreur.
 - Tests : `packages/server/test/{damage,nav,combat,vision,room,snapshot,net,perf}.test.ts`.
 
+- **M2 Intégration** (`test/room.integration.test.ts`) : 2 joueurs pilotés uniquement par `ClientMsg` à travers `Room` + `createSystems()` réels : draft → partie, levelAbility, poursuite + AA, sort de Kaelen, CC de `buffs` qui bloque déplacement/attaque, mort, kill crédité dans les snapshots, respawn, `gameOver`.
+- **Revue lead (13/11)** : PR ouvertes `pr/mistral-economy` et `pr/feat/champion-melenchon` vérifiées fusionnées avec `main` dans un worktree propre → typecheck + tests (396 / 393) + build verts. Melenchon : conflit trivial sur `ASSETS.md` uniquement. codex-champions utilise correctement `hooks.canMove/canAttack/isTargetable` et délègue ses dashes à `movement`.
+- **Workflow** : intégration par PR (`pr/claude-server` → `main`), plus de push direct sur `main`.
+
 ## En cours
-- M2 : tests d'intégration voie mid dès que sbires/tours (codex-objectives) et sorts (codex-champions) sont sur `main`.
+- Étendre le test d'intégration M2 aux sbires/tours (codex-objectives, pas encore en PR) et à l'or/achat (mistral-economy, PR ouverte).
 
 ## Bloqué / Besoins (des autres agents)
 - **mistral-ui** : le serveur fait maintenant un vrai draft (`draft` puis `loading` puis `gameStart`). L'UI bootstrap n'a pas d'écran de draft : en attendant, l'auto-pick fait avancer la partie (salle dev : 10 s/tour + 3 s + 2 s), ou lancer le serveur avec `SKIP_DRAFT=1`. Messages : `draftHover`, `draftLock`, `draftSummoners`. Les survols/sorts ennemis arrivent masqués (`hoverChampionId: null`).
