@@ -1,12 +1,111 @@
 /**
  * Point d'entrée FX. Propriétaire : claude-fx.
- * BOOTSTRAP : stub. installFx() reçoit la scène et s'abonne au fxBus pour jouer les effets par fxKey.
+ *
+ * `installFx(host)` crée le runtime FX dans la scène de l'hôte (GameRenderer ou fxlab), s'abonne au fxBus,
+ * fait tourner la boucle FX et, si l'hôte le permet (`setRenderPipeline`), branche le post-process.
+ *
+ * API publique pour les autres agents client :
+ *  - `fxIndicators` : indicateurs de visée/portée (claude-client) ;
+ *  - `setFxQuality('high' | 'low')` : qualité (store/paramètres) ;
+ *  - `registerFx` / `onWorldEvent` : extension des FX.
  */
-import type * as THREE from 'three';
+import { installChampionModels } from '../render/champions/index.ts';
 import { fxBus } from './FxBus.ts';
+import { FxRuntime } from './core/FxRuntime.ts';
+import type { FxHost } from './core/host.ts';
+import { defaultFx } from './defaults.ts';
+import { FxDispatcher } from './dispatcher.ts';
+import { PostFx, type FxQuality } from './post/PostFx.ts';
+import { fxIndicators } from './telegraph/indicators.ts';
+import { installAutoAttackFx } from './world/autoAttacks.ts';
+import './champions/index.ts';
 
-export function installFx(_scene: THREE.Scene): void {
-  fxBus.subscribe(() => {
-    /* TODO(claude-fx) : particules / shaders par événement */
-  });
+let worldFxInstalled = false;
+
+export { fxBus } from './FxBus.ts';
+export { fxIndicators } from './telegraph/indicators.ts';
+export { registerFx, onWorldEvent } from './registry.ts';
+export type { FxHost } from './core/host.ts';
+export type { FxQuality } from './post/PostFx.ts';
+
+export interface FxInstance {
+  runtime: FxRuntime;
+  dispatcher: FxDispatcher;
+  post: PostFx | null;
+  /** Avance les FX (appelé automatiquement sauf si `manualUpdate`). */
+  update(dt: number): void;
+  dispose(): void;
+}
+
+export interface InstallOptions {
+  /** L'appelant appelle lui-même `update(dt)` (fxlab). */
+  manualUpdate?: boolean;
+  /** Forcer la création du post-process même sans `setRenderPipeline` (l'appelant appelle `post.render()`). */
+  ownPost?: boolean;
+}
+
+let current: FxInstance | null = null;
+
+export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
+  current?.dispose();
+  installChampionModels();
+  if (!worldFxInstalled) {
+    worldFxInstalled = true;
+    installAutoAttackFx();
+  }
+  const runtime = new FxRuntime(host);
+  const dispatcher = new FxDispatcher(runtime, defaultFx);
+  fxIndicators.attach(runtime.root);
+  const unsub = fxBus.subscribe((e) => dispatcher.handle(e));
+
+  let post: PostFx | null = null;
+  if (host.renderer && (host.setRenderPipeline || opts.ownPost)) {
+    post = new PostFx(host.renderer, host.scene, host.camera);
+    if (!opts.ownPost) host.setRenderPipeline?.(() => post!.render());
+  }
+  const onResize = (): void => post?.setSize(innerWidth, innerHeight);
+  if (post && !opts.ownPost) addEventListener('resize', onResize);
+
+  const update = (dt: number): void => {
+    fxBus.update();
+    runtime.update(Math.min(dt, 0.1));
+  };
+
+  let raf = 0;
+  if (!opts.manualUpdate) {
+    if (host.onFrame) host.onFrame(update);
+    else {
+      let last = performance.now();
+      const loop = (now: number): void => {
+        update((now - last) / 1000);
+        last = now;
+        raf = requestAnimationFrame(loop);
+      };
+      raf = requestAnimationFrame(loop);
+    }
+  }
+
+  current = {
+    runtime,
+    dispatcher,
+    post,
+    update,
+    dispose() {
+      unsub();
+      cancelAnimationFrame(raf);
+      removeEventListener('resize', onResize);
+      post?.dispose();
+      runtime.entities.dispose();
+      host.scene.remove(runtime.root);
+      if (current === this) current = null;
+    },
+  };
+  return current;
+}
+
+/** Qualité des FX : 'low' = sans post-process et moitié moins de particules. */
+export function setFxQuality(q: FxQuality): void {
+  if (!current) return;
+  if (current.post) current.post.quality = q;
+  current.runtime.ps.density = q === 'low' ? 0.5 : 1;
 }

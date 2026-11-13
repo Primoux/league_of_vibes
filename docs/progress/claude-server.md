@@ -8,16 +8,30 @@
 - **M1.5 Combat** : auto-attaques (portée bord à bord, windup, projectiles, annulation au déplacement pendant le windup), poursuite, attaque-déplacement, mort/respawn à la fontaine, K/D/A, `damageToChampions`.
 - **M1.7 Fontaine** : soin rapide des alliés (12 %/s PV + mana), laser 1800 dégâts bruts/s sur les champions ennemis (rayon 1200).
 - **Vision** (en avance sur M3) : rayons par type, brousses, balises, invisibilité, révélations, révélation 1 s quand on attaque depuis une brousse.
-- Tests : `packages/server/test/{damage,nav,combat,vision}.test.ts`.
+- **M1.6 Draft** (`room.ts`) : ordre 1-2-2-2-1, 30 s/tour, survol visible des alliés seulement, champion unique, auto-pick (survol sinon aléatoire), finalisation 15 s (sorts d'invocateur ; défaut Flash+Ignite, Flash+Smite si rôle jungle), chargement 5 s, puis partie.
+- **M2 Fin de partie** : `world.winner` → dernier snapshot + `gameOver` (stats) → phase `end` → `returnToLobby`.
+- **M2 Reconnexion** : `reconnectToken` secret (≠ playerId public), reprise de la salle à n'importe quelle phase ; en partie : `gameStart` renvoyé + snapshot complet. Salle vide en partie conservée 3 min.
+- **M3 Snapshots** : filtrés par vision, delta (`removed`), structures toujours envoyées, événements filtrés par équipe, score (kills/tours/drakes/larves). `permessage-deflate` activé.
+- **M3 Validation** des `ClientMsg` (forme, nombres finis, bornes) + rate-limit 40 msg/s (rafale 80) par connexion. `netPing` → `pong { clientTime }`.
+- **M4** : `/health` JSON, Dockerfile, doc Fly/Render dans le README, CI (typecheck + test + build + 8 bots), `scripts/bots.ts`.
+- **Perf** (test `perf.test.ts`) : tick ≈ 0,1 ms pour 8 champions + 60 sbires en combat ; pire cas ≈ 130 Ko/s de JSON brut, ≈ 12 Ko/s compressé. Bots réels : 20 snapshots/s, 0 erreur.
+- Tests : `packages/server/test/{damage,nav,combat,vision,room,snapshot,net,perf}.test.ts`.
 
 ## En cours
-- Draft (M1.6), fin de partie, reconnexion, snapshots filtrés par vision + delta.
+- M2 : tests d'intégration voie mid dès que sbires/tours (codex-objectives) et sorts (codex-champions) sont sur `main`.
 
 ## Bloqué / Besoins (des autres agents)
-- Rien pour l'instant.
+- **mistral-ui** : le serveur fait maintenant un vrai draft (`draft` puis `loading` puis `gameStart`). L'UI bootstrap n'a pas d'écran de draft : en attendant, l'auto-pick fait avancer la partie (salle dev : 10 s/tour + 3 s + 2 s), ou lancer le serveur avec `SKIP_DRAFT=1`. Messages : `draftHover`, `draftLock`, `draftSummoners`. Les survols/sorts ennemis arrivent masqués (`hoverChampionId: null`).
+- **mistral-ui** : écran de fin → bouton « Retour au lobby » = `{ t: 'returnToLobby' }`.
+- **claude-client** : `netPing { clientTime }` → `pong { serverTime, clientTime }` disponible pour le RTT.
+- **codex-champions** : enregistre tes CC via `world.hooks.canMove/canAttack` (et `isTargetable` pour stase/untargetable) ; dashes via `data.dash` (movement émet l'événement `dash`).
+- **codex-objectives** : tours/sbires/monstres peuvent utiliser `attackTarget` + `data.attackConfig` ; montée en dégâts des tours via `hooks.beforeAttackHit` (filtrer `ctx.attacker.kind === 'tower'`) ; `getObjectiveTimers` → `hooks.objectiveTimers`. Mettre `data.keepCorpse = true` si tu gères toi-même la disparition d'un monstre.
+- **mistral-economy** : primes via `hooks.bounty`, `data.goldEarned` pour l'écran de fin, `hooks.selfState` pour `canShop`/`recalling`.
 - **Environnement** : le projet exige Node ≥ 22 (`engines`). Avec Node 21, `vitest` échoue (binding natif rolldown manquant). Utiliser Node 24 comme la CI.
 
 ## Contrats modifiés
+- `contract:` `ClientMsg` + `{ t: 'netPing'; clientTime }` (→ `pong { serverTime, clientTime }`) et `{ t: 'returnToLobby' }` (phase `end` → lobby).
+- Sémantique delta confirmée et documentée dans `Snapshot.removed` : `removed` défini ⇒ delta (claude-client : ✅ c'est bien ta règle).
 - `contract:` `GameEvent` + `{ type: 'respawn'; target; pos }` (émis quand un champion réapparaît à la fontaine).
 - `contract:` `autoAttack` + champs optionnels `speed?` (vitesse du projectile, AA à distance) et `crit?`.
 
@@ -77,6 +91,15 @@ afterAttackHit(ctx, dealt, world)             // on-hit
 - `cancelAttack(e)`, `resetAttackTimer(e)` (reset d'AA), `hit(world, attacker, target, crit)` (impact d'AA avec hooks),
   `orderAttackMove(e, pos)`, `edgeDistance(a, b)`, `isValidAttackTarget(world, attacker, t)`.
 - Événement `autoAttack { source, target, ranged, speed?, crit? }` émis au lancement (mêlée : à l'impact).
+
+### Snapshot / réseau — `net/snapshot.ts`, `room.ts`
+- Hooks `world.hooks.selfState(e, s, world)` (complète `SelfState` : `xpToNext` par leveling, `canShop`/`recalling` par economy),
+  `world.hooks.entitySnapshot(e, s, world)` (ex. `s.buffs` par codex-champions ; doit être déterministe pour le delta),
+  `world.hooks.objectiveTimers(team, world) => Record<string, number>` (codex-objectives).
+- `SelfState.canShop` par défaut : mort ou à moins de `FOUNTAIN_RADIUS` de sa fontaine.
+- Stats de fin : `gold` = `entity.data.goldEarned` (or total gagné, à tenir par mistral-economy) sinon or courant.
+- Événements privés à l'équipe : `goldGain`, `ping`, `chat` (teamOnly). `itemBought/Sold`, `recall*`, `respawn` : équipe + ennemis qui voient l'unité.
+- `ping` et `chat` sont gérés par `input` (émis en événements ; ping limité à 1 / 0,4 s par joueur).
 
 ### Vision — `systems/vision.ts`
 - `isVisibleTo(e, team)` ; `data.sightRadius` (surcharge), `data.invisible`, `data.revealedUntil` (temps de jeu).
