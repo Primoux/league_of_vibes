@@ -123,7 +123,8 @@ void main() {
     mv.xy += mat2(c, s, -s, c) * corner * size;
   }
   gl_Position = projectionMatrix * mv;
-  vUv = (uv + vec2(mod(tex, 4.0), 3.0 - floor(tex / 4.0))) * 0.25;
+  // UV rentrés de ~2 px dans la cellule : le filtrage ne lit jamais la cellule voisine
+  vUv = (uv * 0.97 + 0.015 + vec2(mod(tex, 4.0), 3.0 - floor(tex / 4.0))) * 0.25;
   vColor = vec4(col.rgb * aTint.rgb, col.a);
 }
 `;
@@ -154,6 +155,8 @@ class ParticleBatch {
   private readonly geo: THREE.InstancedBufferGeometry;
   private readonly attrs: THREE.InstancedBufferAttribute[];
   private used = 0;
+  /** Instant où la dernière particule écrite meurt : au-delà, le lot est vide. */
+  private endTime = -1;
 
   constructor(capacity: number, blend: Blend, uniforms: Record<string, THREE.IUniform>) {
     this.ring = new RingAllocator(capacity);
@@ -202,6 +205,8 @@ class ParticleBatch {
   ): void {
     const i = this.ring.next();
     if (this.used < this.ring.capacity) this.used++;
+    if (birth + life > this.endTime) this.endTime = birth + life;
+    this.mesh.visible = true;
     const p0 = this.p0.array as Float32Array;
     const v = this.vel.array as Float32Array;
     const t = this.time.array as Float32Array;
@@ -214,8 +219,18 @@ class ParticleBatch {
     c[i * 4] = r; c[i * 4 + 1] = g; c[i * 4 + 2] = b; c[i * 4 + 3] = rot;
   }
 
-  /** Téléverse uniquement les plages écrites depuis la frame précédente. */
-  flush(): void {
+  /**
+   * Téléverse uniquement les plages écrites depuis la frame précédente. Quand tout est mort, le lot est
+   * masqué et repart de zéro : le vertex shader ne retraite pas des milliers d'instances mortes après un combat.
+   */
+  flush(time: number): void {
+    if (this.used > 0 && time > this.endTime) {
+      this.used = 0;
+      this.ring.reset();
+      this.geo.instanceCount = 0;
+      this.mesh.visible = false;
+      return;
+    }
     const n = this.ring.flush();
     if (n === 0) return;
     this.geo.instanceCount = this.used;
@@ -347,8 +362,8 @@ export class ParticleSystem {
   update(dt: number): void {
     this.time += dt;
     this.uniforms.uTime!.value = this.time;
-    this.batches.add.flush();
-    this.batches.normal.flush();
+    this.batches.add.flush(this.time);
+    this.batches.normal.flush(this.time);
   }
 }
 
