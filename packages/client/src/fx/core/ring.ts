@@ -34,6 +34,12 @@ export class RingAllocator {
     return 2;
   }
 
+  /** Repart de zéro (tous les emplacements sont libres : rien de vivant). */
+  reset(): void {
+    this.head = 0;
+    this.dirtyCount = 0;
+  }
+
   private set(i: number, start: number, count: number): void {
     this.rangeStart[i] = start;
     this.rangeCount[i] = count;

@@ -88,6 +88,7 @@ export class FloatingNumbers {
   private readonly uniforms: { uTime: THREE.IUniform<number>; uAtlas: THREE.IUniform<THREE.Texture> };
   private used = 0;
   private clock = 0;
+  private endTime = -1;
 
   constructor(capacity = 768) {
     this.ring = new RingAllocator(capacity);
@@ -132,6 +133,8 @@ export class FloatingNumbers {
       if (g < 0) continue;
       const i = this.ring.next();
       if (this.used < this.ring.capacity) this.used++;
+      this.endTime = Math.max(this.endTime, this.clock + life);
+      this.mesh.visible = true;
       const a = this.anchor.array as Float32Array;
       const gl = this.glyph.array as Float32Array;
       const t = this.time.array as Float32Array;
@@ -146,6 +149,13 @@ export class FloatingNumbers {
   update(dt: number): void {
     this.clock += dt;
     this.uniforms.uTime.value = this.clock;
+    if (this.used > 0 && this.clock > this.endTime) {
+      this.used = 0;
+      this.ring.reset();
+      this.geo.instanceCount = 0;
+      this.mesh.visible = false;
+      return;
+    }
     const n = this.ring.flush();
     if (n === 0) return;
     this.geo.instanceCount = this.used;
