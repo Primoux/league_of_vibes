@@ -11,7 +11,7 @@ import { genericFor } from './models/generic.ts';
 import { grondakModel } from './models/grondak.ts';
 import { ilyraModel } from './models/ilyra.ts';
 
-export { ProceduralChampionView } from './ChampionView.ts';
+export { ProceduralChampionView, setRespawnHook } from './ChampionView.ts';
 
 const MODELS: Record<string, ChampionModelDef> = {
   grondak: grondakModel,

@@ -53,6 +53,12 @@ export function glowColor(hex: string): THREE.Color {
   return c.multiplyScalar(1.3 + (1 - Math.min(1, lum)) * 1.4);
 }
 
+/** Appelé quand un champion réapparaît (aucun événement serveur ne le signale) : branché par installFx. */
+let respawnHook: ((entityId: number) => void) | null = null;
+export function setRespawnHook(fn: ((entityId: number) => void) | null): void {
+  respawnHook = fn;
+}
+
 const STUN_BUFFS = new Set(['stun', 'knockup', 'suppress', 'taunt', 'fear']);
 const NOMINAL_SPEED = 3.4; // monde/s (≈ 340 u/s)
 
@@ -237,7 +243,9 @@ export class ProceduralChampionView implements ChampionView {
   }
 
   private respawn(): void {
+    const wasDead = this.state.dead;
     this.state.dead = false;
+    if (wasDead) respawnHook?.(this.entityId);
     this.deathT = -1;
     this.dissolve.uDissolve.value = 0;
     this.model.visible = true;

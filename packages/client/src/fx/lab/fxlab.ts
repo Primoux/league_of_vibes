@@ -179,6 +179,18 @@ export function startFxLab(): void {
     recalling = !recalling;
     fxBus.dispatch(recalling ? { type: 'recallStart', target: caster.actor.id } : { type: 'recallEnd', target: caster.actor.id, completed: false });
   };
+  /** Événements du monde que la simulation du lab n'inclut pas (économie, objectifs, structures). */
+  const WORLD: Record<string, [string, () => void]> = {
+    LEVEL: ['Niveau', () => fxBus.dispatch({ type: 'levelUp', target: caster.actor.id, level: 6 })],
+    GOLD: ['Or', () => fxBus.dispatch({ type: 'goldGain', target: caster.actor.id, amount: 300 })],
+    TOWER: ['Tour', () => fxBus.dispatch({ type: 'structureDestroyed', target: targets[2]!.actor.id, kind: 'tower', team: 'red' })],
+    PLATE: ['Plaque', () => fxBus.dispatch({ type: 'structureDestroyed', target: targets[2]!.actor.id, kind: 'tower', team: 'red', plate: true })],
+    NEXUS: ['Nexus', () => fxBus.dispatch({ type: 'structureDestroyed', target: targets[1]!.actor.id, kind: 'nexus', team: 'red' })],
+    DRAKE: ['Drake', () => fxBus.dispatch({ type: 'objectiveTaken', monster: 'dragon', team: 'blue', killer: caster.actor.id, element: 'infernal' })],
+    BLUE: ['Buff bleu', () => fxBus.dispatch({ type: 'buffApplied', target: caster.actor.id, buffId: 'blue_buff', duration: 8 })],
+    RED: ['Buff rouge', () => fxBus.dispatch({ type: 'buffApplied', target: caster.actor.id, buffId: 'red_buff', duration: 8 })],
+    LEVI: ['Léviathan', () => fxBus.dispatch({ type: 'buffApplied', target: caster.actor.id, buffId: 'leviathan', duration: 8 })],
+  };
   const resetAll = (): void => {
     sim.reset();
     attackUntil = -1;
@@ -266,6 +278,10 @@ export function startFxLab(): void {
     sumRow.append(b);
   }
   panel.append(sumRow);
+  panel.append(el('h2', {}, 'Monde'));
+  const worldRow = el('div', { className: 'row' });
+  for (const [label, fn] of Object.values(WORLD)) worldRow.append(el('button', { onclick: fn }, label));
+  panel.append(worldRow);
   panel.append(el('h2', {}, 'Événements reçus'));
   const log = el('div', { className: 'log' });
   panel.append(log);
@@ -282,6 +298,7 @@ export function startFxLab(): void {
     if (slot === 'AA') autoAttack(champ);
     else if (slot === 'DIE') killTarget();
     else if (slot === 'RECALL') toggleRecall();
+    else if (WORLD[slot]) WORLD[slot][1]();
     else if (slot.startsWith('SUM_')) {
       useChampion(champ);
       castSummoner(slot.slice(4) as SummonerId);
