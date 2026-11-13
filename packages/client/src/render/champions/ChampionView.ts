@@ -12,7 +12,7 @@ import { CHAMPIONS, type ChampionDef, type EntitySnapshot } from '@lov/shared';
 import { applyDissolve, createDissolveUniforms, type DissolveUniforms } from '../../fx/shaders/materials.ts';
 import type { ChampionView } from '../EntityView.ts';
 import { GENERIC_CLIPS, DEFAULT_CTX } from './anim/clips.ts';
-import { Animator, type ClipCtx, type ClipSet } from './anim/pose.ts';
+import { Animator, J, createPose, type ClipCtx, type ClipSet } from './anim/pose.ts';
 import { ModelBuilder, type BuiltModel } from './builder.ts';
 import { Rig, type RigSpec } from './rig.ts';
 
@@ -43,6 +43,14 @@ export interface ChampionModelDef {
   /** Échelle globale du modèle. */
   scale?: number;
   build(b: ModelBuilder, c: ModelColors): void;
+  /**
+   * Port d'arme : angle (rad, autour de z, dans le repère du corps) que garde l'accessoire tenu (`prop`) pendant
+   * les états de locomotion — l'arme ne suit plus le balancier du bras. 0 = accessoire vertical (bâton),
+   * négatif = incliné vers l'avant. Absent = l'accessoire suit le bras.
+   */
+  carry?: number;
+  /** Angle de l'accessoire au sol quand le champion est mort (arme couchée à plat) : 0 pour une lame le long de +x, −π/2 pour un bâton le long de +y. */
+  dropAngle?: number;
   extras?(rig: Rig, built: BuiltModel, c: ModelColors): (dt: number, s: ExtrasState) => void;
 }
 
@@ -58,6 +66,12 @@ let respawnHook: ((entityId: number) => void) | null = null;
 export function setRespawnHook(fn: ((entityId: number) => void) | null): void {
   respawnHook = fn;
 }
+
+/** Clips pendant lesquels l'arme est simplement portée (le port d'arme s'applique). */
+const CARRY_CLIPS = new Set(['idle', 'run', 'dash', 'stunned', 'recall']);
+const TAU = Math.PI * 2;
+/** Écart angulaire ramené dans [-π, π]. */
+const wrapAngle = (a: number): number => a - TAU * Math.round(a / TAU);
 
 const STUN_BUFFS = new Set(['stun', 'knockup', 'suppress', 'taunt', 'fear']);
 const NOMINAL_SPEED = 3.4; // monde/s (≈ 340 u/s)
@@ -83,6 +97,17 @@ export class ProceduralChampionView implements ChampionView {
   private liftStart = -1;
   private liftDur = 0;
   private invisible = false;
+  /** Pose finale = pose de l'animateur + couches additives (ne pas écrire dans la pose de l'animateur). */
+  private readonly finalPose = createPose();
+  private yaw = 0;
+  private yawReady = false;
+  private yawRate = 0;
+  private lean = 0;
+  private flinchAmt = 0;
+  private carryW = 1;
+  private readonly carry: number | undefined;
+  private readonly dropAngle: number | undefined;
+  private maxHp = 1;
 
   constructor(
     readonly entityId: number,
@@ -112,6 +137,8 @@ export class ProceduralChampionView implements ChampionView {
     this.object3d.name = `champion-${championId}-${entityId}`;
     const ctx: ClipCtx = { ...DEFAULT_CTX, ...def.ctx };
     this.animator = new Animator({ ...GENERIC_CLIPS, ...(def.clips as ClipSet) }, ctx);
+    this.carry = def.carry;
+    this.dropAngle = def.dropAngle;
     this.extras = def.extras?.(this.rig, this.built, this.colors) ?? null;
   }
 
@@ -165,8 +192,10 @@ export class ProceduralChampionView implements ChampionView {
     }
     this.animator.rate = this.animator.baseClip === 'run' ? THREE.MathUtils.clamp(this.speed / NOMINAL_SPEED, 0.6, 1.7) : 1;
 
+    this.maxHp = snap.maxHp || 1;
+    this.updateYaw(dt);
     this.tickDeath(dt);
-    this.rig.apply(this.animator.update(dt));
+    this.rig.apply(this.layer(this.animator.update(dt), dt));
     this.state.anim = this.animator.current;
     this.extras?.(dt, this.state);
   }
@@ -182,6 +211,13 @@ export class ProceduralChampionView implements ChampionView {
   }
 
   // ------------------------------------------------------------ événements
+  /** Recul quand le champion encaisse un coup (additif, s'estompe en ~0,3 s). */
+  flinch(amount: number): void {
+    if (this.state.dead) return;
+    const k = Math.min(1, 0.35 + (amount / this.maxHp) * 6);
+    this.flinchAmt = Math.min(1, Math.max(this.flinchAmt, k));
+  }
+
   strike(): void {
     if (!this.state.dead) this.animator.play('strike', { fade: 0.04 });
   }
@@ -194,6 +230,57 @@ export class ProceduralChampionView implements ChampionView {
   }
 
   // ------------------------------------------------------------ interne
+  /**
+   * Orientation lissée : le renderer impose l'orientation serveur à `object3d` ; le modèle enfant reçoit l'écart
+   * pour que l'orientation affichée tourne progressivement (fini les demi-tours instantanés).
+   */
+  private updateYaw(dt: number): void {
+    const target = this.object3d.rotation.y;
+    if (!this.yawReady) {
+      this.yaw = target;
+      this.yawReady = true;
+    }
+    const d = wrapAngle(target - this.yaw);
+    const step = d * (1 - Math.exp(-dt * 14));
+    this.yaw += step;
+    this.yawRate += ((dt > 0 ? step / dt : 0) - this.yawRate) * Math.min(1, dt * 10);
+    this.model.rotation.y = wrapAngle(this.yaw - target);
+  }
+
+  /** Couches additives : inclinaison (vitesse, virage), recul, port d'arme. */
+  private layer(pose: Float32Array, dt: number): Float32Array {
+    const p = this.finalPose;
+    p.set(pose);
+    const moving = this.animator.baseClip === 'run' && !this.state.dead;
+    this.lean += ((moving ? Math.min(1.3, this.speed / NOMINAL_SPEED) : 0) - this.lean) * Math.min(1, dt * 8);
+    // en avant selon la vitesse, et vers l'intérieur du virage
+    p[J.body * 3 + 2]! -= 0.1 * this.lean;
+    p[J.body * 3]! += Math.max(-0.22, Math.min(0.22, -this.yawRate * 0.045)) * this.lean;
+    // recul : buste et tête rejetés en arrière
+    if (this.flinchAmt > 0.001) {
+      const f = this.flinchAmt;
+      p[J.spine * 3 + 2]! += 0.32 * f;
+      p[J.head * 3 + 2]! += 0.22 * f;
+      p[J.armL * 3]! += 0.15 * f;
+      p[J.armR * 3]! -= 0.15 * f;
+      p[J.body * 3 + 2]! += 0.06 * f;
+      this.flinchAmt *= Math.exp(-dt * 11);
+    }
+    // port d'arme : l'accessoire compense la chaîne corps → torse → bras → avant-bras ; à la mort, il se couche
+    const dying = this.animator.current === 'death' && this.dropAngle !== undefined;
+    const angle = dying ? this.dropAngle : this.carry;
+    if (angle !== undefined) {
+      const want = dying || CARRY_CLIPS.has(this.animator.current) ? 1 : 0;
+      this.carryW += (want - this.carryW) * Math.min(1, dt * 10);
+      if (this.carryW > 0.001) {
+        const chain = p[J.body * 3 + 2]! + p[J.spine * 3 + 2]! + p[J.armR * 3 + 2]! + p[J.foreR * 3 + 2]!;
+        const i = J.prop * 3 + 2;
+        p[i] = p[i]! + (angle - chain - p[i]!) * this.carryW;
+      }
+    }
+    return p;
+  }
+
   /** Projection : le modèle décrit une parabole pendant la durée du knockup (la simulation reste au sol). */
   private updateLift(remaining: number): void {
     if (remaining > 0 && this.liftStart < 0) {

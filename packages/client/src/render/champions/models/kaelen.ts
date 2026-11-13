@@ -60,6 +60,8 @@ const castW: Clip = {
 
 export const kaelenModel: ChampionModelDef = {
   rig: { hipY: 0.88, hipW: 0.15, thigh: 0.44, shin: 0.43, spine: 0.6, shoulderW: 0.3, upperArm: 0.34, forearm: 0.31, neck: 0.15 },
+  dropAngle: 0,
+  carry: -0.25,
   ctx: { energy: 1.05, hand: 1 },
   clips: { strike, cast_R: castR, cast_W: castW },
   build(b, c) {

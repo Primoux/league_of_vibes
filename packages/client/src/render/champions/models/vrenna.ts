@@ -62,6 +62,8 @@ const castW: Clip = {
 
 export const vrennaModel: ChampionModelDef = {
   rig: { hipY: 0.88, hipW: 0.14, thigh: 0.44, shin: 0.43, spine: 0.56, shoulderW: 0.26, upperArm: 0.33, forearm: 0.3, neck: 0.15 },
+  dropAngle: -Math.PI / 2,
+  carry: -0.5,
   ctx: { energy: 1.1, hand: 1 },
   clips: { idle, strike, cast_Q: strike, cast_W: castW },
   build(b, c) {
