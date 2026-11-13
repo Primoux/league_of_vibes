@@ -10,12 +10,12 @@ Date : 2026-11-13. Branche de travail : `codex-champions`.
 - **M2** : Grondak et Ilyra, quatre sorts et passifs testés ; neuf invocateurs : Flash, Ignite, Heal, Barrier, Exhaust, Teleport, Smite, Ghost, Cleanse. Flash ne laisse pas le rayon du champion dans un mur ; Teleport s'interrompt sur dégâts, CC, ordre ou disparition de la cible.
 - **M3** : les dix kits complets : Grondak, Tharox, Kaelen, Vrenna, Ilyra, Zephyr, Sable, Corvin, Nyx, Solenne. Attaques renforcées, marques, saignement, riposte, trois fentes/rayons, orbe aller-retour, pièges limités, invisibilité, marque de mort et soins/boucliers amplifiés.
 - **M4 — garde-fous** : 90 duels (45 paires × niveaux 6 et 11, équipements par classe), déterministes, sur les vrais systèmes combat/movement/vision. Contrôle des ressources, valeurs finies, dégâts aberrants et répétabilité. 40 tests de coûts/CD des sorts ; descriptions FR alignées sur les paramètres. Cela ne remplace pas l'équilibrage en partie humaine.
-- Dernière validation complète : **321 tests / 31 fichiers**, `npm run typecheck`, `npm test`, `npm run build` verts sur Node 24.22.1. Avertissement de chunk client >500 Ko préexistant, hors de ce domaine.
-- Synchronisation avec main jusqu'à `f9b6e369bd6b1f6623ed76d0a2b8979e7d8cb8eb`. Conflits résolus en conservant **strictement l'API damage.ts de claude-server**, et les deux ensembles d'événements partagés. Aucun changement des systèmes des autres domaines.
+- Dernière validation complète : **331 tests / 32 fichiers**, `npm run typecheck`, `npm test`, `npm run build` verts sur Node 24.22.1. Avertissement de chunk client >500 Ko préexistant, hors de ce domaine.
+- Synchronisation avec main jusqu'à `acc60fbe479e866fb4ecb115dbd8750853464703`. Conflits résolus en conservant **strictement l'API damage.ts de claude-server**, et les deux ensembles d'événements partagés. Aucun changement des systèmes des autres domaines.
 - Aucune dépendance ni asset ajouté.
 
 ## En cours
-- Livraison prête localement ; publication et PR en attente de l'accès en écriture GitHub.
+- Publication par GitHub CLI authentifié et ouverture de la PR pour revue par Fable.
 
 ## Validation réseau
 - Serveur réel et 8 clients WebSocket : draft, chargement, puis 15 secondes de commandes simultanées.
@@ -24,7 +24,7 @@ Date : 2026-11-13. Branche de travail : `codex-champions`.
 - `node --import tsx` utilisé pour contourner uniquement le pipe IPC du CLI tsx indisponible dans cet environnement.
 
 ## Bloqué / Besoins
-- **Publication bloquée par l'accès GitHub** : l'intégration lit le dépôt et indique push=true pour le compte, mais les écritures Git Trees et Contents retournent toutes deux HTTP 403 « Resource not accessible by integration ». Aucun push ni PR distante créé. Il faut autoriser l'intégration à écrire dans `Primoux/league_of_vibes`.
+- L'intégration ChatGPT utilisée pour la lecture refuse les écritures (403). Une connexion GitHub CLI officielle a été validée par l'utilisateur ; la publication utilise cette connexion.
 - Les nouvelles règles d'AGENTS.md sont prises en compte : publication via `pr/codex-champions`, YOUR_PLAN de main conservé, revue/merge par Fable uniquement.
 - Le réglage compétitif, les visuels et l'ergonomie nécessitent les parties humaines et les branches client/FX/UI ; le moteur expose les événements et états requis.
 
