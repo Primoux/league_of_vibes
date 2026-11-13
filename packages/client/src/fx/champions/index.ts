@@ -4,3 +4,5 @@
  */
 import './grondak.ts';
 import './ilyra.ts';
+import { installMelenchonFx } from './melenchon.ts';
+installMelenchonFx();

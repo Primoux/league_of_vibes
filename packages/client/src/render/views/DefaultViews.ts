@@ -124,7 +124,7 @@ export function setDragonElement(e: DragonElement | undefined): void {
 export function defaultViewFor(snap: EntitySnapshot): EntityView | null {
   switch (snap.kind) {
     case 'champion':
-      return snap.subtype === 'melenchon' ? new MelenchonView() : championPlaceholder(snap);
+      return snap.subtype === 'melenchon' ? new MelenchonView(false, snap.team) : championPlaceholder(snap);
     case 'minion':
       return minionModel(snap.subtype, snap.team);
     case 'tower':
