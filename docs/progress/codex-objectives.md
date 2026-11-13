@@ -33,13 +33,16 @@ Session : 2026-11-13, branche `codex-objectives`.
 
 ## Validation
 - Node 24.22.3 : `npm run typecheck`, `npm test`, `npm run build`. Tests réseau exécutés hors sandbox (écoute de port local interdite dans le sandbox).
-- Après récupération des API serveur, champions, FX et client : suite complète de 387 tests (dont 33 tests PvE) ; test d'intégration du combat sans double attaque et scénario de trente minutes à pas accéléré de 0,2 s. Ce test vérifie stabilité et défense, pas la fidélité d'équilibrage à 30 Hz avec joueurs.
+- Après récupération des API serveur, champions, FX et client : suite complète de 473 tests (dont 33 tests PvE) ; test d'intégration du combat sans double attaque et scénario de trente minutes à pas accéléré de 0,2 s. Ce test vérifie stabilité et défense, pas la fidélité d'équilibrage à 30 Hz avec joueurs.
 - Aucune dépendance ou asset ajouté. Le build client signale seulement son bundle >500 Ko déjà présent hors domaine.
 
 ## Livraison
 - Les nouvelles règles AGENTS.md récupérées avec main imposent une PR `pr/codex-objectives` ; revue/merge réservés à Fable. Aucun push sur main effectué. Le premier essai local d'intégration a été arrêté après les tests ; ses correctifs ont été réalisés sur codex-objectives.
 - Publication : branches `codex-objectives` et `pr/codex-objectives` poussées ; `YOUR_PLAN.md` de la branche de PR identique à celui de main.
-- Blocage externe restant : GitHub CLI absent (le script open-pr s'arrête avant mutation) ; création via connecteur GitHub tentée, refusée par GitHub HTTP 403 `Resource not accessible by integration`. Plugin GitHub vérifié installé/activé ; ses droits GitHub d'écriture ne sont pas disponibles ici. PR à ouvrir après autorisation GitHub ou via https://github.com/Primoux/league_of_vibes/compare/main...pr/codex-objectives?expand=1 ; description prête dans `/tmp/league-objectives-pr.md`. Aucun merge de PR effectué.
+- Blocage GitHub résolu : le connecteur reste en HTTP 403, mais le CLI officiel installé dans /tmp est maintenant authentifié après validation de l’utilisateur. Publication via le script officiel ; revue/merge réservés à Fable.
 
 - Connexion GitHub CLI validée par l’utilisateur ; publication de la PR reprise avec le script officiel.
 - Test réseau réel supplémentaire : huit clients pendant 60 s, première vague incluse, 20,0 snapshots/s chacun et aucune erreur. Débit JSON décompressé : 61–62 Ko/s/client ; ce chiffre ne mesure pas le trafic WebSocket compressé.
+
+- Correction d'intégration autorisée par l’utilisateur : la fixture `economy.test.ts` exclut les quatre systèmes PvE. Ses événements/récompenses sont déjà simulés explicitement ; toutes ses assertions sont conservées. Cela évite de lancer de vraies vagues pendant ses simulations économiques de 10–30 minutes. Les tests PvE et le test d'endurance utilisent toujours les vrais systèmes.
+- Validation finale après isolation de la fixture économique : 473 tests / 47 fichiers, typecheck et build verts.
