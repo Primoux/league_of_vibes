@@ -206,6 +206,10 @@ const initialized = new WeakSet<World>();
 export function initBuffs(world: World): void {
   if (initialized.has(world)) return;
   initialized.add(world);
+  world.hooks.entitySnapshot.push((e, snapshot) => {
+    const buffs = getBuffs(e);
+    if (buffs.length) snapshot.buffs = buffs.map((b) => ({ id: b.id, remaining: Math.max(0, Math.round(b.remaining * 10) / 10), ...(b.stacks > 1 ? { stacks: b.stacks } : {}) }));
+  });
   world.hooks.canMove.push((e) => canMove(e));
   world.hooks.canAttack.push((e) => canAttack(e));
   world.hooks.isTargetable.push((e) => !e.data.stasis);

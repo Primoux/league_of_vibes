@@ -41,3 +41,15 @@ describe('Leveling', () => {
     expect(ally.champ!.xp).toBe(50);
   });
 });
+
+it('exports XP and buff state through the server snapshot hooks', async () => {
+  const { buildSnapshot } = await import('../src/net/snapshot.ts');
+  const { buffsSystem } = await import('../src/systems/buffs.ts');
+  const { addBuff } = await import('../src/combat/buffs.ts');
+  const { world, e } = setup();
+  buffsSystem.init!(world);
+  addBuff(world, e, 'stun', { duration: 1, source: e });
+  const snapshot = buildSnapshot(world, 'p', 'blue', []);
+  expect(snapshot.self?.xpToNext).toBe(280);
+  expect(snapshot.entities.find((entity) => entity.id === e.id)?.buffs).toContainEqual({ id: 'stun', remaining: 1 });
+});

@@ -48,6 +48,7 @@ function xpReward(e: Entity): number {
 export function initLeveling(world: World): void {
   if (initialized.has(world)) return;
   initialized.add(world);
+  world.hooks.selfState.push((e, self) => { if (e.champ) self.xpToNext = xpToNextLevel(e.champ.level); });
   world.events.on('death', ({ target, killer }) => {
     const victim = world.get(target), source = world.get(killer);
     if (!victim || victim.data.xpRewarded || victim.kind === 'projectile' || victim.kind === 'zone') return;
