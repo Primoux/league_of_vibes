@@ -33,6 +33,8 @@ export type { FxQuality } from './post/PostFx.ts';
 
 export interface FxInstance {
   runtime: FxRuntime;
+  /** Temps CPU des FX par frame (ms, moyenne glissante) : bus + effets + particules. */
+  readonly stats: { updateMs: number };
   dispatcher: FxDispatcher;
   post: PostFx | null;
   /** Avance les FX (appelé automatiquement sauf si `manualUpdate`). */
@@ -72,9 +74,12 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
   const onResize = (): void => post?.setSize(innerWidth, innerHeight);
   if (post && !opts.ownPost) addEventListener('resize', onResize);
 
+  const stats = { updateMs: 0 };
   const update = (dt: number): void => {
+    const t0 = performance.now();
     fxBus.update();
     runtime.update(Math.min(dt, 0.1));
+    stats.updateMs += (performance.now() - t0 - stats.updateMs) * 0.05;
   };
 
   let raf = 0;
@@ -93,6 +98,7 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
 
   current = {
     runtime,
+    stats,
     dispatcher,
     post,
     update,
