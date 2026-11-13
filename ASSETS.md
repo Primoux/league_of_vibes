@@ -6,3 +6,5 @@ Aucun asset, nom ou son provenant de Riot Games / League of Legends.
 | Fichier | Source (URL) | Auteur | Licence | Ajouté par |
 |---|---|---|---|---|
 | Polices Cinzel et Inter (chargées depuis Google Fonts, non embarquées) | https://fonts.google.com/specimen/Cinzel · https://fonts.google.com/specimen/Inter | Natanael Gama · Rasmus Andersson | SIL OFL 1.1 (police autorisée par le plan UI) | mistral-ui |
+| `client/src/render/champions/melenchon.ts` | Géométrie Three.js originale, générée par code | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |
+| `client/src/fx/champions/melenchon.ts` | Micro, papiers, ondes et pancarte Canvas générés par code | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |

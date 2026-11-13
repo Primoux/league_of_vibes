@@ -5,6 +5,7 @@ import { registerDamageModifier } from './combatHooks.ts';
 import { scaling } from './context.ts';
 import { enemiesInRadius, isUnit } from './primitives.ts';
 import type { DamageContext, Entity, World } from '../world.ts';
+import { installMelenchonPassive } from './champions/melenchon.ts';
 import { updateGranite } from './champions/grondak.ts';
 interface PassiveState { attacks: number; momentum: number; lastPos: { x: number; y: number } }
 interface Bleed { source: number; stacks: number; expires: number; nextTick: number }
@@ -34,6 +35,7 @@ function addBleed(world: World, source: Entity, target: Entity): void {
 export function initPassives(world: World): void {
   if (initialized.has(world)) return;
   initialized.add(world);
+  installMelenchonPassive(world);
   const beforeHp = new WeakMap<DamageContext, number>();
   world.hooks.beforeDamage.push((ctx) => { beforeHp.set(ctx, ctx.target.hp); });
   registerDamageModifier(world, (context) => {
