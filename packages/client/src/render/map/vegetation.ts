@@ -123,6 +123,9 @@ function borderTreeSpots(r: () => number): TreeSpot[] {
   return out;
 }
 
+/** Taille des tuiles de végétation (unités de jeu) : une InstancedMesh par tuile, cullée par la caméra. */
+export const TREE_TILE = 2000;
+
 function buildTrees(spots: TreeSpot[], r: () => number): THREE.Group {
   const { trunk, leaves } = treeGeometries();
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3f2a, roughness: 1, flatShading: true });
@@ -130,34 +133,49 @@ function buildTrees(spots: TreeSpot[], r: () => number): THREE.Group {
   addWind(leafMat, 0.025);
   applyFog(leafMat);
   applyFog(trunkMat);
-  const tm = new THREE.InstancedMesh(trunk, trunkMat, spots.length);
-  const lm = new THREE.InstancedMesh(leaves, leafMat, spots.length);
+  // tirages aléatoires d'abord (ordre stable quel que soit le découpage en tuiles)
+  const placed = spots.map((t) => ({ t, rot: r() * Math.PI * 2, sy: 0.9 + r() * 0.35, color: palette[Math.floor(r() * palette.length)]!, light: (r() - 0.5) * 0.06 }));
+  const tiles = new Map<string, typeof placed>();
+  for (const p of placed) {
+    const key = `${Math.floor(p.t.x / TREE_TILE)},${Math.floor(p.t.y / TREE_TILE)}`;
+    let arr = tiles.get(key);
+    if (!arr) tiles.set(key, (arr = []));
+    arr.push(p);
+  }
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const up = new THREE.Vector3(0, 1, 0);
   const pos = new THREE.Vector3();
   const scl = new THREE.Vector3();
   const col = new THREE.Color();
-  const palette = [0x2f6b3a, 0x3a7a3c, 0x2a5f36, 0x47843f, 0x356f45, 0x5b8a3a];
-  spots.forEach((t, i) => {
-    q.setFromAxisAngle(up, r() * Math.PI * 2);
-    pos.set(t.x * S, terrainHeight(t.x, t.y) * S + (isInWall(t) ? 0.85 : 0), -t.y * S);
-    scl.set(t.s, t.s * (0.9 + r() * 0.35), t.s);
-    m.compose(pos, q, scl);
-    tm.setMatrixAt(i, m);
-    lm.setMatrixAt(i, m);
-    col.setHex(palette[Math.floor(r() * palette.length)]!).offsetHSL(0, 0, (r() - 0.5) * 0.06);
-    lm.setColorAt(i, col);
-  });
-  for (const im of [tm, lm]) {
-    im.castShadow = true;
-    im.receiveShadow = true;
-    im.computeBoundingSphere();
-  }
   const g = new THREE.Group();
-  g.add(tm, lm);
+  for (const arr of tiles.values()) {
+    const tm = new THREE.InstancedMesh(trunk, trunkMat, arr.length);
+    const lm = new THREE.InstancedMesh(leaves, leafMat, arr.length);
+    // une tuile entièrement hors de la carte n'est qu'un fond : pas d'ombre portée
+    const inside = arr.some((p) => p.t.x > 0 && p.t.y > 0 && p.t.x < MAP_SIZE && p.t.y < MAP_SIZE);
+    arr.forEach((p, i) => {
+      const t = p.t;
+      q.setFromAxisAngle(up, p.rot);
+      pos.set(t.x * S, terrainHeight(t.x, t.y) * S + (isInWall(t) ? 0.85 : 0), -t.y * S);
+      scl.set(t.s, t.s * p.sy, t.s);
+      m.compose(pos, q, scl);
+      tm.setMatrixAt(i, m);
+      lm.setMatrixAt(i, m);
+      lm.setColorAt(i, col.setHex(p.color).offsetHSL(0, 0, p.light));
+    });
+    for (const im of [tm, lm]) {
+      im.userData.backdrop = !inside;
+      im.castShadow = inside;
+      im.receiveShadow = true;
+      im.computeBoundingSphere();
+    }
+    g.add(tm, lm);
+  }
   return g;
 }
+
+const palette = [0x2f6b3a, 0x3a7a3c, 0x2a5f36, 0x47843f, 0x356f45, 0x5b8a3a];
 
 // ---------------------------------------------------------------- murs (socle rocheux)
 
@@ -311,6 +329,13 @@ export class Vegetation {
     this.group.add(buildRocks(r));
     this.brushes = buildBrushes(r);
     for (const b of this.brushes) this.group.add(b.mesh);
+  }
+
+  /** Qualité basse : les tuiles d'arbres hors carte (simple fond) sont masquées. */
+  setQuality(q: 'low' | 'high'): void {
+    this.group.traverse((o) => {
+      if (o.userData.backdrop) o.visible = q === 'high';
+    });
   }
 
   /** Rend semi-transparente la brousse où se trouve le joueur local. */
