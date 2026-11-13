@@ -161,6 +161,7 @@ export type GameEvent =
   | { type: 'recallEnd'; target: EntityId; completed: boolean }
   | { type: 'itemBought'; target: EntityId; itemId: string }
   | { type: 'itemSold'; target: EntityId; itemId: string }
+  | { type: 'itemUsed'; target: EntityId; itemId: string }
   | { type: 'structureDestroyed'; target: EntityId; kind: 'tower' | 'inhibitor' | 'nexus'; team: Team; plate?: boolean }
   | { type: 'objectiveSpawn'; monster: MonsterType; element?: DragonElement; pos: Vec2 }
   | { type: 'objectiveTaken'; monster: MonsterType; team: Team; killer?: EntityId; element?: DragonElement }
