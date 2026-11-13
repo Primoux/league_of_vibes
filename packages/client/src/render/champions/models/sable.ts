@@ -65,6 +65,8 @@ const castR: Clip = {
 
 export const sableModel: ChampionModelDef = {
   rig: { hipY: 0.86, hipW: 0.13, thigh: 0.43, shin: 0.42, spine: 0.55, shoulderW: 0.24, upperArm: 0.32, forearm: 0.3, neck: 0.15 },
+  dropAngle: -Math.PI / 2,
+  carry: -1.9,
   ctx: { energy: 1, hand: 1 },
   clips: { idle, attackReady, strike, cast_R: castR },
   build(b, c) {

@@ -90,7 +90,8 @@ varying vec3 vViewPos;
 varying vec3 vTint;
 void main() {
   // normale de facette via dérivées écran : look low-poly sans dupliquer les sommets
-  vec3 n = normalize(cross(dFdx(vViewPos), dFdy(vViewPos)));
+  vec3 cr = cross(dFdx(vViewPos), dFdy(vViewPos));
+  vec3 n = dot(cr, cr) > 1e-20 ? normalize(cr) : vec3(0.0, 0.0, 1.0); // facette dégénérée (éclat qui naît)
   vec3 v = normalize(-vViewPos);
   float rim = pow(max(0.0, 1.0 - abs(dot(n, v))), 2.0);
   float light = 0.5 + 0.5 * dot(n, normalize(vec3(0.3, 0.8, 0.5)));

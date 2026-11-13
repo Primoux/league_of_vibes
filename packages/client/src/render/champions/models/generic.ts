@@ -74,5 +74,8 @@ export const genericModel: ChampionModelDef = {
 export function genericFor(cls: ChampionClass): ChampionModelDef {
   const scale = cls === 'tank' ? 1.12 : cls === 'assassin' ? 0.96 : 1;
   const energy = cls === 'tank' ? 0.75 : cls === 'assassin' ? 1.2 : 1;
-  return { ...genericModel, scale, ctx: { energy } };
+  // port d'arme selon la classe : arme basse vers l'avant, bâtons droits
+  const carry = cls === 'mage' || cls === 'support' ? 0 : cls === 'marksman' ? -0.3 : cls === 'assassin' ? -0.7 : -0.3;
+  const dropAngle = cls === 'mage' || cls === 'support' ? -Math.PI / 2 : 0;
+  return { ...genericModel, scale, carry, dropAngle, ctx: { energy } };
 }
