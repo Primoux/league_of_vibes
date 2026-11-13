@@ -33,10 +33,11 @@ export interface VisibleTo {
 
 const ALWAYS_VISIBLE = new Set(['tower', 'inhibitor', 'nexus']);
 
-export function isVisibleTo(e: Entity, team: Team | 'neutral'): boolean {
+/** `unknown` : réponse si la vision n'a pas encore été calculée pour cette entité (créée hors tick). */
+export function isVisibleTo(e: Entity, team: Team | 'neutral', unknown = true): boolean {
   if (team === 'neutral' || e.team === team || ALWAYS_VISIBLE.has(e.kind)) return true;
   const v = e.data.visibleTo as VisibleTo | undefined;
-  return v ? v[team] : true; // pas encore calculé (premier tick) : visible
+  return v ? v[team] : unknown;
 }
 
 export function sightRadius(e: Entity): number {
