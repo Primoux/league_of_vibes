@@ -11,7 +11,9 @@ import { App } from './ui/App.tsx';
 const params = new URLSearchParams(location.search);
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 
-if (params.has('fxlab')) {
+if (params.has('melenchonlab')) {
+  void import('./render/champions/melenchonlab.ts').then((m) => m.startMelenchonLab(canvas));
+} else if (params.has('fxlab')) {
   // Banc d'essai FX sans serveur (claude-fx), chargé à la demande.
   void import('./fx/lab/fxlab.ts').then((m) => m.startFxLab());
 } else if (params.has('maplab')) {

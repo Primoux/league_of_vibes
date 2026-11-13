@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CHAMPION_LIST, RENDER_SCALE, SUMMONERS, SUMMONER_IDS, type AbilitySlot, type ChampionDef, type EntitySnapshot, type GameEvent, type Team, type Vec2 } from '@lov/shared';
-import { createChampionView, type ProceduralChampionView } from '../../render/champions/index.ts';
+import { createChampionView, type AnimatedChampionView } from '../../render/champions/index.ts';
 import { store } from '../../state.ts';
 import { fxBus } from '../FxBus.ts';
 import type { FxHost } from '../core/host.ts';
@@ -19,7 +19,7 @@ const CASTER_ID = 1;
 const TARGET_IDS = [2, 3, 4];
 
 interface Dummy extends LabActor {
-  view: ProceduralChampionView;
+  view: AnimatedChampionView;
   mesh: THREE.Object3D;
   snap: EntitySnapshot;
   anim: string;
