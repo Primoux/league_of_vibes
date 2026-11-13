@@ -145,6 +145,42 @@ describe('economy — or', () => {
     expect(c.champ!.cs).toBe(20);
   });
 
+  it('simulation M4 : or gagné à 10/20/30 min cohérent avec une partie LoL-like', () => {
+    const w = makeWorld();
+    const c = addChamp(w, 'blue', { x: 5000, y: 5000 });
+    const waveInterval = scaled(30); // 22,5 s de jeu entre deux vagues
+    // bornes attendues (or de départ + passif + last hits) : 10 min ~5,0k, 20 min ~9,6k, 30 min ~14k
+    const checkpoints: [number, number, number][] = [
+      [600, 4500, 5500],
+      [1200, 8800, 10500],
+      [1800, 13000, 15500],
+    ];
+    let nextWave = 0;
+    for (const [target, lo, hi] of checkpoints) {
+      while (w.time < target) {
+        if (w.time >= nextWave) {
+          const n = Math.round(nextWave / waveInterval);
+          for (let i = 0; i < 3; i++) {
+            const m = dummy(w, 'red', { x: 5050, y: 5000 }, 'minion', 'melee', 50);
+            applyDamage(w, { source: c, target: m, amount: 500, type: 'true' });
+          }
+          for (let i = 0; i < 3; i++) {
+            const m = dummy(w, 'red', { x: 5050, y: 5050 }, 'minion', 'caster', 50);
+            applyDamage(w, { source: c, target: m, amount: 500, type: 'true' });
+          }
+          if (n % 3 === 2) {
+            const m = dummy(w, 'red', { x: 5050, y: 5100 }, 'minion', 'cannon', 50);
+            applyDamage(w, { source: c, target: m, amount: 500, type: 'true' });
+          }
+          nextWave += waveInterval;
+        }
+        run(w, 1);
+      }
+      expect(c.champ!.gold).toBeGreaterThanOrEqual(lo);
+      expect(c.champ!.gold).toBeLessThanOrEqual(hi);
+    }
+  });
+
   it('donne l’or d’équipe des objectifs', () => {
     const w = makeWorld();
     const a = addChamp(w, 'blue', { x: 5000, y: 5000 });

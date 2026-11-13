@@ -2,7 +2,7 @@
  * État économie d'une entité, namespacé dans `entity.data.economy`.
  * Propriétaire : mistral-economy. Lu/écrit par systems/economy.ts et items/handlers.ts.
  */
-import type { Stats, Team } from '@lov/shared';
+import type { Team } from '@lov/shared';
 import type { Entity } from '../world.ts';
 
 /** Action de boutique annulable (pile `shopHistory`, vidée quand on quitte la fontaine). */
@@ -40,8 +40,6 @@ export interface EconomyState {
   paidPrice: Record<number, number>;
   /** Cooldowns d'actifs : activeId -> temps de jeu de fin. */
   itemCooldowns: Record<string, number>;
-  /** Bonus de stats actuellement appliqués à ent.stats (objets + effets temporaires). */
-  appliedItemStats: Partial<Stats> | null;
   /** Soin sur la durée (potion) : total, restant (s). */
   hot: { total: number; remaining: number; duration: number } | null;
   staseUntil: number;
@@ -67,7 +65,6 @@ export function defaultEconomyState(): EconomyState {
     charges: {},
     paidPrice: {},
     itemCooldowns: {},
-    appliedItemStats: null,
     hot: null,
     staseUntil: -Infinity,
     grievousUntil: -Infinity,

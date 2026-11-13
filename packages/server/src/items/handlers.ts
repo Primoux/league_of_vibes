@@ -5,9 +5,10 @@
  * Les dégâts passent EXCLUSIVEMENT par applyDamage/applyHeal/applyShield (combat/damage.ts).
  */
 import { ITEMS, dist, type Stats, type Team } from '@lov/shared';
+import { registerStatSource } from '../combat/buffs.ts';
 import { applyHeal, applyShield, creditOf } from '../combat/damage.ts';
 import type { Entity, World } from '../world.ts';
-import { econ } from './state.ts';
+import { econ, type EconomyState } from './state.ts';
 
 export const STAT_KEYS = [
   'maxHp', 'hpRegen', 'maxMana', 'manaRegen', 'ad', 'ap', 'armor', 'mr',
@@ -47,28 +48,27 @@ export function itemStatsOf(ent: Entity): Partial<Stats> {
 }
 
 /**
- * Applique les stats d'objets (plus effets temporaires type rafale) dans `ent.stats` par delta
- * (on retire l'ancien bonus, on applique le nouveau) : compose avec les autres systèmes de stats.
- * Un gain de PV max soigne du delta, une perte clamp les PV (comme dans LoL).
- * Quand le système buffs de codex-champions fera le recalcul global, il devra utiliser itemStatsOf().
+ * Le recalc des stats est la propriété de codex-champions (combat/buffs.ts `recalculateStats`) :
+ * il somme déjà `ITEMS[champ.items].stats`. On ne touche donc PAS à `ent.stats` ici.
+ * On enregistre seulement une source de stats pour l'effet temporaire « rafale » (+40 % vitesse).
+ * Le soin du delta de PV max à l'achat/vente est géré par `healItemMaxHpDelta` (appelé par economy).
  */
-export function applyItemStats(world: World, ent: Entity): void {
-  const st = econ(ent);
-  const prev = st.appliedItemStats ?? {};
-  const bonus = itemStatsOf(ent);
-  if (st.rafaleUntil > world.time) {
-    const baseMove = ent.stats.moveSpeed - ((prev.moveSpeed ?? 0) as number);
-    bonus.moveSpeed = (bonus.moveSpeed ?? 0) + Math.round(baseMove * 0.4);
-  }
-  for (const k of STAT_KEYS) {
-    const oldV = (prev[k] ?? 0) as number;
-    const newV = (bonus[k] ?? 0) as number;
-    if (oldV !== newV) ent.stats[k] = ((ent.stats[k] ?? 0) as number) - oldV + newV;
-  }
-  const dMaxHp = (bonus.maxHp ?? 0) - (prev.maxHp ?? 0);
-  if (dMaxHp > 0) ent.hp = Math.min(ent.hp + dMaxHp, ent.stats.maxHp);
-  else if (dMaxHp < 0) ent.hp = Math.min(ent.hp, ent.stats.maxHp);
-  st.appliedItemStats = bonus;
+let statSourceRegistered = false;
+export function registerItemStatSource(): void {
+  if (statSourceRegistered) return;
+  statSourceRegistered = true;
+  registerStatSource((world, e) => {
+    const st = e.data.economy as EconomyState | undefined;
+    if (!st || st.rafaleUntil <= world.time) return undefined;
+    return { percent: { moveSpeed: 0.4 } };
+  });
+}
+
+/** Soigne/perd le delta de PV max quand les objets changent (appelé après buy/sell/undo). */
+export function healItemMaxHpDelta(ent: Entity, before: Partial<Stats>): void {
+  if (ent.dead) return;
+  const d = (itemStatsOf(ent).maxHp ?? 0) - (before.maxHp ?? 0);
+  if (d !== 0) ent.hp += d; // clamp au prochain recalc de buffs
 }
 
 /** Enregistre tous les hooks de passifs d'objets. Appelé dans init() du système economy. */
@@ -122,17 +122,9 @@ export function registerItemHooks(world: World): void {
     }
   });
 
-  // Stase (sablier) : incoblable, invulnérable, immobile.
-  world.hooks.isTargetable.push((target, _attacker, w) => econ(target).staseUntil <= w.time);
-  world.hooks.preventDeath.push((target, _killer, w) => {
-    if (econ(target).staseUntil > w.time) {
-      target.hp = Math.max(target.hp, 1);
-      return true;
-    }
-    return false;
-  });
-  world.hooks.canMove.push((e, w) => econ(e).staseUntil <= w.time);
-  world.hooks.canAttack.push((e, w) => econ(e).staseUntil <= w.time);
+  // Stase (sablier) : `data.stasis` est géré nativement par combat/buffs.ts (incoblable,
+  // invulnérable, immobile). On le pose/retire ici.
+  registerItemStatSource();
 
   // Un sort lancé arme le sort-lame.
   world.events.on('abilityCast', (e) => {
@@ -171,6 +163,8 @@ export function tickItems(world: World, dt: number): void {
       st.voileShieldAt = world.time + 40;
       world.events.emit({ type: 'buffApplied', target: c.id, buffId: 'item_voile', duration: 8, source: c.id });
     }
+    // Fin de stase (sablier).
+    if (c.data.stasis && st.staseUntil <= world.time) delete c.data.stasis;
   }
 }
 
@@ -208,6 +202,7 @@ export function useItem(world: World, ent: Entity, slot: number): void {
     }
     case 'stase':
       st.staseUntil = world.time + 2.5;
+      ent.data.stasis = true; // géré par combat/buffs.ts (invulnérable, incoblable, immobile)
       world.events.emit({ type: 'buffApplied', target: ent.id, buffId: 'item_stase', duration: 2.5, source: ent.id });
       break;
     case 'rafale':

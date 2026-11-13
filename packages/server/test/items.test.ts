@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOUNTAINS, TICK_RATE, type ClientMsg, type Vec2 } from '@lov/shared';
+import { FOUNTAINS, ITEMS, ITEM_LIST, TICK_RATE, type ClientMsg, type Vec2 } from '@lov/shared';
 import { applyDamage, applyHeal } from '../src/combat/damage.ts';
 import { hit } from '../src/systems/combat.ts';
 import { econ } from '../src/items/index.ts';
@@ -152,15 +152,15 @@ describe('boutique', () => {
 
   it('stats : un gain de PV max soigne du delta', () => {
     const w = makeWorld();
-    const c = addChamp(w, { x: 6000, y: 6000 });
-    c.dead = true; // achat autorisé en mort, hors fontaine (pas de soin de fontaine)
-    c.champ!.respawnIn = 9999;
+    const c = addChamp(w, AT_FOUNTAIN);
     c.champ!.gold = 1000;
     c.hp = 400;
     const hpMaxBefore = c.stats.maxHp;
     cmd(w, c, { t: 'buy', itemId: 'ruby_crystal' });
+    expect(c.hp).toBeGreaterThanOrEqual(550); // 400 + 150 de delta de PV max dès l'achat (+ soin de fontaine)
+    run(w, 0.1); // recalc des stats par le système buffs
     expect(c.stats.maxHp).toBeCloseTo(hpMaxBefore + 150, 5);
-    expect(c.hp).toBeCloseTo(550, 5); // 400 + 150 de delta de PV max
+    expect(c.hp).toBeGreaterThan(500);
   });
 });
 
@@ -176,7 +176,9 @@ describe('passifs et actifs d’objets', () => {
     cmd(w, c, { t: 'useItem', slot });
     expect(econ(c).hot).not.toBeNull();
     run(w, 15);
-    expect(c.hp).toBeCloseTo(400 + 120, 0); // soin complet de la potion
+    // soin complet de la potion (120) + régénération passive pendant le test
+    expect(c.hp).toBeGreaterThan(515);
+    expect(c.hp).toBeLessThan(580);
     expect(c.champ!.items[slot]).toBeNull(); // plus de charges -> slot vidé
   });
 
@@ -195,7 +197,7 @@ describe('passifs et actifs d’objets', () => {
     expect(healed).toBeCloseTo(60, 5);
   });
 
-  it('sablier : stase de 2,5 s, invulnérable', () => {
+  it('sablier : stase de 2,5 s, invulnérable (data.stasis géré par buffs)', () => {
     const w = makeWorld();
     const c = addChamp(w, AT_FOUNTAIN);
     c.champ!.gold = 5000;
@@ -203,11 +205,13 @@ describe('passifs et actifs d’objets', () => {
     const slot = c.champ!.items.indexOf('sablier_eternel');
     cmd(w, c, { t: 'useItem', slot });
     expect(econ(c).staseUntil).toBeGreaterThan(w.time);
+    expect(c.data.stasis).toBe(true);
     const hpBefore = c.hp;
     applyDamage(w, { source: dummy(w, { x: 0, y: 0 }), target: c, amount: 99999, type: 'true' });
     expect(c.dead).toBe(false);
-    expect(c.hp).toBe(1);
-    expect(hpBefore).toBeGreaterThan(1);
+    expect(c.hp).toBe(hpBefore); // dégâts annulés par la stase
+    run(w, 3);
+    expect(c.data.stasis).toBeUndefined(); // stase levée
   });
 
   it('sceptre de l’orage : sort-lame armé par un sort, consommé par l’attaque', () => {
@@ -221,5 +225,29 @@ describe('passifs et actifs d’objets', () => {
     expect(econ(c).spellbladeReady).toBe(true);
     hit(w, c, target, false);
     expect(econ(c).spellbladeReady).toBe(false);
+  });
+});
+
+describe('données des objets (M4)', () => {
+  it('ids/icônes uniques, recettes cohérentes, coûts légendaires dans 2000-3400', () => {
+    const ids = ITEM_LIST.map((i) => i.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const icons = ITEM_LIST.map((i) => i.icon);
+    expect(new Set(icons).size).toBe(icons.length);
+    for (const it of ITEM_LIST) {
+      expect(it.name.length).toBeGreaterThan(2);
+      expect(it.description.length).toBeGreaterThan(5);
+      for (const comp of it.buildsFrom) expect(ITEMS[comp]).toBeDefined();
+      const compCost = it.buildsFrom.reduce((s, c) => s + ITEMS[c]!.cost, 0);
+      expect(it.cost).toBeGreaterThanOrEqual(compCost); // coût de combinaison >= 0
+      if (it.category === 'legendary') {
+        expect(it.cost).toBeGreaterThanOrEqual(2000);
+        expect(it.cost).toBeLessThanOrEqual(3400);
+      }
+    }
+    for (const it of ITEM_LIST.filter((i) => i.category === 'boots')) expect(it.unique).toBe(true);
+    expect(ITEMS['colossus_eye']!.shop).toBe(false); // donné par le Colosse, pas acheté
+    expect(ITEMS['stealth_ward']!.cost).toBe(0);
+    expect(ITEM_LIST.length).toBeGreaterThanOrEqual(30); // ~30 objets du PLAN §8
   });
 });

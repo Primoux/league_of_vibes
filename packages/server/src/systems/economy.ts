@@ -27,7 +27,7 @@ import {
   type Vec2,
 } from '@lov/shared';
 import { kill } from '../combat/damage.ts';
-import { applyItemStats, registerItemHooks, tickItems, useItem } from '../items/index.ts';
+import { healItemMaxHpDelta, itemStatsOf, registerItemHooks, tickItems, useItem } from '../items/index.ts';
 import { econ, type ShopAction } from '../items/state.ts';
 import type { Entity, System, World } from '../world.ts';
 
@@ -392,15 +392,24 @@ export const economySystem: System = {
       const ent = world.championOf(playerId);
       if (!ent?.champ) continue;
       switch (msg.t) {
-        case 'buy':
+        case 'buy': {
+          const before = itemStatsOf(ent);
           buyItem(world, ent, msg.itemId);
+          healItemMaxHpDelta(ent, before);
           break;
-        case 'sell':
+        }
+        case 'sell': {
+          const before = itemStatsOf(ent);
           sellItem(world, ent, msg.slot);
+          healItemMaxHpDelta(ent, before);
           break;
-        case 'undoShop':
+        }
+        case 'undoShop': {
+          const before = itemStatsOf(ent);
           undoShop(world, ent);
+          healItemMaxHpDelta(ent, before);
           break;
+        }
         case 'recall':
           startRecall(world, ent);
           break;
@@ -455,7 +464,7 @@ export const economySystem: System = {
         if (st.trinketCharges < WARD_MAX_CHARGES) st.trinketRechargeAt = world.time + WARD_RECHARGE;
       }
 
-      applyItemStats(world, c);
+      // Les stats d'objets sont recalculées par buffs (codex-champions) ; ici on gère juste le PV max.
     }
 
     tickItems(world, dt);

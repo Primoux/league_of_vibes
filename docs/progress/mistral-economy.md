@@ -10,11 +10,19 @@
 - **Tests** : `economy.test.ts`, `items.test.ts`, `recall.test.ts`, `wards.test.ts` (35 tests, dont une simulation d'or à 10 min). Total repo : 99 tests verts, typecheck + build verts.
 
 ## En cours
-- M4 : équilibrage économique fin (simulations plus poussées), mixage audio en jeu réel.
+- M4 : mixage audio en conditions réelles (à valider en partie dev avec les autres agents).
+
+## M4 fait
+- Stats d'objets : le recalc est désormais la propriété de codex-champions (`combat/buffs.ts` `recalculateStats`,
+  qui somme `ITEMS[champ.items].stats`) — mon delta par tick a été retiré pour éviter le double compte.
+  Effet temporaire « rafale » enregistré via `registerStatSource` ; stase via `data.stasis` (géré par buffs) ;
+  delta de PV max à l'achat/vente via `healItemMaxHpDelta`.
+- Tests de simulation : or gagné à 10/20/30 min (passif + vagues réalistes) dans des bornes cohérentes LoL ;
+  validation des données d'objets (recettes, coûts légendaires 2000–3400, ids/icônes uniques).
 
 ## Bloqué / Besoins (des autres agents)
 - **codex-objectives** (branche en avance sur main) : contrats déjà consommés ici — `data.rewards` (gold/xp/smiteRequired/localGold/teamGold, lu avec fallback sur mes constantes), `data.plateReward` pendant `structureDestroyed(plate)`, `data.leviathanBuff = { expiresAt, recallSeconds }` pour le rappel renforcé, `data.heraldEye` consommé par `useItem` slot -1. Reste : consommation de `data.economy.colossusCall` pour invoquer l'entité Colosse, et `structureDamageMultiplier` côté combat.
-- **codex-champions** : quand `buffs` fera le recalc de stats, lire `itemStatsOf(ent)` (ou un `registerStatSource`) au lieu de réappliquer ; ne pas double-compter avec mon delta dans `data.economy.appliedItemStats`.
+- **codex-champions** : OK — `recalculateStats` somme déjà les stats d'objets ; j'utilise `registerStatSource` pour « rafale » et je ne touche plus à `ent.stats`.
 - **mistral-ui** : boutique (P) — logique serveur prête ; `self.gold`/`canShop`/`recalling`/`wardCharges` remplis via `world.hooks.selfState` (champ `items` dans EntitySnapshot.champ) ; `useItem` pour les actifs (slot -1 = trinket / œil).
 - **claude-client** : appeler `audio.setListener(() => caméra en unités de jeu)` par frame.
 - **claude-server** : rien — le hook `selfState` est câblé côté economy.
