@@ -214,7 +214,8 @@ export class World {
   }
 
   spawn(e: Omit<Entity, 'id' | 'data' | 'facing' | 'shield' | 'dead'> & Partial<Pick<Entity, 'data' | 'facing' | 'shield' | 'dead'>>): Entity {
-    const ent: Entity = { facing: 0, shield: 0, dead: false, data: {}, ...e, id: this.nextId++ };
+    // pos est copiée : movement la modifie en place (ne jamais partager un Vec2 de la carte, ex. LANE_PATHS).
+    const ent: Entity = { facing: 0, shield: 0, dead: false, data: {}, ...e, pos: { x: e.pos.x, y: e.pos.y }, id: this.nextId++ };
     this.entities.set(ent.id, ent);
     if (ent.champ) this.players.set(ent.champ.playerId, ent.id);
     return ent;
