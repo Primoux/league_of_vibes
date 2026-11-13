@@ -110,5 +110,7 @@ export interface ItemDef {
   active?: { id: string; name: string; description: string; cooldown: number };
   unique?: boolean;
   maxStacks?: number; // consommables
+  /** false = non achetable (ex. Œil du colosse, donné par un objectif). Défaut true. */
+  shop?: boolean;
   icon: string; // clé d'icône pour l'UI
 }
