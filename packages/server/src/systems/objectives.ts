@@ -1,7 +1,7 @@
 import { PITS, TEAMS, TIMERS, dist2, scaled, type DragonElement, type MonsterType, type Team } from '@lov/shared';
 import { DRAGON_ELEMENTS } from '../../../shared/src/data/monsters.ts';
 import type { Entity, System, World } from '../world.ts';
-import { addBuff, applyDamage, nearest, retire, type BuffOptions } from '../world-ai/runtime.ts';
+import { addBuff, applyDamage, retire, type BuffOptions } from '../world-ai/runtime.ts';
 import { aggroMonster, spawnMonster, updateMonster, type MonsterState } from '../world-ai/monsters.ts';
 import { installObjectiveEffects, updateObjectiveEffects } from '../world-ai/objective-effects.ts';
 import { removeBuff, updateBuffs } from '../combat/buffs.ts';
@@ -16,6 +16,11 @@ export interface ObjectiveState {
   teams: Record<Team, TeamObjectives>;
 }
 const states = new WeakMap<World, ObjectiveState>();
+const bearerLists = new WeakMap<World, Entity[]>();
+const buffSystems = new WeakMap<World, boolean>();
+const EXPIRING_BUFFS = ['leviathanBuff', 'elderBuff'] as const;
+const BREATH_MONSTERS = new Set(['dragon', 'elder_dragon', 'leviathan']);
+function ready(world: World, slot: Slot): boolean { return !slot.done && slot.ids.length === 0 && world.time >= slot.next; }
 export function getObjectiveState(world: World): ObjectiveState | undefined { return states.get(world); }
 export function getObjectiveTimers(world: World, _team: Team): Record<string, number> {
   const state = states.get(world); const timers = getCampTimers(world);
@@ -76,8 +81,18 @@ function spawnEpic(world: World, type: MonsterType, x = 0, y = 0, element?: Drag
   world.events.emit({ type: 'objectiveSpawn', monster: type, pos: { ...entity.pos }, element });
   return entity;
 }
+function heraldTower(world: World, herald: Entity): Entity | undefined {
+  let best: Entity | undefined; let distance = 30000 ** 2;
+  for (const target of world.query('tower')) {
+    if (target.dead || target.team === herald.team) continue;
+    const d = dist2(herald.pos, target.pos);
+    if (d > distance || (d === distance && best && target.id > best.id) || !isStructureAttackable(world, target)) continue;
+    best = target; distance = d;
+  }
+  return best;
+}
 function epicBreath(world: World, entity: Entity, target: Entity): void {
-  if (!['dragon', 'elder_dragon', 'leviathan'].includes(entity.subtype ?? '')) return;
+  if (!BREATH_MONSTERS.has(entity.subtype ?? '')) return;
   const fxKey = entity.subtype === 'dragon' ? `dragon_${String(entity.data.dragonElement)}` : String(entity.subtype);
   world.events.emit({ type: 'areaEffect', source: entity.id, pos: { ...target.pos }, radius: 300, duration: 0.5, fxKey });
   for (const victim of world.query('champion')) if (!victim.dead && victim.id !== target.id && dist2(victim.pos, target.pos) <= 300 ** 2) applyDamage(world, { source: entity, target: victim, amount: entity.stats.ad * 0.5, type: 'magic', ability: fxKey });
@@ -89,6 +104,9 @@ export const objectivesSystem: System = {
     const slot = (timer: number): Slot => ({ next: scaled(timer), ids: [], done: false });
     const state: ObjectiveState = { dragon: slot(TIMERS.dragonFirstSpawn), grubs: slot(TIMERS.grubsSpawn), herald: slot(TIMERS.heraldSpawn), leviathan: slot(TIMERS.leviathanSpawn), dragonCount: 0, elder: false, teams: { blue: empty(), red: empty() } };
     states.set(world, state);
+    bearerLists.set(world, []);
+    let hasBuffs = false; for (const system of world.systems) if (system.name === 'buffs') hasBuffs = true;
+    buffSystems.set(world, hasBuffs);
     world.hooks.objectiveTimers.push(team => getObjectiveTimers(world, team));
     world.events.on('respawn', event => { const champion = world.get(event.target); if (champion) syncPersistentObjectives(world, champion); });
     installObjectiveEffects(world, state);
@@ -156,11 +174,7 @@ export const objectivesSystem: System = {
   update(world, dt) {
     if (world.winner) return;
     const state = states.get(world); if (!state) return;
-    const spawn = (name: 'dragon' | 'leviathan' | 'herald' | 'grubs', fn: () => number[]) => {
-      const slot = state[name];
-      if (!slot.done && slot.ids.length === 0 && world.time >= slot.next) slot.ids = fn();
-    };
-    spawn('dragon', () => {
+    if (ready(world, state.dragon)) {
       let element: DragonElement | undefined;
       if (!state.elder) {
         state.dragonCount++;
@@ -168,18 +182,23 @@ export const objectivesSystem: System = {
         if (state.dragonCount === 3) state.rift = element;
       }
       const entity = spawnEpic(world, state.elder ? 'elder_dragon' : 'dragon', 0, 0, element);
-      return [entity.id];
-    });
+      state.dragon.ids = [entity.id];
+    }
     if (world.time >= scaled(TIMERS.heraldSpawn)) {
       for (const id of state.grubs.ids) world.remove(id);
-      state.grubs.ids = []; state.grubs.done = true;
+      state.grubs.ids.length = 0; state.grubs.done = true;
     }
-    spawn('grubs', () => [spawnEpic(world, 'grub', -180, -100).id, spawnEpic(world, 'grub', 180, -100).id, spawnEpic(world, 'grub', 0, 200).id]);
+    if (ready(world, state.grubs)) state.grubs.ids = [spawnEpic(world, 'grub', -180, -100).id, spawnEpic(world, 'grub', 180, -100).id, spawnEpic(world, 'grub', 0, 200).id];
     if (world.time >= scaled(TIMERS.heraldDespawn)) {
       for (const id of state.herald.ids) world.remove(id);
-      state.herald.ids = []; state.herald.done = true;
-    } else spawn('herald', () => [spawnEpic(world, 'herald').id]);
-    spawn('leviathan', () => [spawnEpic(world, 'leviathan').id]);
+      state.herald.ids.length = 0; state.herald.done = true;
+    } else if (ready(world, state.herald)) state.herald.ids = [spawnEpic(world, 'herald').id];
+    if (ready(world, state.leviathan)) state.leviathan.ids = [spawnEpic(world, 'leviathan').id];
+    const bearers = bearerLists.get(world)!; bearers.length = 0;
+    for (const champion of world.query('champion')) {
+      const buff = champion.data.leviathanBuff as { expiresAt: number } | undefined;
+      if (!champion.dead && buff && buff.expiresAt > world.time) bearers.push(champion);
+    }
     for (const entity of world.entities.values()) {
       const eye = entity.data.heraldEye as HeraldEye | undefined;
       if (eye && world.time >= eye.expiresAt) delete entity.data.heraldEye;
@@ -192,14 +211,14 @@ export const objectivesSystem: System = {
       if (monster?.epic) {
         if (entity.dead) { retire(world, entity); continue; }
         const target = world.get(entity.attackTarget);
-        if (updateMonster(world, entity, dt) && target && ['dragon', 'elder_dragon', 'leviathan'].includes(entity.subtype ?? '')) {
+        if (updateMonster(world, entity, dt) && target && BREATH_MONSTERS.has(entity.subtype ?? '')) {
           epicBreath(world, entity, target);
         }
       }
       const summon = entity.data.summonedHerald as { owner: number; expiresAt: number; nextCharge: number } | undefined;
       if (summon) {
         if (entity.dead || world.time >= summon.expiresAt) { world.remove(entity.id); continue; }
-        const tower = nearest(world, entity, 30000, target => target.kind === 'tower' && target.team !== entity.team && isStructureAttackable(world, target));
+        const tower = heraldTower(world, entity);
         if (tower) {
           entity.moveTarget = tower.pos;
           if (dist2(entity.pos, tower.pos) <= 450 ** 2 && world.time >= summon.nextCharge) {
@@ -231,13 +250,13 @@ export const objectivesSystem: System = {
           if (!entity.dead && entity.hp / entity.stats.maxHp < 0.2) applyDamage(world, { source, target: entity, amount: entity.hp + entity.shield + 1, type: 'true', ability: 'elder_execute' });
         }
       }
-      for (const key of ['leviathanBuff', 'elderBuff'] as const) {
+      for (const key of EXPIRING_BUFFS) {
         const buff = entity.data[key] as { expiresAt: number } | undefined;
         if (buff && (entity.dead || world.time >= buff.expiresAt)) entity.data[key] = undefined;
       }
       if (entity.kind === 'minion' && entity.team !== 'neutral' && !entity.dead && !entity.data.grubling) {
         let empowered = false;
-        for (const champ of world.query('champion')) if (champ.team === entity.team && !champ.dead && champ.data.leviathanBuff && dist2(champ.pos, entity.pos) <= 1400 ** 2) { empowered = true; break; }
+        for (const champ of bearers) if (champ.team === entity.team && dist2(champ.pos, entity.pos) <= 1400 ** 2) { empowered = true; break; }
         if (empowered && world.time >= Number(entity.data.nextLeviathanRefresh ?? 0)) {
           entity.data.leviathanMinion = true; entity.data.nextLeviathanRefresh = world.time + 0.75;
           addBuff(world, entity, 'leviathan_minion', { duration: 1, params: { adPercent: 0.5, armor: 50, mr: 50, attackRange: 100 } });
@@ -246,7 +265,7 @@ export const objectivesSystem: System = {
         }
       }
     }
-    if (!world.systems.some(system => system.name === 'buffs')) updateBuffs(world, dt);
+    if (!buffSystems.get(world)) updateBuffs(world, dt);
     updateObjectiveEffects(world, state, dt);
   },
 };

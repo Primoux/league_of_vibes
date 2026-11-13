@@ -1,4 +1,4 @@
-import { dist2 } from '@lov/shared';
+import { dist2, type DragonElement } from '@lov/shared';
 import { removeBuff } from '../combat/buffs.ts';
 import { applyHeal, applyShield, timeSinceCombat } from '../combat/damage.ts';
 import type { Entity, World } from '../world.ts';
@@ -6,6 +6,9 @@ import { addBuff, applyDamage } from './runtime.ts';
 import type { ObjectiveState } from '../systems/objectives.ts';
 interface SoulRuntime { nextBurst: number; oceanUntil: number; nextShield: number }
 const runtime = (entity: Entity): SoulRuntime => (entity.data.objectiveSoul ??= { nextBurst: 0, oceanUntil: 0, nextShield: 0 }) as SoulRuntime;
+function dragonStacks(dragons: readonly DragonElement[], element: DragonElement): number {
+  let count = 0; for (const dragon of dragons) if (dragon === element) count++; return count;
+}
 /** Effets des âmes indépendants du recalcul des stats et de l'implémentation externe des buffs. */
 export function installObjectiveEffects(world: World, state: ObjectiveState): void {
   world.hooks.beforeDamage.push(ctx => {
@@ -15,7 +18,7 @@ export function installObjectiveEffects(world: World, state: ObjectiveState): vo
   });
   world.hooks.beforeHeal.push(ctx => {
     if (ctx.source?.team === 'neutral' || !ctx.source?.champ) return;
-    const stacks = state.teams[ctx.source.team].dragons.filter(type => type === 'chemtech').length;
+    const stacks = dragonStacks(state.teams[ctx.source.team].dragons, 'chemtech');
     ctx.amount *= 1 + stacks * 0.06;
   });
   world.events.on('abilityCast', event => {
@@ -48,9 +51,9 @@ export function updateObjectiveEffects(world: World, state: ObjectiveState, dt: 
   for (const champion of world.query('champion')) {
     if (champion.dead || champion.team === 'neutral') continue;
     const progress = state.teams[champion.team];
-    const oceans = progress.dragons.filter(element => element === 'ocean').length;
-    if (oceans) applyHeal(world, { source: champion, target: champion, amount: (champion.stats.maxHp - champion.hp) * 0.025 * oceans * dt / 5, silent: true });
-    const clouds = progress.dragons.filter(element => element === 'cloud').length;
+    const oceans = dragonStacks(progress.dragons, 'ocean');
+    if (oceans && champion.hp < champion.stats.maxHp) applyHeal(world, { source: champion, target: champion, amount: (champion.stats.maxHp - champion.hp) * 0.025 * oceans * dt / 5, silent: true });
+    const clouds = dragonStacks(progress.dragons, 'cloud');
     const outOfCombat = clouds > 0 && timeSinceCombat(world, champion) > 5;
     if (outOfCombat && champion.data.cloudOocStacks !== clouds) {
       champion.data.cloudOocStacks = clouds;

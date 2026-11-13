@@ -38,18 +38,29 @@ export function inRange(a: Entity, b: Entity, range: number): boolean { return d
 export function nearest(world: World, source: Entity, range: number, predicate: (e: Entity) => boolean): Entity | undefined {
   let best: Entity | undefined; let distance = range * range;
   for (const e of world.entities.values()) {
-    if (e.dead || e.id === source.id || !predicate(e)) continue;
+    if (e.dead || e.id === source.id) continue;
     const d = dist2(source.pos, e.pos);
+    if (d > distance || !predicate(e)) continue;
     if (d < distance || (d === distance && (!best || e.id < best.id))) { best = e; distance = d; }
   }
   return best;
 }
 /** En partie complète, le combat central gère windup, projectiles et hooks. Fallback isolé pour tests de domaine. */
-export function usesCoreCombat(world: World): boolean { return world.systems.some(system => system.name === 'combat'); }
+const coreCombat = new WeakMap<World, boolean>();
+export function usesCoreCombat(world: World): boolean {
+  let enabled = coreCombat.get(world);
+  if (enabled === undefined) {
+    enabled = false;
+    for (const system of world.systems) if (system.name === 'combat') { enabled = true; break; }
+    coreCombat.set(world, enabled);
+  }
+  return enabled;
+}
 export function attack(world: World, source: Entity, target: Entity, amount = source.stats.ad): boolean {
   source.attackTarget = target.id;
   if (usesCoreCombat(world)) return false;
-  if (!world.allow(world.hooks.canAttack, source) || !world.hooks.isTargetable.every(fn => fn(target, source, world))) return false;
+  if (!world.allow(world.hooks.canAttack, source)) return false;
+  for (const hook of world.hooks.isTargetable) if (!hook(target, source, world)) return false;
   if (!inRange(source, target, source.stats.attackRange)) { source.moveTarget = target.pos; return false; }
   source.moveTarget = undefined;
   if (world.time < Number(source.data.pveNextAttack ?? 0)) return false;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TIMERS, scaled } from '@lov/shared';
-import { World } from '../src/world.ts';
+import { World, createChampion } from '../src/world.ts';
 import { minionsSystem, spawnWave } from '../src/systems/minions.ts';
 import { structuresSystem } from '../src/systems/structures.ts';
 import { movementSystem } from '../src/systems/movement.ts';
@@ -30,6 +30,18 @@ describe('sbires', () => {
     }
     expect(met).toBe(true);
   });
+  it('réagit à une agression de champion même avec une larvelette alliée proche', async () => {
+    const { applyDamage, stats } = await import('../src/world-ai/runtime.ts');
+    const world = setup(); spawnWave(world, 1);
+    const defender = [...world.query('minion')].find(e => e.team === 'blue' && (e.data.minion as { lane: string }).lane === 'mid')!;
+    defender.pos = { x: 6000, y: 6000 };
+    const ally = createChampion(world, { playerId: 'ally', name: 'Allié', team: 'blue', championId: 'grondak', summoners: ['flash', 'smite'], pos: { x: 6100, y: 6100 } });
+    const aggressor = createChampion(world, { playerId: 'enemy', name: 'Ennemi', team: 'red', championId: 'grondak', summoners: ['flash', 'smite'], pos: { x: 6400, y: 6000 } });
+    world.spawn({ kind: 'minion', subtype: 'grubling', team: 'blue', pos: { x: 6050, y: 6000 }, radius: 30, hp: 250, mana: 0, stats: stats(250, 25), data: { grubling: {} } });
+    world.spawn({ kind: 'minion', subtype: 'melee', team: 'red', pos: { x: 6200, y: 6000 }, radius: 30, hp: 500, mana: 0, stats: stats(500, 10) });
+    applyDamage(world, { source: aggressor, target: ally, amount: 1, type: 'true' }); world.step();
+    expect(defender.attackTarget).toBe(aggressor.id);
+  });
   it('une tour défend une vague seule et une partie vide ne se termine pas', () => {
     const world = setup(true); spawnWave(world, 1);
     for (let i = 0; i < 10 * 180; i++) { world.step(0.1); world.events.drain(); }
@@ -56,9 +68,10 @@ describe('intégration PvE', () => {
   it('une partie sans joueurs reste défendable durant trente minutes simulées', async () => {
     const { createSystems } = await import('../src/systems/index.ts');
     const world = new World(createSystems()); world.init();
-    for (let i = 0; i < 9000; i++) { world.step(0.2); world.events.drain(); }
+    for (let i = 0; i < 3600; i++) { world.step(0.5); world.events.drain(); }
+    expect(world.time).toBe(1800);
     expect(world.winner).toBeNull(); expect([...world.query('nexus')].every(e => !e.dead)).toBe(true);
     expect(world.entities.size).toBeLessThan(1000);
-  // Scénario d'endurance, pas un benchmark : le budget par tick est testé dans perf.test.ts.
-  }, 60000);
+    // Le pas de 0,5 s accélère seulement ce scénario d'endurance ; perf.test.ts garde le tick réel.
+  }, 10000);
 });
