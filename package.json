@@ -1,0 +1,22 @@
+{
+  "name": "league-of-vibes",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/shared", "packages/server", "packages/client"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "npm run dev --workspace @lov/server & npm run dev --workspace @lov/client; wait",
+    "dev:server": "npm run dev --workspace @lov/server",
+    "dev:client": "npm run dev --workspace @lov/client",
+    "build": "npm run build --workspace @lov/client",
+    "start": "npm run start --workspace @lov/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0"
+  }
+}
