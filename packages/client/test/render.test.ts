@@ -99,3 +99,43 @@ describe('règles input', () => {
     expect(needsTarget('skillshot')).toBe(false);
   });
 });
+
+import { computeAim, newAimState } from '../src/render/Indicators.ts';
+import { visionRadius } from '../src/render/FogOfWar.ts';
+import { terrainHeight, RIVER_DEPTH } from '../src/render/map/geometry.ts';
+
+describe('visée des sorts', () => {
+  it('borne le point visé à la portée et lit les données du sort', () => {
+    const aim = newAimState();
+    computeAim(aim, { kind: 'ability', slot: 'Q' }, 'ilyra', undefined, { x: 0, y: 0 }, { x: 5000, y: 0 }, null, 0);
+    expect(aim.active).toBe(true);
+    expect(aim.targeting).toBe('skillshot');
+    expect(aim.fxKey).toBe('ilyra_q');
+    expect(aim.clamped.x).toBeCloseTo(aim.range);
+  });
+  it('sorts d\'invocateur et attaque-déplacement', () => {
+    const aim = newAimState();
+    computeAim(aim, { kind: 'summoner', slot: 'D' }, 'ilyra', { D: 'flash', F: 'ignite' }, { x: 100, y: 100 }, { x: 100, y: 200 }, null, 0);
+    expect(aim.range).toBe(400);
+    expect(aim.clamped).toEqual({ x: 100, y: 200 });
+    computeAim(aim, { kind: 'attackMove' }, 'ilyra', undefined, { x: 0, y: 0 }, { x: 1, y: 1 }, null, 615);
+    expect(aim.attackRange).toBe(615);
+    computeAim(aim, null, 'ilyra', undefined, { x: 0, y: 0 }, null, null, 615);
+    expect(aim.active).toBe(false);
+  });
+});
+
+describe('brouillard et terrain', () => {
+  it('rayons de vision PLAN §9', () => {
+    const e = (kind: EntitySnapshot['kind']): EntitySnapshot => ({ id: 1, kind, team: 'blue', x: 0, y: 0, facing: 0, hp: 1, maxHp: 1 });
+    expect(visionRadius(e('champion'))).toBe(1350);
+    expect(visionRadius(e('minion'))).toBe(1100);
+    expect(visionRadius(e('ward'))).toBe(900);
+    expect(visionRadius(e('projectile'))).toBe(0);
+  });
+  it('rivière creusée, voies plates', () => {
+    expect(terrainHeight(6000, 6000)).toBeLessThan(-RIVER_DEPTH * 0.9);
+    expect(Math.abs(terrainHeight(1100, 6000))).toBeLessThan(1);
+    expect(Math.abs(terrainHeight(4000, 4000))).toBeLessThan(1);
+  });
+});
