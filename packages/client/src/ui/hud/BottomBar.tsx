@@ -2,7 +2,7 @@ import { CHAMPIONS, RECALL_SECONDS, SUMMONERS, type AbilitySlot, type ChampionDe
 import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
 import { AbilityCard, ItemCard, SummonerCard, tip } from '../components.tsx';
-import { selfEntity, ui, useWorld } from '../game/world.ts';
+import { selfEntity, useWorld } from '../game/world.ts';
 import { AbilityIcon, ChampionPortrait, Glyph, ItemIcon, SummonerIcon } from '../icons/Icons.tsx';
 import { formatCooldown, formatInt } from '../logic/format.ts';
 import { canRankUp, cooldownFraction, hastedCooldown, rankValue } from '../logic/game.ts';
@@ -181,7 +181,7 @@ function Inventory({ items, gold, canShop }: { items: (string | null)[]; gold: n
           <ItemIcon itemId={trinket} size="100%" />
           <kbd>4</kbd>
         </div>
-        <button class={`lov-gold ${canShop ? 'shop' : ''}`} onClick={() => ui.set({ shopOpen: !ui.state.shopOpen })} title="Boutique (P)">
+        <button class={`lov-gold ${canShop ? 'shop' : ''}`} onClick={() => store.set({ shopOpen: !store.state.shopOpen })} title="Boutique (P)">
           <Glyph name="gold" size={16} />
           <b>{Math.floor(gold)}</b>
         </button>

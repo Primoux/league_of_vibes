@@ -7,7 +7,7 @@ import { BRUSHES, CAMPS, CHAMPIONS, FOUNTAINS, INHIBITORS, LANE_PATHS, MAP_SIZE,
 import { useEffect, useRef } from 'preact/hooks';
 import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
-import { entities, myTeam, selfEntity, uiBridge, worldTick } from '../game/world.ts';
+import { entities, focusCamera, myTeam, selfEntity, worldTick } from '../game/world.ts';
 import { formatClock, MONSTER_LABEL } from '../logic/format.ts';
 import { settings } from '../settings.ts';
 import { useSelect } from '../useStore.ts';
@@ -131,12 +131,14 @@ export function Minimap() {
     const staticLayer = drawStatic();
     let raf = 0;
     let lastVersion = -1;
+    let lastDraw = 0;
     const draw = () => {
       raf = requestAnimationFrame(draw);
       const now = performance.now();
-      const v = worldTick.state.version;
-      if (v === lastVersion && pings.current.length === 0) return;
-      lastVersion = v;
+      // la caméra bouge à chaque frame : on redessine au plus ~30 fois/s
+      if (now - lastDraw < 33) return;
+      lastDraw = now;
+      lastVersion = worldTick.state.version;
       g.drawImage(staticLayer, 0, 0);
       drawDynamic(g, now, pings.current);
     };
@@ -170,11 +172,11 @@ export function Minimap() {
       pings.current.push({ pos, t: performance.now(), kind: 'alert' });
       return;
     }
-    uiBridge.requestCamera(pos);
+    focusCamera(pos);
     (e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId);
   };
   const onMove = (e: PointerEvent) => {
-    if (e.buttons & 1 && !e.altKey) uiBridge.requestCamera(toGame(e));
+    if (e.buttons & 1 && !e.altKey) focusCamera(toGame(e));
   };
 
   const timerList = settings.state.showTimers && timers ? Object.entries(timers).filter(([, at]) => at > time).sort((a, b) => a[1] - b[1]).slice(0, 4) : [];
@@ -250,9 +252,10 @@ function drawDynamic(g: CanvasRenderingContext2D, now: number, pings: Ping[]): v
     g.fillRect(x - 2.5, y - 2.5, 5, 5);
   }
 
-  // cadre caméra
-  const view = uiBridge.cameraView ?? (me ? { x: me.x - 1300, y: me.y - 800, w: 2600, h: 1700 } : null);
-  if (view) {
+  // cadre caméra (centre lu en silence dans le store, taille approximative de la vue iso)
+  const c = store.state.cameraCenter;
+  const view = { x: c.x - 1250, y: c.y - 700, w: 2500, h: 1500 };
+  {
     const [x0, y0] = px({ x: view.x, y: view.y + view.h });
     g.strokeStyle = 'rgba(255,255,255,0.85)';
     g.lineWidth = 2;

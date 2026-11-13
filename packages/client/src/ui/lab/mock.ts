@@ -25,9 +25,9 @@ import {
   type Team,
   type Vec2,
 } from '@lov/shared';
+import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
 import { quoteItem } from '../logic/shop.ts';
-import { ui } from '../game/world.ts';
 
 const ME = 'p-me';
 const NAMES = ['Toi', 'Mistral', 'Codex', 'Claudette', 'Vibeur', 'Kéké', 'Zozo', 'Lulu'];
@@ -169,8 +169,9 @@ export function startGame(): void {
   me.shield = 120;
 
   const players: GameStart['players'] = PLAYERS.map((p) => ({ id: p.id, name: p.name, team: p.team, championId: p.champ, summoners: p.role === 'jungle' ? ['flash', 'smite'] : [...DEFAULT_SUMMONERS] }));
-  store.set({ playerId: ME, lobby: { ...mockLobby(8), phase: 'game' }, game: { you: ME, team: 'blue', entityId: 1, players, serverTime: Date.now() }, result: null });
-  ui.set({ loadingEndsAt: null });
+  store.set({ playerId: ME, lobby: { ...mockLobby(8), phase: 'game' }, result: null });
+  net.inject({ t: 'gameStart', start: { you: ME, team: 'blue', entityId: 1, players, serverTime: Date.now() } });
+  store.set({ loadingEndsAt: null });
   sim.timer = setInterval(step, 50);
   step();
 }
@@ -250,7 +251,8 @@ function step(): void {
     objectiveTimers: { dragon: 10 * 60, leviathan: 15 * 60, herald: 11 * 60 + 15 },
     score: sim.score,
   };
-  store.set({ snapshot: snap });
+  // passe par le vrai pipeline de claude-client (fusion des deltas, horloge, fxBus)
+  net.inject({ t: 'snapshot', snap });
 }
 
 // ------------------------------------------------------------------ scénarios d'événements

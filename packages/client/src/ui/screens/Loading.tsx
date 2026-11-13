@@ -1,10 +1,9 @@
 import { CHAMPIONS, LOADING_SECONDS, type SummonerId, type Team } from '@lov/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { useCountdown } from '../components.tsx';
-import { ui } from '../game/world.ts';
 import { ChampionPortrait, ClassEmblem, SummonerIcon } from '../icons/Icons.tsx';
 import { CLASS_LABEL } from '../logic/format.ts';
-import { useMini, useSelect } from '../useStore.ts';
+import { useSelect } from '../useStore.ts';
 
 const TIPS = [
   'Le Léviathan apparaît à 15:00 : son buff renforce le rappel et les sbires proches.',
@@ -27,7 +26,7 @@ interface Card {
 
 export function Loading() {
   const { draft, lobby, me } = useSelect((s) => ({ draft: s.draft, lobby: s.lobby, me: s.playerId }));
-  const endsAt = useMini(ui, (s) => s.loadingEndsAt);
+  const endsAt = useSelect((s) => s.loadingEndsAt);
   const remaining = useCountdown(endsAt);
   const [tip, setTip] = useState(() => Math.floor(Math.random() * TIPS.length));
   useEffect(() => {

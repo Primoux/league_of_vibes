@@ -6,7 +6,6 @@
  * `applySnapshot` par une lecture de ce cache.
  */
 import { CHAMPIONS, type EntityId, type EntitySnapshot, type GameEvent, type Snapshot, type Team, type Vec2 } from '@lov/shared';
-import { net } from '../../net/client.ts';
 import { store, type ClientState } from '../../state.ts';
 import { FeedTracker, trimFeed, type Announcement, type FeedEntry, type UnitRef } from '../logic/feed.ts';
 import { MiniStore, useMini } from '../useStore.ts';
@@ -21,44 +20,20 @@ export interface WorldTick {
 }
 export const worldTick = new MiniStore<WorldTick>({ version: 0, time: 0 });
 
-// ------------------------------------------------------------------ panneaux et état UI
-export type Panel = 'shop' | 'scoreboard' | 'stats' | 'settings' | null;
+// ------------------------------------------------------------------ état propre à l'UI
+// Les panneaux (shopOpen, scoreboardOpen, statsOpen, settingsOpen) et loadingEndsAt sont dans le store
+// de claude-client (pilotés par l'input) ; ici seulement le kill feed et les annonces.
 export interface UiState {
-  shopOpen: boolean;
-  scoreboard: boolean;
-  stats: boolean;
-  settings: boolean;
-  loadingEndsAt: number | null;
   feed: FeedEntry[];
   announce: Announcement | null;
 }
-export const ui = new MiniStore<UiState>({
-  shopOpen: false,
-  scoreboard: false,
-  stats: false,
-  settings: false,
-  loadingEndsAt: null,
-  feed: [],
-  announce: null,
-});
+export const ui = new MiniStore<UiState>({ feed: [], announce: null });
 
-/**
- * Pont UI -> moteur (claude-client) : la minimap demande un recentrage de caméra.
- * claude-client : `uiBridge.onCamera((pos) => camera.moveTo(pos))`, et renseigne `uiBridge.cameraView`
- * (rectangle visible en coordonnées jeu) pour que la minimap dessine le cadre exact.
- */
-type CamFn = (pos: Vec2) => void;
-const camSubs = new Set<CamFn>();
-export const uiBridge = {
-  cameraView: null as null | { x: number; y: number; w: number; h: number },
-  onCamera(fn: CamFn): () => void {
-    camSubs.add(fn);
-    return () => camSubs.delete(fn);
-  },
-  requestCamera(pos: Vec2): void {
-    camSubs.forEach((f) => f(pos));
-  },
-};
+/** Minimap -> caméra (claude-client lit `cameraFocus` et déverrouille la caméra). */
+export function focusCamera(pos: Vec2): void {
+  const seq = (store.state.cameraFocus?.seq ?? 0) + 1;
+  store.set({ cameraFocus: { pos, seq }, cameraLocked: false });
+}
 
 /** Dernier état connu de chaque champion par joueur (survit au brouillard de guerre, pour le tableau des scores). */
 export interface ChampMemo {
@@ -122,11 +97,16 @@ function reset(): void {
   ui.set({ feed: [], announce: null });
 }
 
-export function applySnapshot(snap: Snapshot, team: Team): void {
-  if (snap.removed) for (const id of snap.removed) entities.delete(id);
+/**
+ * `full` : `snap.entities` est la vue complète (cas normal : net/ de claude-client fusionne les deltas).
+ * Sinon (snapshot delta brut) : fusion + `removed`.
+ */
+export function applySnapshot(snap: Snapshot, team: Team, full = true): void {
+  if (full) entities.clear();
+  else if (snap.removed) for (const id of snap.removed) entities.delete(id);
   for (const e of snap.entities) {
-    const prev = entities.get(e.id);
-    const merged = prev ? Object.assign(prev, e) : { ...e };
+    const prev = full ? undefined : entities.get(e.id);
+    const merged = prev ? Object.assign(prev, e) : e;
     entities.set(e.id, merged);
     if (merged.kind === 'champion' && merged.champ && merged.team !== 'neutral') {
       const c = merged.champ;
@@ -192,10 +172,5 @@ export function installUiWorld(): void {
       lastSnap = s.snapshot;
       applySnapshot(s.snapshot, myTeam(s));
     }
-    if (!s.game && !s.result && (ui.state.shopOpen || ui.state.scoreboard)) ui.set({ shopOpen: false, scoreboard: false, stats: false });
-  });
-  net.on((msg) => {
-    if (msg.t === 'loading') ui.set({ loadingEndsAt: msg.endsAt });
-    if (msg.t === 'gameStart') ui.set({ loadingEndsAt: null });
   });
 }

@@ -6,14 +6,13 @@ import { LOADING_SECONDS } from '@lov/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
-import { ui } from '../game/world.ts';
 import { handleMsg, labEvent, mockDraft, mockLobby, startGame, stopGame } from './mock.ts';
 
 let patched = false;
 function patchNet(): void {
   if (patched) return;
   patched = true;
-  net.send = (m) => handleMsg(m);
+  net.setLoopback(handleMsg);
   net.connect = () => store.set({ connected: true });
 }
 
@@ -28,7 +27,7 @@ const SCREENS: [string, () => void][] = [
     () => {
       stopGame();
       store.set({ playerId: 'p-me', lobby: { ...mockLobby(8), phase: 'loading' }, draft: mockDraft(5), game: null, result: null });
-      ui.set({ loadingEndsAt: Date.now() + LOADING_SECONDS * 1000 });
+      store.set({ loadingEndsAt: Date.now() + LOADING_SECONDS * 1000 });
     },
   ],
   ['Partie', () => startGame()],
@@ -68,10 +67,10 @@ function autoStart(): void {
     labEvent(screen === 'end' ? 'end' : 'endLose');
   }
   const panel = q.get('panel');
-  if (panel === 'shop') ui.set({ shopOpen: true });
-  if (panel === 'scores') ui.set({ scoreboard: true });
-  if (panel === 'stats') ui.set({ stats: true });
-  if (panel === 'settings') ui.set({ settings: true });
+  if (panel === 'shop') store.set({ shopOpen: true });
+  if (panel === 'scores') store.set({ scoreboardOpen: true });
+  if (panel === 'stats') store.set({ statsOpen: true });
+  if (panel === 'settings') store.set({ settingsOpen: true });
   if (q.has('hidelab')) document.body.classList.add('lov-lab-hidden');
   if (q.has('still')) document.documentElement.classList.add('lov-still');
 }

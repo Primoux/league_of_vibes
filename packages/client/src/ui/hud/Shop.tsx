@@ -3,9 +3,9 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
 import { hideTip, ItemCard, itemTip, tip } from '../components.tsx';
-import { selfEntity, ui, useWorld } from '../game/world.ts';
+import { selfEntity, useWorld } from '../game/world.ts';
 import { Glyph, ItemIcon } from '../icons/Icons.tsx';
-import { useMini } from '../useStore.ts';
+import { useSelect } from '../useStore.ts';
 import { buildsInto, canBuy, CATEGORY_LABEL, CATEGORY_ORDER, filterItems, quoteItem, type ShopVerdict } from '../logic/shop.ts';
 
 type Tab = ItemCategory | 'all' | 'reco';
@@ -38,7 +38,7 @@ const VERDICT_TEXT: Record<ShopVerdict, string> = {
 };
 
 export function Shop() {
-  const open = useMini(ui, (s) => s.shopOpen);
+  const open = useSelect((s) => s.shopOpen);
   if (!open) return null;
   return <ShopPanel />;
 }
@@ -75,7 +75,7 @@ function ShopPanel() {
       setSellSlot(null);
     }
   };
-  const close = () => ui.set({ shopOpen: false });
+  const close = () => store.set({ shopOpen: false });
 
   return (
     <div class="lov-modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>

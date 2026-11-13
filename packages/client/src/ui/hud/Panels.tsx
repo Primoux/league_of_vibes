@@ -1,19 +1,19 @@
 import { CHAMPIONS, ITEMS, type Stats, type Team } from '@lov/shared';
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
-import { store } from '../../state.ts';
+import { store, type Quality } from '../../state.ts';
 import { itemTip, tip } from '../components.tsx';
-import { champMemo, ui, useWorld } from '../game/world.ts';
+import { champMemo, useWorld } from '../game/world.ts';
 import { ChampionPortrait, Glyph, ItemIcon, RoleIcon, SummonerIcon } from '../icons/Icons.tsx';
 import { formatGoldShort, formatStat, STAT_LABEL } from '../logic/format.ts';
 import { sortScoreRows, type ScoreRow } from '../logic/game.ts';
 import { inventoryValue } from '../logic/shop.ts';
-import { DEFAULT_SETTINGS, settings, type AudioChannel, type Graphics } from '../settings.ts';
-import { useMini } from '../useStore.ts';
+import { DEFAULT_SETTINGS, settings, type AudioChannel } from '../settings.ts';
+import { useMini, useSelect } from '../useStore.ts';
 
 // ------------------------------------------------------------------ tableau des scores (Tab)
 export function Scoreboard() {
-  const open = useMini(ui, (s) => s.scoreboard);
+  const open = useSelect((s) => s.scoreboardOpen);
   if (!open) return null;
   return <ScoreboardPanel />;
 }
@@ -111,7 +111,7 @@ const STAT_ORDER: (keyof Stats)[] = ['ad', 'ap', 'armor', 'mr', 'attackSpeed', '
 const STAT_ICON: Partial<Record<keyof Stats, string>> = { ad: 'sword', ap: 'bolt', armor: 'tower', mr: 'inhibitor', attackSpeed: 'bolt', moveSpeed: 'check' };
 
 export function StatsPanel() {
-  const open = useMini(ui, (s) => s.stats);
+  const open = useSelect((s) => s.statsOpen);
   const stats = useWorld(() => store.state.snapshot?.self?.stats ?? null, (a, b) => a === b);
   if (!open || !stats) return null;
   return (
@@ -155,13 +155,14 @@ const KEYS: [string, string][] = [
 type SetTab = 'audio' | 'game' | 'video' | 'keys';
 
 export function SettingsPanel() {
-  const open = useMini(ui, (s) => s.settings);
+  const open = useSelect((s) => s.settingsOpen);
   if (!open) return null;
-  return <SettingsModal onClose={() => ui.set({ settings: false })} />;
+  return <SettingsModal onClose={() => store.set({ settingsOpen: false })} />;
 }
 
 export function SettingsModal({ onClose }: { onClose: () => void }) {
   const s = useMini(settings, (x) => x, (a, b) => a === b);
+  const game = useSelect((st) => st.settings, (a, b) => a === b);
   const [tab, setTab] = useState<SetTab>('audio');
   const row = (label: string, ctrl: ComponentChildren) => (
     <label class="lov-set-row">
@@ -206,16 +207,15 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             )}
           {tab === 'game' && (
             <>
-              <p class="lov-muted">Lancement rapide : le sort part immédiatement vers le curseur, sans confirmation.</p>
-              <div class="lov-qc">
-                {(['Q', 'W', 'E', 'R', 'D', 'F'] as const).map((k) => (
-                  <button key={k} class={`lov-chip ${s.quickCast[k] ? 'on' : ''}`} onClick={() => settings.set({ quickCast: { ...s.quickCast, [k]: !s.quickCast[k] } })}>
-                    {k}
-                  </button>
-                ))}
-              </div>
-              {row('Défilement aux bords de l’écran', toggle(s.edgePan, (v) => settings.set({ edgePan: v })))}
-              {row('Caméra verrouillée par défaut', toggle(s.cameraLock, (v) => settings.set({ cameraLock: v })))}
+              {row('Lancement rapide des sorts (sans confirmation)', toggle(game.quickCast, (v) => store.setSettings({ quickCast: v })))}
+              {row('Défilement aux bords de l’écran', toggle(game.edgePan, (v) => store.setSettings({ edgePan: v })))}
+              {row(
+                'Vitesse de la caméra',
+                <span class="lov-range">
+                  <input type="range" min={1500} max={5000} step={250} value={game.cameraSpeed} onInput={(e) => store.setSettings({ cameraSpeed: Number(e.currentTarget.value) })} />
+                  <b>{Math.round(game.cameraSpeed / 100)}</b>
+                </span>,
+              )}
               {row('Timers d’objectifs sur la minimap', toggle(s.showTimers, (v) => settings.set({ showTimers: v })))}
               {row(
                 'Taille de l’interface',
@@ -231,9 +231,9 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             row(
               'Qualité graphique',
               <span class="lov-seg">
-                {(['low', 'medium', 'high'] as Graphics[]).map((g) => (
-                  <button key={g} class={s.graphics === g ? 'on' : ''} onClick={() => settings.set({ graphics: g })}>
-                    {g === 'low' ? 'Basse' : g === 'medium' ? 'Moyenne' : 'Haute'}
+                {(['low', 'high'] as Quality[]).map((g) => (
+                  <button key={g} class={game.quality === g ? 'on' : ''} onClick={() => store.setSettings({ quality: g })}>
+                    {g === 'low' ? 'Basse' : 'Haute'}
                   </button>
                 ))}
               </span>,
@@ -254,7 +254,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
         <footer>
-          <button class="lov-btn ghost small" onClick={() => settings.set(DEFAULT_SETTINGS)}>
+          <button class="lov-btn ghost small" onClick={() => (settings.set(DEFAULT_SETTINGS), store.setSettings({ quickCast: false, quality: 'high', edgePan: true, cameraSpeed: 3000 }))}>
             Réinitialiser
           </button>
           <button class="lov-btn primary" onClick={onClose}>

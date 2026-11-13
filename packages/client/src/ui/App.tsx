@@ -4,7 +4,7 @@
  */
 import { lazy, Suspense } from 'preact/compat';
 import { TooltipLayer } from './components.tsx';
-import { installUiWorld, ui } from './game/world.ts';
+import { installUiWorld } from './game/world.ts';
 import { Hud } from './hud/Hud.tsx';
 import { Draft } from './screens/Draft.tsx';
 import { EndScreen } from './screens/EndScreen.tsx';
@@ -12,7 +12,7 @@ import { Home } from './screens/Home.tsx';
 import { Loading } from './screens/Loading.tsx';
 import { Lobby } from './screens/Lobby.tsx';
 import { installSettings } from './settings.ts';
-import { useMini, useSelect } from './useStore.ts';
+import { useSelect } from './useStore.ts';
 import './hud.css';
 import './screens.css';
 
@@ -45,8 +45,9 @@ function Router() {
     phase: st.lobby?.phase,
     lobby: !!st.lobby,
     draft: !!st.draft,
+    loadingEndsAt: st.loadingEndsAt,
   }));
-  const loadingEndsAt = useMini(ui, (u) => u.loadingEndsAt);
+  const loadingEndsAt = s.loadingEndsAt;
   if (s.result) return <EndScreen />;
   if (s.game) return <Hud />;
   if (s.phase === 'loading' || s.phase === 'game' || (loadingEndsAt && s.draft)) return <Loading />;

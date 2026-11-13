@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { AbilityIcon, ItemIcon, SummonerIcon } from './icons/Icons.tsx';
 import { formatRanks, formatStat, STAT_LABEL } from './logic/format.ts';
 import { hastedCooldown, rankValue } from './logic/game.ts';
+import { clock } from '../net/client.ts';
 import { MiniStore, useMini } from './useStore.ts';
 
 // ------------------------------------------------------------------ infobulle globale (un seul nœud DOM)
@@ -52,12 +53,12 @@ export function TooltipLayer() {
 }
 
 // ------------------------------------------------------------------ compte à rebours / anneau
-/** Secondes restantes avant `endsAt` (ms epoch), rafraîchi 10×/s. */
+/** Secondes restantes avant `endsAt` (timestamp serveur, ms), via l'horloge synchronisée de net/. Rafraîchi 10×/s. */
 export function useCountdown(endsAt: number | null | undefined): number {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => clock.serverNow(Date.now()));
   useEffect(() => {
     if (!endsAt) return;
-    const id = setInterval(() => setNow(Date.now()), 100);
+    const id = setInterval(() => setNow(clock.serverNow(Date.now())), 100);
     return () => clearInterval(id);
   }, [endsAt]);
   return endsAt ? Math.max(0, (endsAt - now) / 1000) : 0;
