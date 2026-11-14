@@ -38,8 +38,22 @@
 - **`?autoplay`** (dev) : connexion + salle dev + prêt + lancement automatiques. Avec `SKIP_DRAFT=1` côté serveur : partie solo sans clic. Validé de bout en bout avec le vrai serveur.
 - `?stats` : overlay fps / draw calls / triangles (`?stats=log` : aussi dans la console).
 
+### Demandes des autres agents
+- **mistral-economy** : `audio.setListener(() => store.state.cameraCenter)` câblé dans `main.ts` (objet mis à jour en place chaque frame, aucune allocation).
+- **claude-fx** : `renderer.shake(intensité, durée)` / `shakeCamera(intensité, durée)` (export de `render/GameRenderer.ts`) — intensité = déplacement max en unités de jeu (≈ 15 léger, 40 fort, borné à 80), décroissance quadratique, un tremblement plus faible ne remplace pas un plus fort en cours.
+- **mistral-ui** : `store.state.cameraView` (silencieux, chaque frame) = emprise réelle de la vue au sol en unités de jeu : `quad` (trapèze bas-gauche, bas-droite, haut-droite, haut-gauche) + `minX/minY/maxX/maxY/w/h`. Le cadre de la minimap peut remplacer son approximation (`Minimap.tsx`, ton fichier).
+
+- **mistral-ui** : touches 1 2 3 5 6 7 → `useItem` (slots 0 à 5, `targetPos` = curseur), 4 → balise, par position physique (`e.code`).
+
+### Diagnostic réseau (`packages/client/tools/netcheck.ts`)
+- Fait tourner le vrai pipeline client (SnapshotBuffer, ServerClock, MovePredictor) à 60 Hz contre le vrai serveur, avec N joueurs et latence/gigue simulées. Mesure marge du tampon, extrapolation, saccades, erreur et recalages de prédiction, cadence/débit des snapshots.
+  `SKIP_DRAFT=1 npm run dev:server` puis `npx tsx packages/client/tools/netcheck.ts --players 8 --seconds 40 --lag 60 --jitter 30`.
+- **Bug trouvé et corrigé** : l'horloge ajoutait RTT/2 à l'offset, le rendu visait le temps serveur réel et rognait le délai d'interpolation → 44,5 % de frames extrapolées (marge p50 4 ms). Après : **0,1 %**, marge p50 62 ms, 0 saccade, erreur de prédiction p95 34 u (8 joueurs, 60 ms ± 15).
+- Débit mesuré : ~38 Ko/s par client (JSON décompressé) — au-dessus de la cible PLAN de 30 Ko/s (domaine claude-server ; la compression permessage-deflate le réduit déjà sur le fil).
+- `fix(server)` séparé : `useItem` manquait dans `server/src/net/validate.ts` (retour de revue PR #15), ajout additif + test `server/test/validate-useitem.test.ts`.
+
 ## En cours
-- Rien de bloquant. Pistes : LOD des modèles si besoin (non nécessaire après le batching), mesures fps sur machine réelle.
+- Mesures netcheck sur parties longues (sbires, combats) et plus de latence. Pistes : LOD des modèles si besoin (non nécessaire après le batching), mesures fps sur machine réelle.
 
 ### Intégrations
 - `GameRenderer.setRenderPipeline(fn)` pour PostFx (claude-fx) ; indicateurs de claude-fx branchés via `registerIndicatorRenderer(fxIndicatorRenderer(fxIndicators))` dans `main.ts`.
@@ -61,6 +75,7 @@
 - `renderer.aim` (`AimState`, mis à jour chaque frame) et **`registerIndicatorRenderer({ update(aim, dt) })`** pour claude-fx : remplace les indicateurs par défaut. `AimState` = { active, kind, slot, targeting, abilityId, fxKey, origin, cursor, clamped (borné à la portée), range, radius, width, hover, attackRange }.
 - `renderer.fog.canvas` (visibilité, blanc = visible, 192², y du jeu vers le haut) ; `applyFog(material)` pour brouiller un matériau de décor.
 - `terrainHeight(x, y)` (`render/map/geometry.ts`) : hauteur du sol en unités de jeu (poser un FX au sol : `y = terrainHeight * RENDER_SCALE`).
+- `renderer.shake(intensity, duration)` / `shakeCamera(...)` ; `store.state.cameraView` (emprise de la vue au sol).
 - `registerChampionFactory((snap) => ChampionView | null)` (`render/EntityView.ts`, réexporté) ; `ChampionView = { object3d, update(snap, dt), playAnim(name), dispose() }`. Le renderer place `object3d` au sol (y = 0) et règle `rotation.y = facing` (le modèle regarde +x local). Sans fabrique : capsule colorée.
 ### `net` (`net/client.ts`)
 - `fxBus` reçoit les `GameEvent` **synchronisés avec le rendu interpolé** (~100 ms après réception). L'UI peut lire `store.snapshot.events` immédiatement.

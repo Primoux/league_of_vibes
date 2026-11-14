@@ -58,6 +58,11 @@ export interface ClientState {
   cameraLocked: boolean;
   /** Centre de la caméra (coordonnées jeu), mis à jour chaque frame en silence (cadre de la minimap). */
   cameraCenter: Vec2;
+  /**
+   * Emprise de la vue caméra au sol (unités de jeu, silencieux, mis à jour chaque frame) : trapèze `quad`
+   * (bas-gauche, bas-droite, haut-droite, haut-gauche à l'écran) et sa boîte englobante. Pour le cadre de la minimap.
+   */
+  cameraView: { quad: [Vec2, Vec2, Vec2, Vec2]; minX: number; minY: number; maxX: number; maxY: number; w: number; h: number };
   /** Demande de déplacement caméra (clic minimap…) : incrémenter `seq` pour une nouvelle demande. */
   cameraFocus: { pos: Vec2; seq: number } | null;
 
@@ -94,6 +99,7 @@ class Store {
     targeting: null,
     cameraLocked: true,
     cameraCenter: { x: 1500, y: 1500 },
+    cameraView: { quad: [{ x: 250, y: 900 }, { x: 2750, y: 900 }, { x: 2900, y: 2300 }, { x: 100, y: 2300 }], minX: 100, minY: 900, maxX: 2900, maxY: 2300, w: 2800, h: 1400 },
     cameraFocus: null,
     shopOpen: false,
     scoreboardOpen: false,

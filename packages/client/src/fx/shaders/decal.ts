@@ -40,7 +40,7 @@ void main() {
     d = min((1.0 - abs(vP.x)) * uSize.x, (1.0 - abs(vP.y)) * uSize.y);
     along = vP.x * 0.5 + 0.5;
   } else {
-    float a = abs(atan(vP.y, vP.x));
+    float a = r > 1e-5 ? abs(atan(vP.y, vP.x)) : 0.0; // atan(0, 0) est indéfini sur certains GPU
     d = min((1.0 - r) * uSize.x, (uAngle - a) * r * uSize.x);
     along = r;
   }

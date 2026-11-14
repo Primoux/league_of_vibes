@@ -27,6 +27,13 @@ export class CameraController {
   private keys = { left: false, right: false, up: false, down: false };
   centerHeld = false;
   private lookAt = new THREE.Vector3();
+  /** Tremblement : amplitude (unités de jeu) et temps restant / durée totale (s). */
+  private shakeAmp = 0;
+  private shakeLeft = 0;
+  private shakeDur = 0;
+  private shakeT = 0;
+  /** Décalage de tremblement courant (unités de jeu), pour les tests. */
+  readonly shakeOffset = { x: 0, y: 0 };
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(38, aspect, 0.5, 200);
@@ -44,6 +51,19 @@ export class CameraController {
   }
   setKey(k: keyof CameraController['keys'], down: boolean): void {
     this.keys[k] = down;
+  }
+
+  /**
+   * Fait trembler la caméra : `intensity` = amplitude en unités de jeu (≈ 15 léger, 40 fort, max 80),
+   * `duration` en secondes. Un nouveau tremblement plus fort remplace le courant, un plus faible est ignoré
+   * s'il reste plus d'énergie en cours. Décroissance quadratique. N'affecte pas `center`.
+   */
+  shake(intensity: number, duration: number): void {
+    const amp = clamp(intensity, 0, 80);
+    const current = this.shakeDur > 0 ? this.shakeAmp * (this.shakeLeft / this.shakeDur) ** 2 : 0;
+    if (amp < current || duration <= 0) return;
+    this.shakeAmp = amp;
+    this.shakeLeft = this.shakeDur = duration;
   }
 
   zoomBy(deltaY: number): void {
@@ -92,6 +112,18 @@ export class CameraController {
     this.center.y = clamp(this.center.y, -BOUNDS_MARGIN, MAP_SIZE + BOUNDS_MARGIN);
 
     this.distance += (this.targetDistance - this.distance) * Math.min(1, dt * 10);
+    this.shakeT += dt;
+    if (this.shakeLeft > 0) {
+      this.shakeLeft = Math.max(0, this.shakeLeft - dt);
+      // / √2 : la norme du décalage (x, y) reste ≤ amplitude
+      const k = this.shakeAmp * (this.shakeLeft / this.shakeDur) ** 2 * Math.SQRT1_2;
+      // bruit pseudo-aléatoire lisse (somme de sinus incommensurables)
+      this.shakeOffset.x = k * (Math.sin(this.shakeT * 47.3) * 0.6 + Math.sin(this.shakeT * 83.1) * 0.4);
+      this.shakeOffset.y = k * (Math.sin(this.shakeT * 53.7 + 1.3) * 0.6 + Math.sin(this.shakeT * 91.9 + 0.7) * 0.4);
+    } else {
+      this.shakeOffset.x = 0;
+      this.shakeOffset.y = 0;
+    }
     this.apply();
     return manual;
   }
@@ -99,8 +131,8 @@ export class CameraController {
   /** Place la caméra : au sud du centre (z+), élevée selon le pitch. */
   apply(): void {
     const d = this.distance * S;
-    const cx = this.center.x * S;
-    const cz = -this.center.y * S;
+    const cx = (this.center.x + this.shakeOffset.x) * S;
+    const cz = -(this.center.y + this.shakeOffset.y) * S;
     this.camera.position.set(cx, Math.sin(CAMERA_PITCH) * d, cz + Math.cos(CAMERA_PITCH) * d);
     this.lookAt.set(cx, 0, cz);
     this.camera.lookAt(this.lookAt);

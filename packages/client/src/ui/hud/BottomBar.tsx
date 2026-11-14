@@ -2,9 +2,10 @@ import { CHAMPIONS, RECALL_SECONDS, SUMMONERS, type AbilitySlot, type ChampionDe
 import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
 import { AbilityCard, ItemCard, SummonerCard, tip } from '../components.tsx';
-import { selfEntity, useWorld } from '../game/world.ts';
+import { juice, selfEntity, useWorld } from '../game/world.ts';
+import { useMini } from '../useStore.ts';
 import { AbilityIcon, ChampionPortrait, Glyph, ItemIcon, SummonerIcon } from '../icons/Icons.tsx';
-import { formatCooldown, formatInt } from '../logic/format.ts';
+import { buffInitials, buffName, formatCooldown, formatInt, isDebuff } from '../logic/format.ts';
 import { canRankUp, cooldownFraction, hastedCooldown, rankValue } from '../logic/game.ts';
 import { ITEMS } from '@lov/shared';
 
@@ -53,9 +54,21 @@ export function BottomBar() {
           </div>
           <Bars ent={ent} champ={champ} self={self} />
         </div>
-        <Inventory items={items} gold={self.gold} canShop={self.canShop} />
+        <Inventory items={items} gold={self.gold} canShop={self.canShop} ward={self.wardCharges} charges={self.itemCharges} cooldowns={self.itemCooldowns} />
       </div>
     </div>
+  );
+}
+
+function LevelBurst() {
+  const j = useMini(juice, (s) => ({ seq: s.levelSeq, level: s.level }));
+  if (!j.seq) return null;
+  return (
+    <span class="lov-lvlup" key={j.seq} aria-hidden="true">
+      <i class="ring" />
+      <i class="ring r2" />
+      <b>Niveau {j.level}</b>
+    </span>
   );
 }
 
@@ -71,6 +84,7 @@ function Portrait({ self, ent, champ }: BarData) {
         <circle cx="50" cy="50" r={r} class="bar" stroke-dasharray={c} stroke-dashoffset={c * (1 - xpFrac)} transform="rotate(90 50 50)" />
       </svg>
       <span class="lvl">{self.level}</span>
+      <LevelBurst />
       {self.skillPoints > 0 && <span class="pts">+{self.skillPoints}</span>}
     </div>
   );
@@ -136,9 +150,11 @@ function Bars({ ent, champ, self }: BarData) {
   return (
     <div class="lov-bars">
       <div class="lov-bar hp">
+        <i class="trail" style={{ width: `${hpPct}%` }} />
         <i class="fill" style={{ width: `${hpPct}%` }} />
         {shield > 0 && <i class="shield" style={{ left: `${hpPct}%`, width: `${shPct}%` }} />}
         <i class="ticks" style={{ '--seg': `${(100 * 100) / denom}%` } as Record<string, string>} />
+        <i class="gloss" />
         <span>
           {formatInt(ent.hp)} / {formatInt(maxHp)}
           {shield > 0 && <em> (+{formatInt(shield)})</em>}
@@ -148,6 +164,7 @@ function Bars({ ent, champ, self }: BarData) {
       {resClass !== 'none' && (
         <div class={`lov-bar ${resClass}`}>
           <i class="fill" style={{ width: `${maxMana > 0 ? ((ent.mana ?? 0) / maxMana) * 100 : 0}%` }} />
+          <i class="gloss" />
           <span>
             {formatInt(ent.mana ?? 0)} / {formatInt(maxMana)}
           </span>
@@ -160,37 +177,76 @@ function Bars({ ent, champ, self }: BarData) {
 
 const ITEM_KEYS = ['1', '2', '3', '5', '6', '7'];
 
-function Inventory({ items, gold, canShop }: { items: (string | null)[]; gold: number; canShop: boolean }) {
+/** Clic sur un objet actif : `useItem` (vers la dernière position du curseur au sol si besoin). */
+function useItemAt(slot: number): void {
+  const pos = store.state.cursorGame;
+  net.send({ t: 'useItem', slot, targetPos: pos ? { x: pos.x, y: pos.y } : undefined });
+}
+
+function GoldFloats() {
+  const golds = useMini(juice, (s) => s.golds);
+  return (
+    <span class="lov-gold-floats" aria-hidden="true">
+      {golds.map((g) => (
+        <b key={g.key}>+{g.amount}</b>
+      ))}
+    </span>
+  );
+}
+
+function Inventory({ items, gold, canShop, ward, charges, cooldowns }: { items: (string | null)[]; gold: number; canShop: boolean; ward?: SelfState['wardCharges']; charges?: (number | null)[]; cooldowns?: (number | null)[] }) {
+  const bought = useMini(juice, (s) => ({ seq: s.boughtSeq, item: s.boughtItem }));
+  const newSlot = bought.item ? items.indexOf(bought.item) : -1;
   const trinket = items[6] ?? items.find((i) => i && ITEMS[i]?.category === 'trinket') ?? null;
+  const trinketDef = trinket ? ITEMS[trinket] : undefined;
+  const wardCd = ward && ward.charges === 0 ? ward.cooldownRemaining : 0;
   return (
     <div class="lov-inventory">
       <div class="grid">
         {Array.from({ length: 6 }, (_, i) => {
           const id = items[i] ?? null;
           const def = id ? ITEMS[id] : undefined;
+          const active = !!def?.active;
+          const ch = charges?.[i] ?? null;
+          const cd = cooldowns?.[i] ?? 0;
+          const cdTotal = def?.active?.cooldown ?? 0;
           return (
-            <div class={`slot ${id ? 'full' : ''}`} key={i} {...(def ? tip(() => <ItemCard item={def} />) : {})}>
+            <div
+              class={`slot ${id ? 'full' : ''} ${active ? 'active' : ''}`}
+              key={i}
+              onClick={active ? () => useItemAt(i) : undefined}
+              {...(def ? tip(() => <ItemCard item={def} />) : {})}
+            >
               <ItemIcon itemId={id} size="100%" />
+              {cd > 0 && <div class="cd-sweep" style={{ '--f': cooldownFraction(cd, Math.max(cdTotal, cd)) } as Record<string, number>} />}
+              {cd > 0 && <span class="cd-num">{formatCooldown(cd)}</span>}
+              {ch !== null && ch > 1 && <b class="charges">{ch}</b>}
+              {i === newSlot && <i class="lov-newitem" key={bought.seq} />}
               <kbd>{ITEM_KEYS[i]}</kbd>
             </div>
           );
         })}
       </div>
       <div class="side">
-        <div class="slot trinket" {...(trinket && ITEMS[trinket] ? tip(() => <ItemCard item={ITEMS[trinket]!} />) : {})}>
+        <div
+          class={`slot trinket ${trinketDef ? 'active' : ''}`}
+          onClick={trinketDef ? () => (trinketDef.active && trinketDef.id !== 'stealth_ward' ? useItemAt(-1) : store.set({ targeting: { kind: 'ward' } })) : undefined}
+          {...(trinketDef ? tip(() => <ItemCard item={trinketDef} />) : {})}
+        >
           <ItemIcon itemId={trinket} size="100%" />
+          {wardCd > 0 && <span class="cd-num">{formatCooldown(wardCd)}</span>}
+          {ward && <b class="charges">{ward.charges}</b>}
           <kbd>4</kbd>
         </div>
         <button class={`lov-gold ${canShop ? 'shop' : ''}`} onClick={() => store.set({ shopOpen: !store.state.shopOpen })} title="Boutique (P)">
           <Glyph name="gold" size={16} />
           <b>{Math.floor(gold)}</b>
+          <GoldFloats />
         </button>
       </div>
     </div>
   );
 }
-
-const CC_WORDS = /stun|root|slow|silence|knock|taunt|suppress|fear|blind|ground|bleed|burn|ignite|mark|frost|givre|poison|exhaust|grievous|anti/i;
 
 function BuffBar({ ent }: { ent: EntitySnapshot }) {
   const buffs = ent.buffs ?? [];
@@ -198,7 +254,7 @@ function BuffBar({ ent }: { ent: EntitySnapshot }) {
   return (
     <div class="lov-buffs">
       {buffs.slice(0, 12).map((b) => (
-        <div key={b.id} class={`lov-buff ${CC_WORDS.test(b.id) ? 'debuff' : 'buff'}`} {...tip(() => <span>{prettyBuff(b.id)} — {b.remaining.toFixed(1).replace('.', ',')} s</span>)}>
+        <div key={b.id} class={`lov-buff ${isDebuff(b.id) ? 'debuff' : 'buff'}`} {...tip(() => <span>{buffName(b.id)} — {b.remaining.toFixed(1).replace('.', ',')} s</span>)}>
           <span>{buffInitials(b.id)}</span>
           {b.stacks && b.stacks > 1 && <b>{b.stacks}</b>}
           <i style={{ '--t': `${Math.min(99, b.remaining)}` } as Record<string, string>}>{Math.ceil(b.remaining)}</i>
@@ -206,28 +262,6 @@ function BuffBar({ ent }: { ent: EntitySnapshot }) {
       ))}
     </div>
   );
-}
-
-const BUFF_NAMES: Record<string, string> = {
-  blue_buff: 'Sentinelle bleue',
-  red_buff: 'Brute rouge',
-  leviathan: 'Bénédiction du Léviathan',
-  leviathan_buff: 'Bénédiction du Léviathan',
-  elder: 'Drake Ancien',
-  elder_buff: 'Drake Ancien',
-  recall: 'Rappel',
-};
-
-function prettyBuff(id: string): string {
-  const known = BUFF_NAMES[id];
-  if (known) return known;
-  const s = id.replace(/_/g, ' ');
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function buffInitials(id: string): string {
-  const words = prettyBuff(id).split(/\s+/).filter((w) => w.length > 2 || /^[A-Z]/.test(w));
-  return (words.length > 1 ? words.slice(0, 2).map((w) => w[0]) : [prettyBuff(id).slice(0, 2)]).join('').toUpperCase();
 }
 
 function RecallBar({ remaining }: { remaining: number }) {

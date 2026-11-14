@@ -163,6 +163,7 @@ export function startGame(): void {
       summoners: { D: 'flash', F: 'ignite' },
       stats: { ...CHAMPIONS.ilyra!.baseStats, ap: 58, abilityHaste: 10, maxHp: me.maxHp, maxMana: me.maxMana ?? 0 },
       canShop: true,
+      wardCharges: { charges: 1, cooldownRemaining: 0 },
     },
   };
   me.buffs = [{ id: 'blue_buff', remaining: 74 }, { id: 'ilyra_frost', remaining: 3.2, stacks: 2 }];
@@ -234,6 +235,10 @@ function step(): void {
   const cd = { ...sim.self.cooldowns };
   (Object.keys(cd) as (keyof typeof cd)[]).forEach((k) => (cd[k] = Math.max(0, cd[k] - dt)));
   const self: SelfState = { ...sim.self, cooldowns: cd, gold: sim.self.gold + (sim.tick % 10 === 0 ? 2 : 0), xp: Math.min(sim.self.xpToNext, sim.self.xp + 0.4) };
+  if (self.wardCharges && self.wardCharges.cooldownRemaining > 0) {
+    const r = Math.max(0, self.wardCharges.cooldownRemaining - dt);
+    self.wardCharges = { charges: r === 0 ? self.wardCharges.charges + 1 : self.wardCharges.charges, cooldownRemaining: r };
+  }
   if (self.recalling !== undefined) {
     self.recalling = Math.max(0, self.recalling - dt);
     if (self.recalling <= 0) self.recalling = undefined;
@@ -248,11 +253,16 @@ function step(): void {
     removed,
     events: sim.events.splice(0),
     self,
-    objectiveTimers: { dragon: 10 * 60, leviathan: 15 * 60, herald: 11 * 60 + 15 },
+    objectiveTimers: { dragon: 7 * 60 + 40, leviathan: 15 * 60, herald: 11 * 60 + 15, blue_krugs: 7 * 60 + 50, red_raptors: 8 * 60 + 30, scuttle_top: 9 * 60 },
     score: sim.score,
   };
   // passe par le vrai pipeline de claude-client (fusion des deltas, horloge, fxBus)
   net.inject({ t: 'snapshot', snap });
+}
+
+/** Avance la simulation d'un pas immédiatement (démos, captures). */
+export function labTick(): void {
+  step();
 }
 
 // ------------------------------------------------------------------ scénarios d'événements
@@ -274,6 +284,19 @@ export function labEvent(kind: string): void {
   switch (kind) {
     case 'killEnemy':
       kill(10 + Math.floor(Math.random() * 4), 1, [2]);
+      sim.events.push({ type: 'goldGain', target: 1, amount: 300 });
+      break;
+    case 'lowHp': {
+      const me = champ(1);
+      me.hp = me.maxHp * 0.12;
+      break;
+    }
+    case 'chatAlly':
+      sim.events.push({ type: 'chat', playerId: 'p4', text: 'Drake dans 30 s, on se regroupe bot !', teamOnly: true });
+      break;
+    case 'soul':
+      sim.score.blue.dragons = ['infernal', 'ocean', 'mountain', 'mountain'];
+      sim.events.push({ type: 'announcement', key: 'dragon_soul', team: 'blue', params: { element: 'mountain' } });
       break;
     case 'killAlly':
       kill(2 + Math.floor(Math.random() * 3), 12, [13]);
@@ -469,6 +492,31 @@ export function handleMsg(m: ClientMsg): void {
         me.x = m.pos.x;
         me.y = m.pos.y;
       }
+      break;
+    case 'useItem': {
+      if (!sim) break;
+      const me = sim.ents.get(1)!;
+      const id = m.slot >= 0 ? me.champ!.items[m.slot] : me.champ!.items[6];
+      if (id === 'health_potion') {
+        me.hp = Math.min(me.maxHp, me.hp + 120);
+        const inv = [...me.champ!.items];
+        inv[m.slot] = null;
+        me.champ = { ...me.champ!, items: inv };
+      }
+      if (id) sim.events.push({ type: 'itemUsed', target: 1, itemId: id });
+      break;
+    }
+    case 'placeWard':
+      if (sim?.self.wardCharges && sim.self.wardCharges.charges > 0) sim.self = { ...sim.self, wardCharges: { charges: sim.self.wardCharges.charges - 1, cooldownRemaining: 60 } };
+      break;
+    case 'returnToLobby':
+      stopGame();
+      store.set({ lobby: mockLobby(8), draft: null });
+      break;
+    case 'chat':
+      if (!sim) break;
+      sim.events.push({ type: 'chat', playerId: ME, text: m.text, teamOnly: m.teamOnly });
+      setTimeout(() => sim?.events.push({ type: 'chat', playerId: m.teamOnly ? 'p2' : 'p7', text: m.teamOnly ? 'Reçu, j’arrive !' : 'gg ez… ou pas', teamOnly: m.teamOnly }), 1500);
       break;
     case 'ping':
       sim?.events.push({ type: 'ping', playerId: ME, pos: m.pos, kind: m.kind });

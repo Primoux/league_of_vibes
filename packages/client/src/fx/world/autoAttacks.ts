@@ -4,8 +4,8 @@
  */
 import * as THREE from 'three';
 import { CHAMPIONS, type EntitySnapshot } from '@lov/shared';
-import { impactBurst } from '../defaults.ts';
-import { ProjectileFx, flash, shockwave } from '../effects/primitives.ts';
+import { ProjectileFx, flash, lightning, shockwave } from '../effects/primitives.ts';
+import type { DragonElement } from '@lov/shared';
 import type { FxColors, FxRuntime } from '../core/FxRuntime.ts';
 import { rng } from '../core/rng.ts';
 import { onWorldEvent, type Ev } from '../registry.ts';
@@ -55,9 +55,18 @@ export function homingShot(
   );
 }
 
+/**
+ * Impact d'auto-attaque à distance : volontairement sobre (plusieurs par seconde en combat).
+ * Un empilement de halos HDR sature en blanc sous le bloom.
+ */
+function aaImpact(rt: FxRuntime, at: THREE.Vector3, c: FxColors, crit: boolean): void {
+  flash(rt, at, crit ? 1.1 : 0.7, c.vivid, 0.14);
+  rt.ps.emit(rt.s.spark, at, { count: crit ? 10 : 5, shape: 'point', speed: [2, 4], life: [0.12, 0.22], size: [0.04, 0.07], stretch: 0.04, tint: c.vividHdr });
+  if (crit) shockwave(rt, _at.set(at.x, 0, at.z), 1, 0.25, c.vivid, 0.08);
+}
+
 function genericRanged(rt: FxRuntime, e: Ev<'autoAttack'>, from: THREE.Vector3, c: FxColors): void {
-  const size = e.crit ? 0.55 : 0.38;
-  homingShot(rt, e, from, c.vividHdr, c.accentHdr, size, (at) => impactBurst(rt, at, c, e.crit ? 0.8 : 0.45));
+  homingShot(rt, e, from, c.vivid, c.accent, e.crit ? 0.45 : 0.3, (at) => aaImpact(rt, at, c, !!e.crit));
 }
 
 function genericMelee(rt: FxRuntime, e: Ev<'autoAttack'>, at: THREE.Vector3, c: FxColors): void {
@@ -83,12 +92,82 @@ function structureOrMinion(rt: FxRuntime, e: Ev<'autoAttack'>, src: EntitySnapsh
   });
 }
 
+// ---------------------------------------------------------------- monstres épiques
+/** Élément du drake courant (comme le renderer : appris par `objectiveSpawn`). */
+let dragonElement: DragonElement | 'elder' = 'infernal';
+
+const BREATH: Record<DragonElement | 'elder', { color: THREE.Color; style: 'flame' | 'glow' | 'dust' | 'sparkles' | 'smoke' }> = {
+  infernal: { color: new THREE.Color(2.6, 0.9, 0.25), style: 'flame' },
+  ocean: { color: new THREE.Color(0.3, 1.3, 2.6), style: 'glow' },
+  mountain: { color: new THREE.Color(0.7, 0.55, 0.4), style: 'dust' },
+  cloud: { color: new THREE.Color(1.8, 2.3, 2.6), style: 'sparkles' },
+  hextech: { color: new THREE.Color(0.5, 1.8, 2.8), style: 'sparkles' },
+  chemtech: { color: new THREE.Color(0.7, 2.2, 0.3), style: 'smoke' },
+  elder: { color: new THREE.Color(1.8, 0.8, 2.8), style: 'flame' },
+};
+
+const _dir = new THREE.Vector3();
+const _vel = new THREE.Vector3();
+
+/** Souffle de drake : jet de particules élémentaires de la gueule vers la cible, impact coloré. */
+function breath(rt: FxRuntime, e: Ev<'autoAttack'>, element: DragonElement | 'elder'): void {
+  const b = BREATH[element];
+  if (!rt.entities.pos(e.source, _from, 1.8) || !rt.entities.pos(e.target, _at, 0.9)) return;
+  _dir.copy(_at).sub(_from);
+  const len = _dir.length();
+  _dir.divideScalar(len || 1);
+  _from.addScaledVector(_dir, 1.2); // gueule, devant le corps
+  const speed = Math.max(6, len * 2.5);
+  _vel.copy(_dir).multiplyScalar(speed);
+  const style = rt.s[b.style];
+  rt.ps.emit(style, _from, { count: 26, shape: 'cone', dir: _dir, angle: 0.18, speed: [speed * 0.8, speed * 1.1], life: [len / speed, (len / speed) * 1.2], size: [0.3, 0.6], drag: 0.5, tint: b.color });
+  if (element === 'hextech') lightning(rt, _from, _at, b.color, { width: 0.16, life: 0.2, jag: 0.25 });
+  const at = _at.clone();
+  rt.after(len / speed, () => {
+    flash(rt, at, 1.8, b.color, 0.2);
+    rt.ps.emit(style, at, { count: 10, shape: 'sphere', radius: 0.3, speed: [1, 2.5], life: [0.3, 0.6], size: [0.3, 0.6], tint: b.color });
+    if (element === 'mountain') rt.ps.emit(rt.s.debris, at, { count: 6, shape: 'sphere', radius: 0.2, speed: [2, 4], up: [1, 3], gravity: 9, life: [0.6, 0.9], size: [0.12, 0.2], spin: [-6, 6], tint: b.color });
+  });
+}
+
+/** Coup lourd d'un monstre épique (Léviathan, Colosse) : onde de choc et poussière. */
+function heavyHit(rt: FxRuntime, e: Ev<'autoAttack'>, color: THREE.Color): void {
+  if (!rt.entities.pos(e.target, _at)) return;
+  shockwave(rt, _at, 1.8, 0.4, color, 0.14);
+  flash(rt, _at.setY(1), 2, color, 0.2);
+  rt.ps.emit(rt.s.dust, _at.setY(0.1), { count: 8, shape: 'ring', radius: 0.5, speed: [1, 2], up: [0.3, 0.8], life: [0.6, 0.9], size: [0.6, 1] });
+}
+const LEVIATHAN = new THREE.Color(1.6, 0.6, 2.6);
+const HERALD = new THREE.Color(1.2, 0.7, 2.4);
+
+function monster(rt: FxRuntime, e: Ev<'autoAttack'>, src: EntitySnapshot): boolean {
+  switch (src.subtype) {
+    case 'dragon':
+      breath(rt, e, dragonElement === 'elder' ? 'infernal' : dragonElement);
+      return true;
+    case 'elder_dragon':
+      breath(rt, e, 'elder');
+      return true;
+    case 'leviathan':
+      heavyHit(rt, e, LEVIATHAN);
+      return true;
+    case 'herald':
+      heavyHit(rt, e, HERALD);
+      return true;
+    default:
+      return false;
+  }
+}
+
 export function installAutoAttackFx(): void {
+  onWorldEvent('objectiveSpawn', (_rt, e) => {
+    if (e.monster === 'dragon' && e.element) dragonElement = e.element;
+  });
   onWorldEvent('autoAttack', (rt, e) => {
     const src = rt.entities.info(e.source);
     const champId = src?.subtype && CHAMPIONS[src.subtype] ? src.subtype : null;
     if (!champId) {
-      if (src) structureOrMinion(rt, e, src);
+      if (src && !(src.kind === 'monster' && monster(rt, e, src))) structureOrMinion(rt, e, src);
       return;
     }
     const c = rt.colors(`${champId}_aa`);

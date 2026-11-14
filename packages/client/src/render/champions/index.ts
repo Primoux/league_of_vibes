@@ -12,17 +12,38 @@ import { ProceduralChampionView, TEAM_HEX, type ChampionModelDef } from './Champ
 import { genericFor } from './models/generic.ts';
 import { grondakModel } from './models/grondak.ts';
 import { ilyraModel } from './models/ilyra.ts';
+import { corvinModel } from './models/corvin.ts';
+import { kaelenModel } from './models/kaelen.ts';
+import { nyxModel } from './models/nyx.ts';
+import { sableModel } from './models/sable.ts';
+import { solenneModel } from './models/solenne.ts';
+import { tharoxModel } from './models/tharox.ts';
+import { vrennaModel } from './models/vrenna.ts';
+import { zephyrModel } from './models/zephyr.ts';
+import { master67Model } from './models/master67.ts';
+import { portraitModel } from './portrait/index.ts';
 
-export { ProceduralChampionView } from './ChampionView.ts';
+export { ProceduralChampionView, setRespawnHook } from './ChampionView.ts';
 
 const MODELS: Record<string, ChampionModelDef> = {
   grondak: grondakModel,
   ilyra: ilyraModel,
+  tharox: tharoxModel,
+  kaelen: kaelenModel,
+  vrenna: vrennaModel,
+  zephyr: zephyrModel,
+  sable: sableModel,
+  corvin: corvinModel,
+  nyx: nyxModel,
+  solenne: solenneModel,
+  master67: master67Model,
 };
 
 /** Contrat commun aux modèles articulés et aux caricatures originales. */
 export interface AnimatedChampionView extends EntityView {
   readonly height: number;
+  /** Recul à l'impact (optionnel : les vues sur mesure peuvent l'ignorer). */
+  flinch?(amount: number): void;
   strike(): void;
   cast(slot: string): void;
   setRecalling(on: boolean): void;
@@ -32,7 +53,7 @@ export interface AnimatedChampionView extends EntityView {
 const views = new Map<number, AnimatedChampionView>();
 
 export function modelFor(championId: string): ChampionModelDef {
-  return MODELS[championId] ?? genericFor(CHAMPIONS[championId]?.class ?? 'fighter');
+  return portraitModel(championId, MODELS[championId] ?? genericFor(CHAMPIONS[championId]?.class ?? 'fighter'));
 }
 
 /** Crée la vue d'un champion (null si le championId est inconnu → vue par défaut du renderer). */
@@ -61,6 +82,9 @@ function route(e: GameEvent): void {
       break;
     case 'abilityCast':
       views.get(e.source)?.cast(e.slot);
+      break;
+    case 'damage':
+      if (e.amount > 0) views.get(e.target)?.flinch?.(e.amount);
       break;
     case 'recallStart':
       views.get(e.target)?.setRecalling(true);

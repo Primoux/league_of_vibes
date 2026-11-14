@@ -5,7 +5,12 @@
 
 export const TICK_RATE = 30; // ticks de simulation / seconde (serveur)
 export const TICK_DT = 1 / TICK_RATE;
-export const SNAPSHOT_RATE = 20; // snapshots / seconde envoyés aux clients
+/**
+ * Snapshots / seconde envoyés aux clients. DOIT diviser TICK_RATE (cadence régulière : un snapshot tous les
+ * TICK_RATE / SNAPSHOT_RATE ticks). 30 = un snapshot par tick : mesuré avec netcheck (gigue ±30 ms), la marge du
+ * tampon d'interpolation passe de −5 ms (15 Hz) à 24 ms ; le coût en débit est absorbé par les patches delta.
+ */
+export const SNAPSHOT_RATE = 30;
 export const INTERP_DELAY_MS = 100; // délai d'interpolation côté client
 
 export const MAP_SIZE = 12000; // carte carrée, origine (0,0) = coin bas-gauche (base bleue)

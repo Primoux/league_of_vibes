@@ -8,7 +8,10 @@ import { World, createChampion, type Entity } from '../src/world.ts';
 
 let n = 0;
 function makeWorld(): World {
-  const w = new World(createSystems());
+  // Les récompenses PvE sont simulées par événements dans cette suite économique.
+  // Les vraies vagues, structures et camps ont leurs tests dédiés et d'intégration.
+  const pveSystems = new Set(['minions', 'structures', 'jungle', 'objectives']);
+  const w = new World(createSystems().filter(system => !pveSystems.has(system.name)));
   w.init();
   return w;
 }

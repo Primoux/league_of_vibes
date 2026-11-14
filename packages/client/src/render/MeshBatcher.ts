@@ -9,6 +9,7 @@
  * Les animations continuent de manipuler les pivots comme avant. Aucune allocation par frame.
  */
 import * as THREE from 'three';
+import { assignShadowDepth } from './shadowDepth.ts';
 
 interface Batch {
   mesh: THREE.InstancedMesh;
@@ -76,6 +77,7 @@ export class MeshBatcher {
     m.count = 0;
     m.castShadow = cast;
     m.receiveShadow = receive;
+    assignShadowDepth(m);
     // les instances couvrent toute la carte : pas de culling global (le GPU rejette les sommets hors champ)
     m.frustumCulled = false;
     this.scene.add(m);

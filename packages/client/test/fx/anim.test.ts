@@ -58,7 +58,8 @@ describe('Animator', () => {
     a.play('death');
     a.update(3);
     expect(a.current).toBe('death');
-    expect(a.pose[BODY_OFFSET + 1]).toBeLessThan(-0.4); // effondré
+    expect(a.pose[J.body * 3 + 2]).toBeGreaterThan(1.2); // couché (≈ 80°)
+    expect(a.pose[BODY_OFFSET + 1]).toBeGreaterThanOrEqual(0); // pivot aux pieds : le corps couché ne s'enfonce pas
   });
 
   it('fondu : la pose part de la précédente', () => {

@@ -7,3 +7,4 @@ export * from './math.ts';
 export * from './data/champions/index.ts';
 export * from './data/summoners.ts';
 export * from './data/items.ts';
+export * from './data/buffs.ts';

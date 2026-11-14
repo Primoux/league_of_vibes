@@ -28,7 +28,7 @@ varying vec3 vN;
 varying vec3 vV;
 varying vec3 vLocal;
 void main() {
-  float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), uPower);
+  float f = pow(max(0.0, 1.0 - abs(dot(normalize(vN), normalize(vV)))), uPower);
   float bands = uBands * (0.5 + 0.5 * sin(vLocal.y * 18.0 - uTime * 3.0));
   float a = (uBase + f + bands * f) * uOpacity;
   gl_FragColor = vec4(uColor, clamp(a, 0.0, 1.0));
@@ -90,9 +90,10 @@ varying vec3 vViewPos;
 varying vec3 vTint;
 void main() {
   // normale de facette via dérivées écran : look low-poly sans dupliquer les sommets
-  vec3 n = normalize(cross(dFdx(vViewPos), dFdy(vViewPos)));
+  vec3 cr = cross(dFdx(vViewPos), dFdy(vViewPos));
+  vec3 n = dot(cr, cr) > 1e-20 ? normalize(cr) : vec3(0.0, 0.0, 1.0); // facette dégénérée (éclat qui naît)
   vec3 v = normalize(-vViewPos);
-  float rim = pow(1.0 - abs(dot(n, v)), 2.0);
+  float rim = pow(max(0.0, 1.0 - abs(dot(n, v))), 2.0);
   float light = 0.5 + 0.5 * dot(n, normalize(vec3(0.3, 0.8, 0.5)));
   float glint = pow(max(0.0, dot(reflect(-v, n), normalize(vec3(0.2, 0.9, 0.4)))), 24.0);
   vec3 col = (mix(uDeep, uColor, light) * 0.85 + rim * uColor * 0.7) * vTint + glint * 1.2;
@@ -152,6 +153,11 @@ export function createWaterMaterial(color = new THREE.Color(0.03, 0.18, 0.42), f
 // ---------------------------------------------------------------- Distorsion (chaleur, ondes)
 /** Couche Three.js réservée aux objets de distorsion : invisibles dans le rendu principal, lus par PostFx. */
 export const DISTORTION_LAYER = 3;
+/**
+ * Nombre d'objets de distorsion vivants : PostFx ne rend la couche (second parcours complet de la scène)
+ * que s'il y en a. Incrémenter à l'ajout d'un objet sur DISTORTION_LAYER, décrémenter au retrait.
+ */
+export const distortionUsers = { count: 0 };
 
 const HEAT_FRAG = /* glsl */ `
 uniform float uTime;

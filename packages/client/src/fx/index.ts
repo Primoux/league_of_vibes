@@ -9,15 +9,19 @@
  *  - `setFxQuality('high' | 'low')` : qualité (store/paramètres) ;
  *  - `registerFx` / `onWorldEvent` : extension des FX.
  */
-import { installChampionModels } from '../render/champions/index.ts';
+import { installChampionModels, setRespawnHook } from '../render/champions/index.ts';
 import { fxBus } from './FxBus.ts';
 import { FxRuntime } from './core/FxRuntime.ts';
 import type { FxHost } from './core/host.ts';
 import { defaultFx } from './defaults.ts';
 import { FxDispatcher } from './dispatcher.ts';
 import { PostFx, type FxQuality } from './post/PostFx.ts';
+import { AmbientFx } from './world/ambient.ts';
 import { fxIndicators } from './telegraph/indicators.ts';
 import { installAutoAttackFx } from './world/autoAttacks.ts';
+import { installStatusFx } from './world/status.ts';
+import { installWorldFx, respawnFx } from './world/events.ts';
+import './summoners.ts';
 import './champions/index.ts';
 
 let worldFxInstalled = false;
@@ -30,8 +34,12 @@ export type { FxQuality } from './post/PostFx.ts';
 
 export interface FxInstance {
   runtime: FxRuntime;
+  /** Temps CPU des FX par frame (ms, moyenne glissante) : bus + effets + particules. */
+  readonly stats: { updateMs: number };
   dispatcher: FxDispatcher;
   post: PostFx | null;
+  /** Particules d'ambiance de la carte (null sans carte). */
+  ambient: AmbientFx | null;
   /** Avance les FX (appelé automatiquement sauf si `manualUpdate`). */
   update(dt: number): void;
   dispose(): void;
@@ -52,9 +60,14 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
   if (!worldFxInstalled) {
     worldFxInstalled = true;
     installAutoAttackFx();
+    installStatusFx();
+    installWorldFx();
   }
   const runtime = new FxRuntime(host);
+  // ambiance de la carte (lucioles, pollen, brume) : seulement si l'hôte affiche la carte (pas dans le fxlab)
+  const ambient = 'map' in host ? new AmbientFx(runtime.root) : null;
   const dispatcher = new FxDispatcher(runtime, defaultFx);
+  setRespawnHook((id) => respawnFx(runtime, id));
   fxIndicators.attach(runtime.root);
   const unsub = fxBus.subscribe((e) => dispatcher.handle(e));
 
@@ -66,9 +79,13 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
   const onResize = (): void => post?.setSize(innerWidth, innerHeight);
   if (post && !opts.ownPost) addEventListener('resize', onResize);
 
+  const stats = { updateMs: 0 };
   const update = (dt: number): void => {
+    const t0 = performance.now();
     fxBus.update();
     runtime.update(Math.min(dt, 0.1));
+    ambient?.update(Math.min(dt, 0.1));
+    stats.updateMs += (performance.now() - t0 - stats.updateMs) * 0.05;
   };
 
   let raf = 0;
@@ -87,6 +104,8 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
 
   current = {
     runtime,
+    ambient,
+    stats,
     dispatcher,
     post,
     update,
@@ -95,6 +114,7 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
       cancelAnimationFrame(raf);
       removeEventListener('resize', onResize);
       post?.dispose();
+      setRespawnHook(null);
       runtime.entities.dispose();
       host.scene.remove(runtime.root);
       if (current === this) current = null;
@@ -108,4 +128,5 @@ export function setFxQuality(q: FxQuality): void {
   if (!current) return;
   if (current.post) current.post.quality = q;
   current.runtime.ps.density = q === 'low' ? 0.5 : 1;
+  if (current.ambient) current.ambient.ps.density = q === 'low' ? 0.4 : 1;
 }

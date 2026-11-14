@@ -1,5 +1,5 @@
 /** Formatage pur (testé). Propriétaire : mistral-ui. */
-import type { DragonElement, MonsterType, Role, Stats } from '@lov/shared';
+import { BUFFS, type DragonElement, type MonsterType, type Role, type Stats } from '@lov/shared';
 
 /** 125.4 -> "2:05" ; 3725 -> "1:02:05". */
 export function formatClock(seconds: number): string {
@@ -65,19 +65,20 @@ export const DRAGON_COLOR: Record<DragonElement, string> = {
   chemtech: '#9fe03a',
 };
 
-export const MONSTER_LABEL: Partial<Record<MonsterType, string>> = {
+export const MONSTER_LABEL: Partial<Record<MonsterType | 'grubs', string>> = {
   dragon: 'Drake',
   elder_dragon: 'Drake Ancien',
   grub: 'Larve',
   herald: 'Colosse du Rift',
+  grubs: 'Larves',
   leviathan: 'Léviathan',
-  blue_buff: 'Sentinelle bleue',
-  red_buff: 'Brute rouge',
+  blue_buff: 'Gardien d’azur',
+  red_buff: 'Bête écarlate',
   scuttle: 'Crabe de rivière',
   gromp: 'Grenouille',
   wolves: 'Loups',
   raptors: 'Raptors',
-  krugs: 'Krugs',
+  krugs: 'Golems de pierre',
 };
 
 export const STAT_LABEL: Record<keyof Stats, string> = {
@@ -114,6 +115,55 @@ export function formatRanks(values: number[], unit = ''): string {
   const uniq = values.every((v) => v === values[0]);
   const fmt = (v: number) => `${Number.isInteger(v) ? v : v.toFixed(1).replace('.', ',')}${unit}`;
   return uniq ? fmt(values[0] ?? 0) : values.map(fmt).join(' / ');
+}
+
+/** Noms des buffs hors registre `BUFFS` (buffs de camps et d'objectifs). */
+const EXTRA_BUFF_NAMES: Record<string, string> = {
+  blue_buff: 'Gardien d’azur',
+  red_buff: 'Bête écarlate',
+  leviathan: 'Bénédiction du Léviathan',
+  leviathan_buff: 'Bénédiction du Léviathan',
+  elder: 'Drake Ancien',
+  elder_buff: 'Drake Ancien',
+  recall: 'Rappel',
+};
+
+/** Adjectif de l'âme du drake (« Âme infernale »). */
+export const SOUL_LABEL: Record<DragonElement, string> = {
+  infernal: 'infernale',
+  ocean: 'océanique',
+  mountain: 'des montagnes',
+  cloud: 'des nuages',
+  hextech: 'électrique',
+  chemtech: 'toxique',
+};
+
+const isElement = (s: string): s is DragonElement => s in DRAGON_LABEL;
+
+/** Nom lisible d'un buff : registre partagé `BUFFS`, puis table locale, drakes/âmes, puis id reformaté. */
+export function buffName(id: string): string {
+  const known = BUFFS[id]?.name ?? EXTRA_BUFF_NAMES[id];
+  if (known) return known;
+  const m = /^(dragon|soul)_(\w+)$/.exec(id);
+  if (m && isElement(m[2]!)) return m[1] === 'dragon' ? DRAGON_LABEL[m[2]] : `Âme ${SOUL_LABEL[m[2]]}`;
+  const s = id.replace(/_/g, ' ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+const DEBUFF_WORDS = /stun|root|slow|silence|knock|taunt|suppress|fear|blind|ground|bleed|burn|ignite|mark|frost|givre|poison|exhaust|grievous|anti/i;
+
+/** Effet négatif ? (registre `BUFFS` sinon heuristique sur l'id). */
+export function isDebuff(id: string): boolean {
+  const def = BUFFS[id];
+  if (def) return def.kind !== 'buff';
+  return DEBUFF_WORDS.test(id);
+}
+
+/** Initiales affichées dans la pastille de buff. */
+export function buffInitials(id: string): string {
+  const name = buffName(id);
+  const words = name.split(/[\s’']+/).filter((w) => w.length > 2);
+  return (words.length > 1 ? words.slice(0, 2).map((w) => w[0]).join('') : name.slice(0, 2)).toUpperCase();
 }
 
 /** Hash déterministe (FNV-1a 32 bits) pour générer des motifs stables. */

@@ -5,7 +5,7 @@
  * - A puis clic gauche : attaque-déplacement (quick-cast : immédiat).
  * - Q W E R : cast normal (indicateur, clic gauche pour confirmer, clic droit/Échap pour annuler) ou
  *   quick-cast selon les paramètres ; Maj+touche inverse le mode. Ctrl+QWER : monter le sort.
- * - D / F : sorts d'invocateur. 4 : balise. B : rappel. S : stop.
+ * - D / F : sorts d'invocateur. 1 2 3 5 6 7 : objets actifs. 4 : balise. B : rappel. S : stop.
  * - Espace (maintenu) : centrer la caméra. Y : verrouiller/déverrouiller. Flèches : déplacer la caméra.
  * - P : boutique. Tab (maintenu) : scores. C : stats. Échap : annuler / fermer / paramètres.
  * - Alt+clic gauche : ping.
@@ -14,7 +14,7 @@ import { CHAMPIONS, SUMMONERS, type AbilitySlot, type EntityId, type EntitySnaps
 import { net, snapshots } from '../net/client.ts';
 import type { GameRenderer } from '../render/GameRenderer.ts';
 import { store, type Targeting } from '../state.ts';
-import { isAttackable, needsTarget } from './rules.ts';
+import { digitAction, isAttackable, needsTarget } from './rules.ts';
 
 const ATTACK_CURSOR = cursorSvg('#ff5a4a');
 const TARGET_CURSOR = cursorSvg('#7fd8ff');
@@ -221,6 +221,14 @@ export function installControls(renderer: GameRenderer): void {
     }
     if (e.repeat) return;
 
+    // rangée du haut : objets (1 2 3 5 6 7) et balise (4), par position physique
+    const digit = digitAction(code);
+    if (digit) {
+      e.preventDefault();
+      if (digit.kind === 'ward') setTargeting({ kind: 'ward' });
+      else net.send({ t: 'useItem', slot: digit.slot, targetPos: hasCursor ? { x: cursor.x, y: cursor.y } : undefined });
+      return;
+    }
     // on se fie à e.code (position physique) pour QWER/DF... sauf en AZERTY où l'utilisateur attend les lettres :
     // e.key est donc prioritaire pour les lettres.
     const key = e.key.length === 1 ? e.key.toUpperCase() : '';
@@ -239,10 +247,6 @@ export function installControls(renderer: GameRenderer): void {
       case 'A':
         if (store.state.settings.quickCast) confirmTargeting({ kind: 'attackMove' }, hasCursor ? { x: cursor.x, y: cursor.y } : null);
         else setTargeting({ kind: 'attackMove' });
-        return;
-      case '4':
-      case "'":
-        setTargeting({ kind: 'ward' });
         return;
       case 'S':
         net.send({ t: 'stop' });

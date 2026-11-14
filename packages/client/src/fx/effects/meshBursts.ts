@@ -3,6 +3,7 @@
  * débris balistiques qui rebondissent. Pierre (Grondak), glace (Ilyra), éclats divers.
  */
 import * as THREE from 'three';
+import { assignShadowDepth } from '../../render/shadowDepth.ts';
 import { rng } from '../core/rng.ts';
 
 export type BurstMode = 'spike' | 'debris' | 'static';
@@ -60,10 +61,12 @@ export class MeshBurstSystem {
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = true;
     this.mesh.count = capacity;
+    this.mesh.visible = false;
     for (let i = 0; i < capacity; i++) {
       this.mesh.setMatrixAt(i, ZERO);
       this.mesh.setColorAt(i, new THREE.Color(1, 1, 1));
     }
+    assignShadowDepth(this.mesh);
     const f = (): Float32Array => new Float32Array(capacity);
     this.px = f(); this.py = f(); this.pz = f();
     this.vx = f(); this.vy = f(); this.vz = f();
@@ -76,6 +79,7 @@ export class MeshBurstSystem {
     const i = this.head;
     this.head = (this.head + 1) % this.capacity;
     if (this.mode[i] === 0) this.active++;
+    this.mesh.visible = true;
     this.px[i] = o.pos.x; this.py[i] = o.pos.y; this.pz[i] = o.pos.z;
     this.vx[i] = o.vel?.x ?? 0; this.vy[i] = o.vel?.y ?? 0; this.vz[i] = o.vel?.z ?? 0;
     this.age[i] = -(o.delay ?? 0);
@@ -102,7 +106,11 @@ export class MeshBurstSystem {
   }
 
   update(dt: number): void {
-    if (this.active === 0) return;
+    // vide : ni rendu ni passe d'ombre (sinon 1 draw call + 1 d'ombre par système à chaque frame)
+    if (this.active === 0) {
+      this.mesh.visible = false;
+      return;
+    }
     for (let i = 0; i < this.capacity; i++) {
       const mode = this.mode[i]!;
       if (mode === 0) continue;

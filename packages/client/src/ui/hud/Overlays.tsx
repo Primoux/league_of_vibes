@@ -25,6 +25,11 @@ export function TopBar() {
             <i key={i} style={{ background: DRAGON_COLOR[el as DragonElement] ?? '#aaa' }} title={DRAGON_LABEL[el as DragonElement] ?? el} />
           ))}
           {sc.dragons.length === 0 && <em>—</em>}
+          {sc.dragons.length >= 4 && (
+            <span class="soul" title="Âme du drake" style={{ '--c': DRAGON_COLOR[(sc.dragons[2] ?? sc.dragons[0]) as DragonElement] ?? '#fff' } as Record<string, string>}>
+              Âme
+            </span>
+          )}
         </span>
         {sc.grubs > 0 && (
           <span class="grubs" title="Larves">
@@ -185,6 +190,19 @@ export function TeamFrames() {
       ))}
     </div>
   );
+}
+
+// ------------------------------------------------------------------ PV bas
+/** Vignette rouge qui pulse sur les bords de l'écran sous 30 % de PV (plus intense sous 15 %). */
+export function LowHpVignette() {
+  const level = useWorld(() => {
+    const e = selfEntity();
+    if (!e || e.dead || e.maxHp <= 0) return 0;
+    const r = e.hp / e.maxHp;
+    return r < 0.15 ? 2 : r < 0.3 ? 1 : 0;
+  });
+  if (!level) return null;
+  return <div class={`lov-lowhp l${level}`} aria-hidden="true" />;
 }
 
 // ------------------------------------------------------------------ mort

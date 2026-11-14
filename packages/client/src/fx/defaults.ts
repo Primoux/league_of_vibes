@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { AllHandlers } from './dispatcher.ts';
 import { ProjectileFx, dashTrail, flash, shockwave, telegraph, zone } from './effects/primitives.ts';
 import type { FxColors, FxRuntime } from './core/FxRuntime.ts';
+import { isTelegraphKey } from './keys.ts';
 
 const _p = new THREE.Vector3();
 const _q = new THREE.Vector3();
@@ -15,7 +16,7 @@ export function impactBurst(rt: FxRuntime, at: THREE.Vector3, c: FxColors, scale
   _q.set(at.x, 1, at.z);
   flash(rt, _q, 1.6 * scale, c.accentHdr, 0.22);
   rt.ps.emit(rt.s.spark, _q, { count: 14 * scale, shape: 'point', speed: [3, 7], life: [0.2, 0.4], size: [0.06, 0.12], stretch: 0.05, gravity: 6, tint: c.vividHdr });
-  rt.ps.emit(rt.s.glowPop, _q, { count: 4, shape: 'sphere', radius: 0.2, speed: [0.3, 1], life: [0.25, 0.4], size: [0.6 * scale, 1.1 * scale], tint: c.vivid, intensity: 1.6 });
+  rt.ps.emit(rt.s.glowPop, _q, { count: 3, shape: 'sphere', radius: 0.2, speed: [0.3, 1], life: [0.25, 0.4], size: [0.5 * scale, 0.9 * scale], tint: c.vivid, intensity: 1 });
   _q.y = 0;
   shockwave(rt, _q, 1.1 * scale, 0.35, c.vividHdr, 0.1);
 }
@@ -62,12 +63,12 @@ export const defaultFx: AllHandlers = {
   area(rt, e, c) {
     const center = rt.world(e.pos, 0, new THREE.Vector3());
     const radius = rt.scale(e.radius);
-    if (e.duration <= 0.05) return areaBurst(rt, center, radius, c);
-    if (e.duration <= 1.25) {
-      // zone retardée : télégraphie puis explosion
-      telegraph(rt, center, radius, e.duration, c.vivid, { color2: c.vividHdr, onDone: () => areaBurst(rt, center, radius, c) });
+    // zone retardée : le serveur émet d'abord `<clé>_telegraph` (durée = délai), puis `<clé>` à la détonation
+    if (isTelegraphKey(e.fxKey)) {
+      telegraph(rt, center, radius, Math.max(0.1, e.duration), c.vivid, { color2: c.vividHdr });
       return;
     }
+    if (e.duration <= 0.35) return areaBurst(rt, center, radius, c);
     // zone persistante
     zone(rt, center, radius, e.duration, c.vividHdr, {
       fill: 0.12,

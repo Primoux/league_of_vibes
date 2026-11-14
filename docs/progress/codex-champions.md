@@ -1,6 +1,40 @@
 # Progress — codex-champions
 
-Date : 2026-11-13. Branche de travail actuelle : `feat/champion-melenchon` (extension demandée par l'utilisateur).
+Date : 2026-11-14. Branche de travail actuelle : `feat/portrait-champion-models` (extension demandée par l'utilisateur).
+
+## Extension : modèles inspirés des portraits
+
+- Demande explicite de retravailler largement les modèles client d'après les images. Départ sur la branche des portraits ; PR #22 désormais fusionnée. Synchronisation avec `main` jusqu'à `09a9b72`, incluant les travaux graphiques, audio et UI récents ; aucun conflit et YOUR_PLAN.md de main conservé.
+- Douze modèles retravaillés : visages, cheveux/tresses/boucles, capuches ouvertes, capes épaisses, robes plissées, mains/doigts, armures, plumes, défenses, failles de roche et armes sculptées d'après les portraits. Géométrie originale générée par code, sans dépendance ni asset tiers.
+- Onze modèles utilisent la nouvelle construction `portrait/` autour des rigs/clips/extras existants. Mélenchon garde son rig et ses gestes, avec visage/costume/cravate/mèches affinés et pièces fixes fusionnées par articulation/matière : 27 meshes visibles au repos contre 66 auparavant ; 10 148 triangles visibles.
+- Le 67 Master conserve ses paumes vers le haut et leur alternance en repos/course/sorts/rappel. Son modèle reste à 3 meshes avec contour, moins de 16 000 triangles. Les budgets existants ne sont pas relâchés.
+- Atelier sans serveur `?modellab`, choix des douze champions, portrait de référence, rotation/zoom, vues portrait/jeu, course/attaque/QWER/mort-retour. Le labo FX existant conserve les vrais sorts simulés.
+- Validation complète : **573 tests / 60 fichiers**, typage et build verts. Seize nouveaux garde-fous pour géométrie/index/poids, déformations pendant QWER, budgets incluant contours, normales sculptées sous transformation, matières, invisibilité de Nyx et libération des géométries/matières fusionnées.
+- Rendus PBR CPU des douze véritables vues skinnées inspectés et affinés (yeux, ouvertures des capuches, mèches, plis et ornements). Planche `docs/previews/champion-models.webp`, export et script Blender reproductibles documentés dans `docs/champion-models.md`. Cette planche exclut contour GPU/bloom ; pas de contrôle WebGL interactif ni de FPS revendiqué dans cet environnement.
+- Publication dans une nouvelle PR via `scripts/open-pr.sh` ; revue et fusion laissées à Fable. Les portraits d'origine et le gameplay ne sont pas modifiés.
+
+### Contrats modifiés pour les modèles
+
+- Commits `contract:` : options additives `smooth`, `sculptedSurfaces()` et `metal()` du builder ; lot de métal facultatif, fusion skinnée existante conservée. Normales sculptées transformées correctement ; modèles sans option conservés à facettes.
+- Branchement de la nouvelle géométrie dans la fabrique commune et ajout de `?modellab` dans main. Contrats de vue, rigs, clips, port d'arme et effets existants conservés. Aucun contrat réseau ajouté.
+- Extension de l'invisibilité du client à toutes les matières des lots opaques/émissifs, pour que les nouvelles dagues métalliques de Nyx deviennent translucides avec elle. Test de régression dédié.
+
+## Historique : portraits de sélection et 67 Master
+
+## Extension : portraits de sélection et 67 Master
+
+- Base initiale : `main` à `c945df9`, puis synchronisation avec `bca314e` (animations et correctifs FX récents préservés) ; les précédentes PR de champions sont fusionnées. Installation, typage et 483 tests verts avant les ajouts.
+- Douze portraits originaux générés avec l'outil de génération d'images intégré, palettes et descriptions tirées des données/modèles existants ; Mélenchon conserve sa ressemblance caricaturale et le 67 Master est un personnage adulte fictif. Prompts et provenance dans `client/src/assets/champions/manifest.json`.
+- WebP 512 × 512, ~650 Ko pour les douze fichiers ; import Vite avec URL hashée compatible sous-chemin, réutilisation dans le cadre SVG commun (draft, chargement, HUD, feed et scores). Portrait procédural existant conservé en dessous et réaffiché en cas d'erreur réseau/image inconnue. Aucun service distant sollicité par le jeu pour les illustrations.
+- Nouveau mage jouable `master67` : Q projectile/slow, W zone retardée/root, E blink/bouclier, R deux ondes retardées (slow puis knockup), passif au septième impact de sort confirmé sur champion, avec verrouillage anti-multi-proc de 0,67 s et expiration des cumuls. Mort avant la seconde onde = seconde onde annulée.
+- Modèle procédural dédié dans le pipeline skinné commun : hoodie violet, cheveux bouclés, sourire, doigts et deux paumes ouvertes qui alternent continuellement en idle, course, attaques, Q/W/E/R et rappel. Mort et CC utilisent les comportements communs. Trois meshes, ~1 100 triangles de géométrie opaque/émissive ; tests de direction des paumes et d'alternance.
+- FX dédiés par événements réels : 6 projectile, 7 qui tombe, trace de téléportation et deux ondes numérotées. Aucun changement de protocole, aucune dépendance npm ajoutée.
+- Branchement hors domaine demandé explicitement par l'utilisateur, isolé dans un commit `contract:` : une illustration optionnelle dans le cadre SVG de `ui/icons/Icons.tsx`, une entrée de modèle et l'import des FX. Pas de remplacement de l'interface ni des autres modèles.
+- Validation : **525 tests / 53 fichiers**, typage et build verts. Les garde-fous couvrent désormais 132 duels déterministes (66 paires × deux niveaux) et les coûts/CD des 48 sorts. Tests des dimensions/format/poids/unicité des douze images, du repli, des gestes, des délais, des cibles, des cumuls et de la mort entre deux ondes. Portraits et géométrie skinnée inspectés localement ; aucun contrôle WebGL interactif revendiqué.
+- Test réseau réel à huit clients, picks distincts et 67 Master confirmé dans gameStart : 15 s de commandes, **20 snapshots/s sur chacun des huit clients, aucune erreur**, sortie 0. JSON décompressé : 44,1–44,5 Ko/s/client ; ce chiffre ne certifie pas le débit compressé. Script temporaire dérivé de scripts/bots.ts, non livré.
+- Publication : l'intégration GitHub refuse les écritures (403). La connexion GitHub CLI a été rétablie par le flux officiel après préparation des commits et de la description de PR ; publication via scripts/open-pr.sh, revue et fusion laissées à Fable.
+
+## Historique : Mélenchon
 
 ## Extension : Mélenchon
 

@@ -4,15 +4,12 @@
  */
 import * as THREE from 'three';
 import { recall, stunned } from '../anim/clips.ts';
+import { clamp01, easeOut, easeIn, bell } from '../anim/ease.ts';
 import { J, addRot, setOffset, setRot, type Clip } from '../anim/pose.ts';
 import { geo } from '../builder.ts';
 import type { ChampionModelDef } from '../ChampionView.ts';
 import { createIceMaterial } from '../../../fx/shaders/materials.ts';
 
-const clamp01 = (t: number): number => (t < 0 ? 0 : t > 1 ? 1 : t);
-const easeOut = (t: number): number => 1 - (1 - clamp01(t)) ** 3;
-const easeIn = (t: number): number => clamp01(t) ** 2;
-const bell = (t: number, a: number, b: number): number => Math.sin(clamp01((t - a) / (b - a)) * Math.PI);
 
 /** Bâton tenu verticalement dans la main droite, main gauche ouverte. */
 function stance(p: Float32Array): void {
@@ -124,6 +121,8 @@ function uprightStaff(clip: Clip): Clip {
 
 export const ilyraModel: ChampionModelDef = {
   rig: { hipY: 0.9, hipW: 0.11, thigh: 0.45, shin: 0.43, spine: 0.55, shoulderW: 0.23, upperArm: 0.3, forearm: 0.29, neck: 0.16 },
+  dropAngle: -Math.PI / 2,
+  carry: 0,
   ctx: { energy: 0.85, hand: 1 },
   clips: { idle, strike, attackReady, cast, cast_Q: castQ, cast_R: castR, recall: uprightStaff(recall), stunned: uprightStaff(stunned) },
   build(b, c) {

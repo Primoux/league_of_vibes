@@ -41,7 +41,7 @@ export interface TelegraphOptions {
 
 /** Télégraphie au sol qui se remplit pendant `duration`, puis disparaît rapidement. */
 export function telegraph(rt: FxRuntime, center: THREE.Vector3, radius: number, duration: number, color: THREE.Color, o: TelegraphOptions = {}): GroundDecal {
-  const d = rt.acquireDecal().setColor(color, o.color2 ?? color);
+  const d = rt.acquireDecal().setColor(rt.groundColor(color), rt.groundColor(o.color2 ?? color));
   if (o.shape === 'rect' && o.to) d.rect(center, o.to, o.width ?? radius);
   else if (o.shape === 'cone' && o.to) d.cone(center, o.to, radius, o.halfAngle ?? 0.5);
   else d.circle(center, radius);
@@ -108,7 +108,7 @@ export interface ZoneOptions {
 /** Zone persistante (blizzard, nuée, aura) : fondu d'entrée/sortie + motif animé + particules. */
 export function zone(rt: FxRuntime, at: THREE.Vector3, radius: number, duration: number, color: THREE.Color, o: ZoneOptions = {}): void {
   const center = at.clone();
-  const d = rt.acquireDecal().setColor(color).circle(center, radius);
+  const d = rt.acquireDecal().setColor(rt.groundColor(color)).circle(center, radius);
   d.u.uFill.value = o.fill ?? 0.18;
   d.u.uPattern.value = o.pattern ?? 0.6;
   d.u.uEdge.value = 0.1;
@@ -313,6 +313,28 @@ export function dashTrail(rt: FxRuntime, entityId: number, fromAt: THREE.Vector3
       }
       return r.alive > 0;
     },
+    end: () => rt.releaseRibbon(r),
+  });
+}
+
+/** Éclair en zigzag (ruban) de `from` à `to`, qui s'efface en `life` s. */
+export function lightning(rt: FxRuntime, from: THREE.Vector3, to: THREE.Vector3, color: THREE.Color, opts: { width?: number; life?: number; jag?: number; segments?: number } = {}): void {
+  const r = rt.acquireRibbon();
+  r.width = opts.width ?? 0.18;
+  r.life = opts.life ?? 0.25;
+  r.minDist = 0.001;
+  r.setColor(color, new THREE.Color(3, 3, 3));
+  const n = opts.segments ?? 10;
+  const jag = opts.jag ?? 0.25;
+  const p = new THREE.Vector3();
+  for (let i = 0; i <= n; i++) {
+    const k = i / n;
+    p.lerpVectors(from, to, k);
+    if (i > 0 && i < n) p.set(p.x + (Math.random() - 0.5) * jag * 2, p.y + (Math.random() - 0.5) * jag, p.z + (Math.random() - 0.5) * jag * 2);
+    r.push(p);
+  }
+  rt.add({
+    update: () => r.alive > 0,
     end: () => rt.releaseRibbon(r),
   });
 }

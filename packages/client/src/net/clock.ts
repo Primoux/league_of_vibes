@@ -27,7 +27,9 @@ export class ServerClock {
     }
     let max = -Infinity;
     for (const v of this.samples) if (v > max) max = v;
-    this.target = max + this.rttMs / 2;
+    // Base = temps des données REÇUES (pas le temps serveur réel) : l'interpolation doit garder
+    // INTERP_DELAY_MS de marge sur le dernier snapshot arrivé. La latence est compensée par la prédiction.
+    this.target = max;
     if (!this.initialized) {
       this.smoothed = this.target;
       this.initialized = true;

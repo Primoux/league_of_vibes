@@ -13,6 +13,22 @@ export type AllHandlers = { [K in keyof FxHandlers]-?: NonNullable<FxHandlers[K]
 /** Durée max de suivi d'un projectile sans impact (skillshot raté…), en secondes. */
 const PROJECTILE_TTL = 8;
 
+/** Auteur d'un événement de sort (pour la teinte ennemie). */
+function sourceOf(e: GameEvent): number | undefined {
+  switch (e.type) {
+    case 'abilityCast':
+    case 'projectileSpawn':
+    case 'areaEffect':
+    case 'dash':
+    case 'summonerCast':
+      return e.source;
+    case 'buffApplied':
+      return e.source;
+    default:
+      return undefined;
+  }
+}
+
 export class FxDispatcher {
   private readonly resolved: ResolvedFx = { key: '', phase: 'cast' };
   private readonly projectiles = new Map<number, { h: ProjectileHandle; at: number }>();
@@ -35,6 +51,17 @@ export class FxDispatcher {
     if (custom) this.stats.custom++;
     else this.stats.defaults++;
     const c = this.rt.colors(key);
+    const rt = this.rt;
+    const source = sourceOf(e);
+    rt.enemyContext = source !== undefined && rt.entities.isEnemy(source);
+    try {
+      this.run(e, key, c);
+    } finally {
+      rt.enemyContext = false;
+    }
+  }
+
+  private run(e: GameEvent, key: string, c: ReturnType<FxRuntime['colors']>): void {
     const rt = this.rt;
     // Le switch conserve le typage précis de chaque événement.
     switch (e.type) {

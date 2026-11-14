@@ -1,11 +1,15 @@
 /**
- * Icônes générées en SVG (aucun asset externe). Propriétaire : mistral-ui.
- * Portraits de champions procéduraux (palette + emblème de classe + motif déterministe),
+ * Icônes générées en SVG et portraits illustrés locaux. Propriétaire : mistral-ui.
+ * Portraits de secours procéduraux (palette + emblème de classe + motif déterministe),
  * icônes de sorts, d'objets, de sorts d'invocateur et de rôles.
  */
-import { CHAMPIONS, ITEMS, type AbilityDef, type ItemDef, type Role, type SummonerId } from '@lov/shared';
+import { CHAMPIONS, ITEMS, type AbilityDef, type Role, type SummonerId } from '@lov/shared';
 import type { JSX } from 'preact';
 import { hashString } from '../logic/format.ts';
+import { ChampionArtwork, championArtworkUrl } from './ChampionArtwork.tsx';
+import { abilityGlyph, CATEGORY_COLOR, ITEM_GLYPH, itemGlyphKey, itemTint, itemVariation } from './glyphs.ts';
+import { getShot, studio } from '../stage/studio.ts';
+import { useMini } from '../useStore.ts';
 
 type SvgProps = { size?: number | string; class?: string; title?: string };
 
@@ -29,8 +33,9 @@ export function ClassEmblem({ cls, size = 16, color = 'currentColor' }: { cls: s
 
 // ------------------------------------------------------------------ portrait de champion
 /**
- * Portrait procédural : fond dégradé de la palette, motif radial déterministe, emblème de classe en filigrane,
- * initiale gravée. `variant="splash"` : format portrait 3:4 pour les cartes de chargement / draft.
+ * Illustration locale avec portrait procédural de secours si l'image manque ou échoue.
+ * Le cadre SVG conserve le recadrage, les états et l'accessibilité de toutes les vues existantes.
+ * `variant="splash"` : format portrait 3:4 pour les cartes de chargement / draft.
  */
 export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls, grayscale }: { id: string; size?: number | string; variant?: 'square' | 'splash' | 'round'; class?: string; grayscale?: boolean }) {
   const c = CHAMPIONS[id];
@@ -45,6 +50,10 @@ export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls
   const rot = (h >> 4) % 360;
   const ringR = 26 + ((h >> 9) % 10);
   const letter = (c?.name ?? id).charAt(0).toUpperCase();
+  useMini(studio, (s) => s.version);
+  // illustration peinte (codex-champions) en priorité ; rendu 3D du modèle en secours, puis l'initiale
+  const art = championArtworkUrl(id);
+  const shot = art ? null : getShot(id, variant === 'splash' ? 'full' : 'bust');
   const rayPaths: JSX.Element[] = [];
   for (let i = 0; i < rays; i++) {
     const a0 = ((rot + (i * 360) / rays) * Math.PI) / 180;
@@ -90,178 +99,122 @@ export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls
       <g fill={pal.accent} opacity="0.09">{rayPaths}</g>
       <circle cx={cx} cy={cy} r={ringR} fill="none" stroke={pal.accent} stroke-opacity="0.35" stroke-width="1.2" />
       <circle cx={cx} cy={cy} r={ringR + 6} fill="none" stroke={pal.primary} stroke-opacity="0.4" stroke-width="0.6" stroke-dasharray="2 3" />
-      <g transform={`translate(${cx - 34} ${cy - 34}) scale(2.83)`} opacity="0.22">
+      <g transform={`translate(${cx - 34} ${cy - 34}) scale(2.83)`} opacity={shot || art ? 0.1 : 0.22}>
         <path d={EMBLEM[c?.class ?? 'mage']} fill={pal.accent} fill-rule="evenodd" />
       </g>
       <g fill={pal.accent}>{shards}</g>
+      {shot ? (
+        <>
+          <ellipse cx={cx} cy={H * 0.93} rx={W * 0.42} ry={H * 0.06} fill="#000" opacity="0.35" />
+          <image href={shot} x="0" y={variant === 'splash' ? 4 : 2} width={W} height={H} preserveAspectRatio={variant === 'splash' ? 'xMidYMax meet' : 'xMidYMid slice'} />
+        </>
+      ) : (
       <text
-        x={cx}
-        y={cy + 15}
-        text-anchor="middle"
-        font-family="Cinzel, 'Times New Roman', serif"
-        font-weight="800"
-        font-size="44"
-        fill={`url(#${uid}-glyph)`}
-        stroke="#0a0a12"
-        stroke-width="1.6"
-        paint-order="stroke"
-      >
-        {letter}
-      </text>
+          x={cx}
+          y={cy + 15}
+          text-anchor="middle"
+          font-family="Cinzel, 'Times New Roman', serif"
+          font-weight="800"
+          font-size="44"
+          fill={`url(#${uid}-glyph)`}
+          stroke="#0a0a12"
+          stroke-width="1.6"
+          paint-order="stroke"
+        >
+          {letter}
+        </text>
+      )}
+      <ChampionArtwork id={id} width={W} height={H} />
       <rect width={W} height={H} fill={`url(#${uid}-vig)`} />
     </svg>
   );
 }
 
 // ------------------------------------------------------------------ icônes de sorts
-const TARGET_GLYPH: Record<string, string> = {
-  skillshot: 'M3 13 L15 13 L15 9 L22 12 L15 15 L15 11 L3 11 Z M3 8 L9 8 L9 9.4 L3 9.4 Z M3 14.6 L9 14.6 L9 16 L3 16 Z',
-  targeted: 'M11 2 H13 V7 H11 Z M11 17 H13 V22 H11 Z M2 11 H7 V13 H2 Z M17 11 H22 V13 H17 Z M12 8.5 A3.5 3.5 0 1 1 11.99 8.5 Z',
-  ground: 'M12 4 A8 8 0 1 1 11.99 4 Z M12 6.5 A5.5 5.5 0 1 0 12.01 6.5 Z M12 9.5 A2.5 2.5 0 1 1 11.99 9.5 Z',
-  cone: 'M3 12 L21 3 C23 9 23 15 21 21 Z M8 12 L18 7.5 C19 10.5 19 13.5 18 16.5 Z',
-  self: 'M12 3 A9 9 0 1 1 11.99 3 Z M12 5 A7 7 0 1 0 12.01 5 Z M12 8 A4 4 0 1 1 11.99 8 Z',
-  dash: 'M2 5 L9 12 L2 19 L5 19 L12 12 L5 5 Z M10 5 L17 12 L10 19 L13 19 L20 12 L13 5 Z',
-  targetedDash: 'M2 6 L8 12 L2 18 L4.5 18 L10.5 12 L4.5 6 Z M9 6 L15 12 L9 18 L11.5 18 L17.5 12 L11.5 6 Z M20 9.5 A2.5 2.5 0 1 1 19.99 9.5 Z',
-  global: 'M12 2 A10 10 0 1 1 11.99 2 Z M12 4 A8 8 0 1 0 12.01 4 Z M11 3 H13 V21 H11 Z M3 11 H21 V13 H3 Z M12 4 C7 8 7 16 12 20 C9 16 9 8 12 4 Z M12 4 C17 8 17 16 12 20 C15 16 15 8 12 4 Z',
-  passive: 'M12 2 L20.7 7 V17 L12 22 L3.3 17 V7 Z M12 5 L18 8.5 V15.5 L12 19 L6 15.5 V8.5 Z M12 8 L15.5 10 V14 L12 16 L8.5 14 V10 Z',
-};
-
-const SLOT_HUE: Record<string, number> = { P: 0, Q: 0, W: 35, E: -35, R: 70 };
 
 export function AbilityIcon({ ability, championId, size = 48 }: { ability: AbilityDef; championId: string; size?: number | string }) {
   const pal = CHAMPIONS[championId]?.palette ?? { primary: '#888', secondary: '#222', accent: '#eee' };
   const uid = `la-${ability.id}`;
-  const glyph = ability.slot === 'P' ? TARGET_GLYPH.passive : (TARGET_GLYPH[ability.targeting] ?? TARGET_GLYPH.self);
-  const hue = SLOT_HUE[ability.slot] ?? 0;
+  const glyph = abilityGlyph(ability);
   const dmg = ability.damage?.type;
-  const tint = dmg === 'physical' ? '#ffb36b' : dmg === 'magic' ? '#c79bff' : dmg === 'true' ? '#ffffff' : pal.accent;
+  const tint = dmg === 'physical' ? '#ffb36b' : dmg === 'magic' ? '#d2a8ff' : dmg === 'true' ? '#ffffff' : pal.accent;
   const h = hashString(ability.id);
+  const ang = (h % 360) * (Math.PI / 180);
+  const rays = [];
+  for (let i = 0; i < 6; i++) {
+    const a = ang + (i * Math.PI) / 3;
+    rays.push(<path key={i} d={`M24 24 L${24 + Math.cos(a) * 40} ${24 + Math.sin(a) * 40} L${24 + Math.cos(a + 0.22) * 40} ${24 + Math.sin(a + 0.22) * 40} Z`} />);
+  }
   return (
     <svg viewBox="0 0 48 48" width={size} height={size} class="lov-ability-icon" role="img" aria-label={ability.name}>
       <defs>
-        <linearGradient id={`${uid}-bg`} x1="0" y1="0" x2="1" y2="1" gradientTransform={`rotate(${h % 90})`}>
-          <stop offset="0%" stop-color={pal.primary} style={{ filter: `hue-rotate(${hue}deg)` }} />
-          <stop offset="100%" stop-color={pal.secondary} />
-        </linearGradient>
+        <radialGradient id={`${uid}-bg`} cx="30%" cy="25%" r="95%">
+          <stop offset="0%" stop-color={pal.primary} />
+          <stop offset="55%" stop-color={pal.secondary} />
+          <stop offset="100%" stop-color="#05060c" />
+        </radialGradient>
         <radialGradient id={`${uid}-glow`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color={tint} stop-opacity="0.55" />
+          <stop offset="0%" stop-color={tint} stop-opacity="0.7" />
+          <stop offset="60%" stop-color={tint} stop-opacity="0.12" />
           <stop offset="100%" stop-color={tint} stop-opacity="0" />
         </radialGradient>
+        <linearGradient id={`${uid}-glyph`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffffff" />
+          <stop offset="55%" stop-color={pal.accent} />
+          <stop offset="100%" stop-color={tint} />
+        </linearGradient>
+        <filter id={`${uid}-f`} x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="1.6" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
       <rect width="48" height="48" fill={`url(#${uid}-bg)`} />
-      <g opacity="0.18" stroke={pal.accent} stroke-width="0.8" fill="none">
-        <circle cx="24" cy="24" r={10 + (h % 8)} />
-        <circle cx="24" cy="24" r={18 + ((h >> 3) % 6)} stroke-dasharray="3 4" />
+      <g fill={pal.accent} opacity="0.1">{rays}</g>
+      <circle cx="24" cy="24" r="20" fill={`url(#${uid}-glow)`} />
+      <circle cx="24" cy="24" r={13 + (h % 5)} fill="none" stroke={pal.accent} stroke-opacity="0.22" stroke-width="0.7" stroke-dasharray="2 3" />
+      <g transform="translate(7 7) scale(1.4167)" filter={`url(#${uid}-f)`}>
+        <path d={glyph} fill={`url(#${uid}-glyph)`} fill-rule="evenodd" stroke="#05060c" stroke-width="0.7" paint-order="stroke" />
       </g>
-      <circle cx="24" cy="24" r="18" fill={`url(#${uid}-glow)`} />
-      <g transform="translate(8 8) scale(1.333)">
-        <path d={glyph} fill={pal.accent} fill-rule="evenodd" stroke="#08080e" stroke-width="0.6" paint-order="stroke" />
-      </g>
-      {ability.slot === 'R' && <path d="M0 0 H14 L0 14 Z M48 48 H34 L48 34 Z" fill={tint} opacity="0.7" />}
+      <path d="M0 0 H48 V16 C32 10 16 10 0 16 Z" fill="#fff" opacity="0.08" />
+      {ability.slot === 'R' && <path d="M0 0 H12 L0 12 Z M48 48 H36 L48 36 Z M48 0 V12 L36 0 Z M0 48 V36 L12 48 Z" fill={tint} opacity="0.75" />}
     </svg>
   );
 }
 
 // ------------------------------------------------------------------ objets
-const ITEM_GLYPH: Record<string, string> = {
-  sword: 'M18 2 L22 2 L22 6 L10 18 L12 20 L10.5 21.5 L8 19 L5 22 L2 19 L5 16 L2.5 13.5 L4 12 L6 14 Z',
-  blade: 'M20 2 C21 8 16 15 9 18 L11 20 L9.5 21.5 L7 19 L4 22 L2 20 L5 17 L2.5 14.5 L4 13 L6 15 C9 8 14 4 20 2 Z',
-  tome: 'M4 3 H17 C18.7 3 20 4.3 20 6 V21 H6.5 C5.1 21 4 19.9 4 18.5 Z M6.5 17.5 C5.9 17.5 5.5 18 5.5 18.5 C5.5 19 5.9 19.5 6.5 19.5 H18.5 V17.5 Z M9 7 H16 V8.5 H9 Z M9 10 H14 V11.5 H9 Z',
-  gem: 'M7 3 H17 L22 9 L12 22 L2 9 Z M8 4.5 L4.6 8.8 H9.4 Z M16 4.5 L14.6 8.8 H19.4 Z M10 4.5 L12 8.5 L14 4.5 Z M5 10.3 L11 18.5 L9.6 10.3 Z M19 10.3 L14.4 10.3 L13 18.5 Z',
-  boots: 'M6 2 H13 V12 L20 15 C21.5 15.7 22 17 22 18.5 V21 H4 V16 L6 13 Z M4 19 H22 V21 H4 Z',
-  potion: 'M9 2 H15 V4 H14 V8 C17.5 9.3 20 12.4 20 16 C20 19.9 16.4 23 12 23 C7.6 23 4 19.9 4 16 C4 12.4 6.5 9.3 10 8 V4 H9 Z M6 15.5 C6.4 19 9 21 12 21 C15 21 17.6 19 18 15.5 Z',
-  ring: 'M12 7 A8 8 0 1 1 11.99 7 Z M12 10 A5 5 0 1 0 12.01 10 Z M9 2 H15 L16.5 5 L12 8.5 L7.5 5 Z',
-  shield: 'M12 2 L21 5.5 V11 C21 16.5 17 20.8 12 22.5 C7 20.8 3 16.5 3 11 V5.5 Z M12 5 V19.5 C15.5 18 18.5 15 18.5 11 V7.2 Z',
-  eye: 'M12 5 C17 5 21 9 23 12 C21 15 17 19 12 19 C7 19 3 15 1 12 C3 9 7 5 12 5 Z M12 8 A4 4 0 1 0 12.01 8 Z M12 10.3 A1.7 1.7 0 1 1 11.99 10.3 Z',
-  dagger: 'M12 1 L14.5 6 V14 H17 V16 H13.2 V19 L14 20 L12 23 L10 20 L10.8 19 V16 H7 V14 H9.5 V6 Z',
-  cloak: 'M8 2 H16 L17 5 C20 9 21.5 15 22 22 H15 L12 16 L9 22 H2 C2.5 15 4 9 7 5 Z M10 3.5 L12 7 L14 3.5 Z',
-  wand: 'M3 20 L15 8 L16.5 9.5 L4.5 21.5 Z M18 2 L19.2 4.8 L22 6 L19.2 7.2 L18 10 L16.8 7.2 L14 6 L16.8 4.8 Z',
-  hammer: 'M4 4 H15 L18 7 V11 H15 L13.5 9.5 H12 V22 H9 V9.5 H4 Z',
-  hourglass: 'M5 2 H19 V4 H17.5 C17.5 8 14.5 10.5 13 12 C14.5 13.5 17.5 16 17.5 20 H19 V22 H5 V20 H6.5 C6.5 16 9.5 13.5 11 12 C9.5 10.5 6.5 8 6.5 4 H5 Z M8.6 20 H15.4 C15 17.4 13 15.5 12 14.6 C11 15.5 9 17.4 8.6 20 Z',
-  chest: 'M3 4 L8 2 C9 4 10.5 5 12 5 C13.5 5 15 4 16 2 L21 4 L19.5 10 L18 9.5 V22 H6 V9.5 L4.5 10 Z M9 11 H15 V12.5 H9 Z M9 14.5 H15 V16 H9 Z',
-  orb: 'M12 3 A9 9 0 1 1 11.99 3 Z M9 7.5 A3 3 0 1 0 9.01 7.5 Z',
-  heart: 'M12 21 C5 16 2 12.5 2 8.5 C2 5.5 4.5 3 7.5 3 C9.5 3 11 4 12 5.5 C13 4 14.5 3 16.5 3 C19.5 3 22 5.5 22 8.5 C22 12.5 19 16 12 21 Z',
-  claw: 'M5 21 C5 13 7 6 12 2 C10 7 10 12 11 15 C12 10 14 6 18 3 C16 8 15.5 13 16 17 C17 14 19 12 22 11 C19 15 18 19 17 22 Z',
-  bow: 'M5 2 C17 4 20 10 20 12 C20 14 17 20 5 22 L6.5 20.2 C14 18.5 17.5 15 17.5 12 C17.5 9 14 5.5 6.5 3.8 Z M4 11 H19 V13 H4 Z M2 9 L5 12 L2 15 Z',
-};
-
-const CATEGORY_COLOR: Record<string, [string, string]> = {
-  starter: ['#5b8a5a', '#1d2b1c'],
-  consumable: ['#b7434a', '#2a0f13'],
-  boots: ['#8a6a46', '#2a1c10'],
-  basic: ['#7f8ea3', '#1a1f29'],
-  epic: ['#8b5bd6', '#1d1233'],
-  legendary: ['#e2b64a', '#3a2408'],
-  trinket: ['#d7c24a', '#2c2709'],
-};
-
-function itemGlyphKey(item: ItemDef): string {
-  const k = `${item.icon} ${item.id}`.toLowerCase();
-  const table: [RegExp, string][] = [
-    [/hourglass|sablier|stasis/, 'hourglass'],
-    [/potion|flask|elixir|biscuit/, 'potion'],
-    [/ward|eye|trinket|totem/, 'eye'],
-    [/boot|greave|tabi|shoe/, 'boots'],
-    [/machete|claw|griffe/, 'claw'],
-    [/bow|arc/, 'bow'],
-    [/dagger|dague/, 'dagger'],
-    [/blade|lame|edge|doran_blade/, 'blade'],
-    [/sword|epee|saber/, 'sword'],
-    [/tome|book|codex|grimoire/, 'tome'],
-    [/ruby|crystal|gem|sapphire|saphir|jewel/, 'gem'],
-    [/ring|anneau/, 'ring'],
-    [/shield|bouclier|aegis|egide/, 'shield'],
-    [/cloak|cape|mantle|negation/, 'cloak'],
-    [/wand|rod|staff|baton|baguette|sceptre/, 'wand'],
-    [/hammer|marteau|mace/, 'hammer'],
-    [/armor|vest|plate|cuirasse|tissu|chest/, 'chest'],
-    [/orb|pearl|perle/, 'orb'],
-    [/heart|coeur|warmog/, 'heart'],
-  ];
-  for (const [re, g] of table) if (re.test(k)) return g;
-  const s = item.stats;
-  if (s.critChance) return 'cloak';
-  if (s.attackSpeed) return 'dagger';
-  if (s.ad || s.armorPen) return 'sword';
-  if (s.ap || s.magicPen) return 'wand';
-  if (s.armor) return 'chest';
-  if (s.mr) return 'cloak';
-  if (s.maxHp) return 'heart';
-  if (s.maxMana) return 'orb';
-  return 'gem';
-}
-
-function itemTint(item: ItemDef): string {
-  const s = item.stats;
-  if (s.ap || s.magicPen) return '#c48bff';
-  if (s.critChance || s.attackSpeed) return '#ffd16b';
-  if (s.ad || s.armorPen || s.lifesteal) return '#ff9a5c';
-  if (s.armor) return '#e8d08c';
-  if (s.mr) return '#7fc6ff';
-  if (s.maxHp || s.hpRegen) return '#ff6d7a';
-  if (s.maxMana || s.manaRegen) return '#6fa8ff';
-  if (s.moveSpeed) return '#9ff0c2';
-  return '#f2f2f2';
-}
-
 export function ItemIcon({ itemId, size = 40, class: cls }: { itemId: string | null | undefined; size?: number | string; class?: string }) {
   const item = itemId ? ITEMS[itemId] : undefined;
   if (!item) return <span class={`lov-item-empty ${cls ?? ''}`} style={{ width: size, height: size }} />;
   const [c1, c2] = CATEGORY_COLOR[item.category] ?? CATEGORY_COLOR.basic!;
-  const uid = `li-${item.category}`;
+  const uid = `li-${item.id}`;
   const tint = itemTint(item);
+  const v = itemVariation(item);
   return (
     <svg viewBox="0 0 40 40" width={size} height={size} class={`lov-item-icon cat-${item.category} ${cls ?? ''}`} role="img" aria-label={item.name}>
       <defs>
-        <radialGradient id={`${uid}-bg`} cx="35%" cy="30%" r="85%">
-          <stop offset="0%" stop-color={c1} />
+        <radialGradient id={`${uid}-bg`} cx={`${v.lightX}%`} cy="28%" r="90%">
+          <stop offset="0%" stop-color={c1} style={{ filter: `hue-rotate(${v.hue}deg)` }} />
           <stop offset="100%" stop-color={c2} />
+        </radialGradient>
+        <radialGradient id={`${uid}-glow`} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color={tint} stop-opacity="0.45" />
+          <stop offset="100%" stop-color={tint} stop-opacity="0" />
         </radialGradient>
       </defs>
       <rect width="40" height="40" fill={`url(#${uid}-bg)`} />
-      <g transform="translate(6 6) scale(1.1667)">
+      <g opacity="0.14" stroke={tint} stroke-width="0.6" fill="none">
+        <circle cx="20" cy="20" r={9 + v.ring} />
+        <circle cx="20" cy="20" r={15 + v.ring / 2} stroke-dasharray="2 3" />
+      </g>
+      <circle cx="20" cy="20" r="15" fill={`url(#${uid}-glow)`} />
+      <g transform={`translate(6 6) scale(1.1667) rotate(${v.tilt} 12 12)`}>
         <path d={ITEM_GLYPH[itemGlyphKey(item)]} fill={tint} fill-rule="evenodd" stroke="#0a0a10" stroke-width="0.9" paint-order="stroke" />
       </g>
+      {item.category === 'legendary' && <path d={`M${v.gemX} 4.5 L${v.gemX + 2.5} 7 L${v.gemX} 9.5 L${v.gemX - 2.5} 7 Z`} fill={v.gem} stroke="#0a0a10" stroke-width="0.6" />}
+      <path d="M0 0 H40 V12 C27 8 13 8 0 12 Z" fill="#fff" opacity="0.07" />
       <rect x="0.75" y="0.75" width="38.5" height="38.5" fill="none" stroke={c1} stroke-opacity="0.9" stroke-width="1.5" />
     </svg>
   );

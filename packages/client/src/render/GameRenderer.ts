@@ -12,11 +12,11 @@
  *  - `registerChampionFactory` : voir ./EntityView.ts
  */
 import * as THREE from 'three';
-import { INHIBITORS, NEXUS, TOWERS, isInWall, type EntityId, type EntitySnapshot, type Snapshot, type Vec2 } from '@lov/shared';
+import { INHIBITORS, NEXUS, TOWERS, type EntityId, type EntitySnapshot, type Snapshot, type Vec2 } from '@lov/shared';
 import { clock, flushEvents, net, renderTime, snapshots } from '../net/client.ts';
-import { MovePredictor } from '../net/prediction.ts';
+import { MovePredictor, segmentBlocked } from '../net/prediction.ts';
 import type { Interpolated } from '../net/snapshots.ts';
-import { store } from '../state.ts';
+import { store, type ClientState } from '../state.ts';
 import { CameraController } from './CameraController.ts';
 import { ClickMarkers } from './ClickMarkers.ts';
 import { HealthBars } from './HealthBars.ts';
@@ -27,6 +27,8 @@ import { Indicators, computeAim, newAimState, type AimState } from './Indicators
 import { S, toGameInto, toWorld, toGame } from './coords.ts';
 import { getChampionFactory, type EntityView } from './EntityView.ts';
 import { MapView } from './MapView.ts';
+import { DynamicResolution } from './DynamicResolution.ts';
+import { assignShadowDepthTree } from './shadowDepth.ts';
 import { terrainHeight } from './map/geometry.ts';
 import { rayCylinder, worldHitbox, type Ray3 } from './picking.ts';
 import { defaultViewFor, getDragonElement, setDragonElement } from './views/DefaultViews.ts';
@@ -48,20 +50,15 @@ interface Slot {
   batch?: BatchHandle;
 }
 
-/** La ligne droite a→b traverse-t-elle un mur ? (échantillonnage tous les 50 u) */
-function segmentBlocked(a: Vec2, b: Vec2): boolean {
-  const d = Math.hypot(b.x - a.x, b.y - a.y);
-  const n = Math.ceil(d / 50);
-  const p = { x: 0, y: 0 };
-  for (let i = 1; i <= n; i++) {
-    p.x = a.x + ((b.x - a.x) * i) / n;
-    p.y = a.y + ((b.y - a.y) * i) / n;
-    if (isInWall(p)) return true;
-  }
-  return false;
-}
+
+type ClientStateCameraView = ClientState['cameraView'];
 
 let current: GameRenderer | null = null;
+
+/** Tremblement de caméra (voir GameRenderer.shake) ; sans effet avant la création du renderer. */
+export function shakeCamera(intensity: number, duration: number): void {
+  current?.shake(intensity, duration);
+}
 
 /** Instance active du renderer (pour claude-fx / mistral-ui), null avant création. */
 export function getRenderer(): GameRenderer | null {
@@ -109,6 +106,9 @@ export class GameRenderer {
   private renderFn: () => void = this.defaultRender;
   private stats: StatsOverlay | null = typeof location !== 'undefined' && new URLSearchParams(location.search).has('stats') ? new StatsOverlay() : null;
   private cameraInitForGame: number | null = null;
+  /** Pixel ratio adapté au temps de frame (`?dynres=0` pour le désactiver, ex. mesures). */
+  private readonly dynRes = new DynamicResolution(1);
+  private readonly dynResOn = typeof location === 'undefined' || new URLSearchParams(location.search).get('dynres') !== '0';
 
   constructor(canvas: HTMLCanvasElement) {
     current = this;
@@ -122,6 +122,9 @@ export class GameRenderer {
     this.cam = new CameraController(innerWidth / innerHeight);
     this.camera = this.cam.camera;
     this.scene.add(this.camera); // permet d'attacher des objets à la caméra (FX écran)
+    // frame() met à jour les matrices monde explicitement (le batcher en a besoin avant le rendu) : sans ceci,
+    // renderer.render() reparcourrait toute la scène une seconde fois (≈ 25 % du CPU de rendu mesuré)
+    this.scene.matrixWorldAutoUpdate = false;
 
     this.map = new MapView(this.scene, this.renderer, store.state.settings.quality);
     this.markers = new ClickMarkers(this.scene);
@@ -196,6 +199,7 @@ export class GameRenderer {
         const view = created.view;
         slot = { view, anim: '', dead: false, variant: e.subtype === 'dragon' ? element : undefined };
         if (created.batchable) slot.batch = this.batcher.adopt(view.object3d);
+        else assignShadowDepthTree(view.object3d); // champions skinnés : programme d'ombre stable
         this.slots.set(e.id, slot);
         this.scene.add(view.object3d);
         if (e.kind === 'tower' || e.kind === 'inhibitor' || e.kind === 'nexus') this.hideStaticNear(e);
@@ -250,9 +254,47 @@ export class GameRenderer {
    */
   applyQuality(q: 'low' | 'high'): void {
     this.quality = q;
-    this.renderer.setPixelRatio(q === 'high' ? Math.min(devicePixelRatio, 2) : 1);
+    const ratio = q === 'high' ? Math.min(devicePixelRatio, 2) : 1;
+    this.dynRes.reset(ratio);
+    this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(innerWidth, innerHeight, false);
     this.map.setQuality(q);
+  }
+
+  /**
+   * Tremblement de caméra (impacts d'ultimes, explosions de structures) : `intensity` en unités de jeu
+   * (≈ 15 léger, 40 fort, max 80), `duration` en secondes.
+   */
+  shake(intensity: number, duration: number): void {
+    this.cam.shake(intensity, duration);
+  }
+
+  private static readonly VIEW_NDC: readonly [number, number][] = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  /** Emprise de la vue au sol (plan y = 0), écrite en place dans `out` (aucune allocation). */
+  private updateCameraView(out: ClientStateCameraView): void {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    this.groundPlane.constant = 0;
+    for (let i = 0; i < 4; i++) {
+      const c = GameRenderer.VIEW_NDC[i]!;
+      this.ndc.set(c[0], c[1]);
+      this.raycaster.setFromCamera(this.ndc, this.camera);
+      const q = out.quad[i]!;
+      const hit = this.raycaster.ray.intersectPlane(this.groundPlane, this.tmpV);
+      if (hit) toGameInto(q, hit);
+      minX = Math.min(minX, q.x);
+      minY = Math.min(minY, q.y);
+      maxX = Math.max(maxX, q.x);
+      maxY = Math.max(maxY, q.y);
+    }
+    out.minX = minX;
+    out.minY = minY;
+    out.maxX = maxX;
+    out.maxY = maxY;
+    out.w = maxX - minX;
+    out.h = maxY - minY;
   }
 
   /** claude-fx (PostFx) : remplace le rendu final (bloom, FXAA…). `null` = rendu direct. */
@@ -397,6 +439,9 @@ export class GameRenderer {
     this.cam.update(dt, selfPos ?? null, s.cameraLocked, s.settings.edgePan, s.settings.cameraSpeed, innerWidth, innerHeight);
     s.cameraCenter.x = this.cam.center.x;
     s.cameraCenter.y = this.cam.center.y;
+    // cam.update() a déplacé la caméra : ses matrices monde doivent être à jour avant de lancer les rayons
+    this.camera.updateMatrixWorld();
+    this.updateCameraView(s.cameraView);
 
     if (selfPos) {
       const st = s.snapshot?.self;
@@ -415,8 +460,18 @@ export class GameRenderer {
     for (const cb of this.frameCbs) cb(dt);
     this.scene.updateMatrixWorld();
     this.batcher.sync();
+    // avec post-process, la frame fait plusieurs render() : on compte la frame entière (sinon seule la dernière passe)
+    if (this.stats) {
+      this.renderer.info.autoReset = false;
+      this.renderer.info.reset();
+    }
     this.renderFn();
     this.stats?.frame(dt, this.renderer, this.slots.size);
+    // résolution dynamique (qualité haute) : le post-process suit le nouveau ratio de lui-même
+    if (this.quality === 'high' && this.dynResOn) {
+      const ratio = this.dynRes.update(dt);
+      if (ratio !== null) this.renderer.setPixelRatio(ratio);
+    }
   }
 
   private resize(): void {
