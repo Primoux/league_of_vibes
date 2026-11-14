@@ -27,6 +27,8 @@ import { Indicators, computeAim, newAimState, type AimState } from './Indicators
 import { S, toGameInto, toWorld, toGame } from './coords.ts';
 import { getChampionFactory, type EntityView } from './EntityView.ts';
 import { MapView } from './MapView.ts';
+import { DynamicResolution } from './DynamicResolution.ts';
+import { assignShadowDepthTree } from './shadowDepth.ts';
 import { terrainHeight } from './map/geometry.ts';
 import { rayCylinder, worldHitbox, type Ray3 } from './picking.ts';
 import { defaultViewFor, getDragonElement, setDragonElement } from './views/DefaultViews.ts';
@@ -104,6 +106,9 @@ export class GameRenderer {
   private renderFn: () => void = this.defaultRender;
   private stats: StatsOverlay | null = typeof location !== 'undefined' && new URLSearchParams(location.search).has('stats') ? new StatsOverlay() : null;
   private cameraInitForGame: number | null = null;
+  /** Pixel ratio adapté au temps de frame (`?dynres=0` pour le désactiver, ex. mesures). */
+  private readonly dynRes = new DynamicResolution(1);
+  private readonly dynResOn = typeof location === 'undefined' || new URLSearchParams(location.search).get('dynres') !== '0';
 
   constructor(canvas: HTMLCanvasElement) {
     current = this;
@@ -117,6 +122,9 @@ export class GameRenderer {
     this.cam = new CameraController(innerWidth / innerHeight);
     this.camera = this.cam.camera;
     this.scene.add(this.camera); // permet d'attacher des objets à la caméra (FX écran)
+    // frame() met à jour les matrices monde explicitement (le batcher en a besoin avant le rendu) : sans ceci,
+    // renderer.render() reparcourrait toute la scène une seconde fois (≈ 25 % du CPU de rendu mesuré)
+    this.scene.matrixWorldAutoUpdate = false;
 
     this.map = new MapView(this.scene, this.renderer, store.state.settings.quality);
     this.markers = new ClickMarkers(this.scene);
@@ -191,6 +199,7 @@ export class GameRenderer {
         const view = created.view;
         slot = { view, anim: '', dead: false, variant: e.subtype === 'dragon' ? element : undefined };
         if (created.batchable) slot.batch = this.batcher.adopt(view.object3d);
+        else assignShadowDepthTree(view.object3d); // champions skinnés : programme d'ombre stable
         this.slots.set(e.id, slot);
         this.scene.add(view.object3d);
         if (e.kind === 'tower' || e.kind === 'inhibitor' || e.kind === 'nexus') this.hideStaticNear(e);
@@ -245,7 +254,9 @@ export class GameRenderer {
    */
   applyQuality(q: 'low' | 'high'): void {
     this.quality = q;
-    this.renderer.setPixelRatio(q === 'high' ? Math.min(devicePixelRatio, 2) : 1);
+    const ratio = q === 'high' ? Math.min(devicePixelRatio, 2) : 1;
+    this.dynRes.reset(ratio);
+    this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(innerWidth, innerHeight, false);
     this.map.setQuality(q);
   }
@@ -449,8 +460,18 @@ export class GameRenderer {
     for (const cb of this.frameCbs) cb(dt);
     this.scene.updateMatrixWorld();
     this.batcher.sync();
+    // avec post-process, la frame fait plusieurs render() : on compte la frame entière (sinon seule la dernière passe)
+    if (this.stats) {
+      this.renderer.info.autoReset = false;
+      this.renderer.info.reset();
+    }
     this.renderFn();
     this.stats?.frame(dt, this.renderer, this.slots.size);
+    // résolution dynamique (qualité haute) : le post-process suit le nouveau ratio de lui-même
+    if (this.quality === 'high' && this.dynResOn) {
+      const ratio = this.dynRes.update(dt);
+      if (ratio !== null) this.renderer.setPixelRatio(ratio);
+    }
   }
 
   private resize(): void {
