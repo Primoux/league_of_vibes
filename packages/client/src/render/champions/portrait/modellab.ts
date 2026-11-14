@@ -65,7 +65,7 @@ export function startModelLab(canvas: HTMLCanvasElement): void {
   const animate = (name: string): void => {
     if (!view) return;
     if (name === 'death') { snap.dead = !snap.dead; walking = false; view.playAnim(snap.dead ? 'death' : 'idle'); return; }
-    snap.dead = false; walking = name === 'run';
+    snap.dead = false; view.update(snap, 0); walking = name === 'run';
     if (name.startsWith('cast_')) { view.cast(name.slice(5)); if (name === 'cast_R' && snap.subtype === 'melenchon') rUntil = performance.now() + 4000; }
     else if (name === 'attack') view.strike(); else view.playAnim(name);
   };
