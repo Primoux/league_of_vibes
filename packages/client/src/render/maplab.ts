@@ -24,6 +24,7 @@ import {
   type Team,
   type Vec2,
 } from '@lov/shared';
+import { installFx } from '../fx/index.ts';
 import { installControls } from '../input/controls.ts';
 import { net } from '../net/client.ts';
 import { store } from '../state.ts';
@@ -44,6 +45,8 @@ export function startMapLab(canvas: HTMLCanvasElement): void {
   if (q === 'low' || q === 'high') store.set({ settings: { ...store.state.settings, quality: q } });
   const renderer = new GameRenderer(canvas);
   installControls(renderer);
+  // FX, post-process et vrais modèles de champions (comme en jeu) ; `&nofx` pour le rendu brut
+  if (!params.has('nofx')) installFx(renderer);
 
   let nextId = 1;
   const ents = new Map<number, SimEntity>();
