@@ -1,11 +1,12 @@
 /**
- * Icônes générées en SVG (aucun asset externe). Propriétaire : mistral-ui.
- * Portraits de champions procéduraux (palette + emblème de classe + motif déterministe),
+ * Icônes générées en SVG et portraits illustrés locaux. Propriétaire : mistral-ui.
+ * Portraits de secours procéduraux (palette + emblème de classe + motif déterministe),
  * icônes de sorts, d'objets, de sorts d'invocateur et de rôles.
  */
 import { CHAMPIONS, ITEMS, type AbilityDef, type ItemDef, type Role, type SummonerId } from '@lov/shared';
 import type { JSX } from 'preact';
 import { hashString } from '../logic/format.ts';
+import { ChampionArtwork, championArtworkUrl } from './ChampionArtwork.tsx';
 import { abilityGlyph } from './glyphs.ts';
 import { getShot, studio } from '../stage/studio.ts';
 import { useMini } from '../useStore.ts';
@@ -32,8 +33,9 @@ export function ClassEmblem({ cls, size = 16, color = 'currentColor' }: { cls: s
 
 // ------------------------------------------------------------------ portrait de champion
 /**
- * Portrait procédural : fond dégradé de la palette, motif radial déterministe, emblème de classe en filigrane,
- * initiale gravée. `variant="splash"` : format portrait 3:4 pour les cartes de chargement / draft.
+ * Illustration locale avec portrait procédural de secours si l'image manque ou échoue.
+ * Le cadre SVG conserve le recadrage, les états et l'accessibilité de toutes les vues existantes.
+ * `variant="splash"` : format portrait 3:4 pour les cartes de chargement / draft.
  */
 export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls, grayscale }: { id: string; size?: number | string; variant?: 'square' | 'splash' | 'round'; class?: string; grayscale?: boolean }) {
   const c = CHAMPIONS[id];
@@ -49,7 +51,9 @@ export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls
   const ringR = 26 + ((h >> 9) % 10);
   const letter = (c?.name ?? id).charAt(0).toUpperCase();
   useMini(studio, (s) => s.version);
-  const shot = getShot(id, variant === 'splash' ? 'full' : 'bust');
+  // illustration peinte (codex-champions) en priorité ; rendu 3D du modèle en secours, puis l'initiale
+  const art = championArtworkUrl(id);
+  const shot = art ? null : getShot(id, variant === 'splash' ? 'full' : 'bust');
   const rayPaths: JSX.Element[] = [];
   for (let i = 0; i < rays; i++) {
     const a0 = ((rot + (i * 360) / rays) * Math.PI) / 180;
@@ -95,7 +99,7 @@ export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls
       <g fill={pal.accent} opacity="0.09">{rayPaths}</g>
       <circle cx={cx} cy={cy} r={ringR} fill="none" stroke={pal.accent} stroke-opacity="0.35" stroke-width="1.2" />
       <circle cx={cx} cy={cy} r={ringR + 6} fill="none" stroke={pal.primary} stroke-opacity="0.4" stroke-width="0.6" stroke-dasharray="2 3" />
-      <g transform={`translate(${cx - 34} ${cy - 34}) scale(2.83)`} opacity={shot ? 0.1 : 0.22}>
+      <g transform={`translate(${cx - 34} ${cy - 34}) scale(2.83)`} opacity={shot || art ? 0.1 : 0.22}>
         <path d={EMBLEM[c?.class ?? 'mage']} fill={pal.accent} fill-rule="evenodd" />
       </g>
       <g fill={pal.accent}>{shards}</g>
@@ -120,6 +124,7 @@ export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls
           {letter}
         </text>
       )}
+      <ChampionArtwork id={id} width={W} height={H} />
       <rect width={W} height={H} fill={`url(#${uid}-vig)`} />
     </svg>
   );

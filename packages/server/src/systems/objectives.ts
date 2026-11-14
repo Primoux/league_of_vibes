@@ -2,6 +2,7 @@ import { PITS, TEAMS, TIMERS, dist2, scaled, type DragonElement, type MonsterTyp
 import { DRAGON_ELEMENTS } from '../../../shared/src/data/monsters.ts';
 import type { Entity, System, World } from '../world.ts';
 import { addBuff, applyDamage, retire, type BuffOptions } from '../world-ai/runtime.ts';
+import { refreshBurn, takeBurnTick } from '../world-ai/burns.ts';
 import { aggroMonster, spawnMonster, updateMonster, type MonsterState } from '../world-ai/monsters.ts';
 import { installObjectiveEffects, updateObjectiveEffects } from '../world-ai/objective-effects.ts';
 import { removeBuff, updateBuffs } from '../combat/buffs.ts';
@@ -113,16 +114,16 @@ export const objectivesSystem: System = {
     world.hooks.afterAttackHit.push(ctx => {
       if ((ctx.attacker.data.monster as MonsterState | undefined)?.epic) epicBreath(world, ctx.attacker, ctx.target);
     });
-    world.events.on('damage', event => {
-      if (event.amount <= 0) return;
-      const source = world.get(event.source); const target = world.get(event.target);
-      if (!source || !target) return;
+    world.hooks.afterDamage.push((ctx, dealt) => {
+      if (dealt <= 0) return;
+      const source = ctx.credit ?? ctx.source; const target = ctx.target;
+      if (!source || !target || target.hp <= 0) return;
       source.data.pveLastCombat = target.data.pveLastCombat = world.time;
       const monster = target.data.monster as MonsterState | undefined;
       if (monster?.epic) aggroMonster(world, target, source);
       if (source.champ && source.team !== 'neutral' && target.team !== source.team) {
         const progress = state.teams[source.team];
-        if (target.kind === 'tower' && progress.grubs > 0 && event.ability !== 'grub_siege') {
+        if (target.kind === 'tower' && progress.grubs > 0 && ctx.ability !== 'grub_siege') {
           applyDamage(world, { source, target, amount: 8 * progress.grubs, type: 'true', ability: 'grub_siege' });
           if (progress.grubs >= 3 && world.time >= Number(source.data.nextGrubling ?? 0)) {
             source.data.nextGrubling = world.time + 15;
@@ -132,8 +133,8 @@ export const objectivesSystem: System = {
             grub.data.owner = source.id; grub.data.grubling = { target: target.id, expiresAt: world.time + 15 };
           }
         }
-        if (target.kind === 'champion' && progress.elderUntil > world.time && source.data.elderBuff && !target.dead && !event.ability?.startsWith('elder_')) {
-          target.data.elderBurn = { source: source.id, until: world.time + 3, next: world.time + 1 };
+        if (target.kind === 'champion' && progress.elderUntil > world.time && source.data.elderBuff && !target.dead && !ctx.ability?.startsWith('elder_')) {
+          refreshBurn(world, target, 'elderBurn', source);
           if (target.hp / target.stats.maxHp < 0.2) applyDamage(world, { source, target, amount: target.hp + target.shield + 1, type: 'true', ability: 'elder_execute' });
         }
       }
@@ -242,12 +243,12 @@ export const objectivesSystem: System = {
           }
         }
       }
-      const burn = entity.data.elderBurn as { source: number; until: number; next: number } | undefined;
-      if (burn && !entity.dead && world.time >= burn.next && world.time <= burn.until) {
-        const source = world.get(burn.source); burn.next += 1;
-        if (source && !source.dead && source.data.elderBuff && (source.data.elderBuff as { expiresAt: number }).expiresAt > world.time) {
-          applyDamage(world, { source, target: entity, amount: 40, type: 'true', ability: 'elder_burn' });
-          if (!entity.dead && entity.hp / entity.stats.maxHp < 0.2) applyDamage(world, { source, target: entity, amount: entity.hp + entity.shield + 1, type: 'true', ability: 'elder_execute' });
+      let burnSource: Entity | undefined;
+      while ((burnSource = takeBurnTick(world, entity, 'elderBurn'))) {
+        const buff = burnSource.data.elderBuff as { expiresAt: number } | undefined;
+        if (!burnSource.dead && buff && buff.expiresAt > world.time) {
+          applyDamage(world, { source: burnSource, target: entity, amount: 40, type: 'true', ability: 'elder_burn' });
+          if (!entity.dead && entity.hp > 0 && entity.hp / entity.stats.maxHp < 0.2) applyDamage(world, { source: burnSource, target: entity, amount: entity.hp + entity.shield + 1, type: 'true', ability: 'elder_execute' });
         }
       }
       for (const key of EXPIRING_BUFFS) {

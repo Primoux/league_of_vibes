@@ -180,7 +180,7 @@ export function startFxLab(): void {
   const autoAttack = (champ: ChampionDef): void => {
     useChampion(champ);
     sim.attack(caster.actor.id, main.actor.id);
-    attackUntil = clock + 1.6;
+    attackUntil = clock + 4;
   };
   const castSummoner = (spell: SummonerId): void => {
     sim.summoner(caster.actor.id, spell, spell === 'teleport' ? ally.actor : main.actor, mainPos());
@@ -357,6 +357,8 @@ export function startFxLab(): void {
 
   let spamAcc = 0;
   let stressAcc = 0;
+  let walkFlip = -1;
+  const walk = params.get('walk') === '1';
   const stress = params.get('stress') === '1';
   let moveFlip = 0;
   const simulate = (dt: number): void => {
@@ -364,6 +366,11 @@ export function startFxLab(): void {
     if (attackUntil > 0 && clock > attackUntil) {
       attackUntil = -1;
       sim.stop(caster.actor.id);
+    }
+    // &walk=1 : le lanceur fait des allers-retours (revue de la course et des demi-tours)
+    if (walk && Math.floor(clock / 2.2) !== walkFlip) {
+      walkFlip = Math.floor(clock / 2.2);
+      sim.moveTo(caster.actor.id, walkFlip % 2 ? { x: P.caster.x + 650, y: P.caster.y - 120 } : { ...P.caster });
     }
     if (moving && Math.floor(clock / 1.5) !== moveFlip) {
       moveFlip = Math.floor(clock / 1.5);

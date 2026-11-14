@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { CHAMPIONS, CHAMPION_LIST } from '@lov/shared';
 import { createChampionView, type AnimatedChampionView } from '../../render/champions/index.ts';
+import { championArtworkUrl } from '../icons/ChampionArtwork.tsx';
 import { MiniStore } from '../useStore.ts';
 
 export type ShotKind = 'bust' | 'full';
@@ -38,8 +39,10 @@ export function getShot(id: string, kind: ShotKind): string | null {
 
 /** Précharge tous les bustes (appelé au démarrage de l'UI). */
 export function preloadShots(): void {
-  for (const c of CHAMPION_LIST) getShot(c.id, 'bust');
-  for (const c of CHAMPION_LIST) getShot(c.id, 'full');
+  // seuls les champions sans illustration peinte ont besoin d'une photo 3D
+  const todo = CHAMPION_LIST.filter((c) => !championArtworkUrl(c.id));
+  for (const c of todo) getShot(c.id, 'bust');
+  for (const c of todo) getShot(c.id, 'full');
 }
 
 function pump(): void {

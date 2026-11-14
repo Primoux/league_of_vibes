@@ -20,6 +20,7 @@ import { solenneModel } from './models/solenne.ts';
 import { tharoxModel } from './models/tharox.ts';
 import { vrennaModel } from './models/vrenna.ts';
 import { zephyrModel } from './models/zephyr.ts';
+import { master67Model } from './models/master67.ts';
 
 export { ProceduralChampionView, setRespawnHook } from './ChampionView.ts';
 
@@ -34,11 +35,14 @@ const MODELS: Record<string, ChampionModelDef> = {
   corvin: corvinModel,
   nyx: nyxModel,
   solenne: solenneModel,
+  master67: master67Model,
 };
 
 /** Contrat commun aux modèles articulés et aux caricatures originales. */
 export interface AnimatedChampionView extends EntityView {
   readonly height: number;
+  /** Recul à l'impact (optionnel : les vues sur mesure peuvent l'ignorer). */
+  flinch?(amount: number): void;
   strike(): void;
   cast(slot: string): void;
   setRecalling(on: boolean): void;
@@ -77,6 +81,9 @@ function route(e: GameEvent): void {
       break;
     case 'abilityCast':
       views.get(e.source)?.cast(e.slot);
+      break;
+    case 'damage':
+      if (e.amount > 0) views.get(e.target)?.flinch?.(e.amount);
       break;
     case 'recallStart':
       views.get(e.target)?.setRecalling(true);
