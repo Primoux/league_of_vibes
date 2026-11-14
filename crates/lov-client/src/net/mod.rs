@@ -84,6 +84,22 @@ impl Plugin for NetPlugin {
     }
 }
 
+/// Mode hors ligne (scène de charge) : mêmes ressources, mais aucun fil réseau. Les ordres envoyés
+/// sont perdus car le récepteur du canal est abandonné.
+pub struct OfflinePlugin;
+
+impl Plugin for OfflinePlugin {
+    fn build(&self, app: &mut App) {
+        let (outgoing, _) = mpsc::channel();
+        let (_, incoming) = mpsc::channel();
+        app.insert_resource(Connection {
+            outgoing,
+            incoming: Mutex::new(incoming),
+        })
+        .init_resource::<GameState>();
+    }
+}
+
 /// Signale un problème de connexion au jeu sous la forme d'un `ServerMsg` d'erreur.
 fn report(to_game: &Sender<Value>, message: String) {
     let _ = to_game.send(json!({ "t": "error", "message": message }));

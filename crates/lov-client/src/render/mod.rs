@@ -5,6 +5,8 @@ use bevy::prelude::*;
 pub mod camera;
 pub mod entities;
 pub mod map;
+pub mod perf;
+pub mod stress;
 
 /// 1 unité de jeu = 0,01 unité 3D (`RENDER_SCALE` de `packages/shared/src/constants.ts`).
 pub const RENDER_SCALE: f32 = 0.01;
