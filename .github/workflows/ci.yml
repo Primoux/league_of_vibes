@@ -1,7 +1,14 @@
 name: CI
 on:
   push:
+    branches: [main]
   pull_request:
+
+# Plusieurs machines poussent en parallèle : on annule les runs dépassés d'une même branche.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -9,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npm run typecheck
@@ -23,16 +30,58 @@ jobs:
       - name: Logs serveur
         if: always()
         run: cat server.log || true
-  your-plan-guard:
-    # Une PR ne doit jamais remplacer le YOUR_PLAN.md (stub) de main par celui d'une branche d'agent.
+
+  areas:
+    # Une PR = une area = une issue. Les fichiers de contrat partagés passent par une PR « contract: » seule.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Périmètre de la PR
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_REF: ${{ github.base_ref }}
+        run: node scripts/check-areas.mjs
+      - name: Label de l'area
+        # Pose « area:<scope> » sur la PR pour qu'on puisse filtrer la file comme les issues.
+        # Jamais bloquant : un label raté ne doit pas faire échouer une PR correcte.
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          scope=$(printf '%s' "$PR_TITLE" | sed -nE 's/^[a-z]+\(([^)]+)\)!?:.*/\1/p')
+          if printf '%s' "$PR_TITLE" | grep -qE '^contract(\(|:)'; then scope=contrat; fi
+          [ -n "$scope" ] || { echo "Pas de scope dans le titre, rien à labelliser."; exit 0; }
+          label=$([ "$scope" = contrat ] && echo contrat || echo "area:$scope")
+          gh label list --limit 200 --json name -q '.[].name' | grep -qxF "$label" \
+            && gh pr edit "$PR_NUMBER" --add-label "$label" && echo "Label posé : $label" \
+            || echo "Label « $label » inexistant (sync-labels le créera au prochain merge)."
+
+  size:
+    # Une PR relisible : au-delà, on découpe. Avertissement seulement, jamais bloquant.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - run: |
-          if ! git diff --quiet "origin/${{ github.base_ref }}...HEAD" -- YOUR_PLAN.md; then
-            echo "::error file=YOUR_PLAN.md::Cette PR modifie YOUR_PLAN.md. Ouvre-la avec scripts/open-pr.sh (voir AGENTS.md §3)."
-            exit 1
+      - name: Taille de la PR
+        run: |
+          lines=$(git diff --numstat "origin/${{ github.base_ref }}...HEAD" -- . \
+            ':(exclude)package-lock.json' ':(exclude)*.webp' ':(exclude)*.png' \
+            | awk '{a+=$1; d+=$2} END {print a+d+0}')
+          echo "Lignes modifiées (hors lock et binaires) : $lines"
+          if [ "$lines" -gt 800 ]; then
+            echo "::warning::PR de $lines lignes : au-delà de ~800 la relecture devient approximative. Découpe-la si tu peux (AGENTS.md §3)."
           fi

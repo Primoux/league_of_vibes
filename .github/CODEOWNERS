@@ -1,0 +1,19 @@
+# Relecteurs demandés automatiquement sur chaque PR.
+# GitHub ne gère pas « n'importe lequel d'un groupe » : toute personne listée ici est sollicitée.
+# Les mainteneurs sont les seuls à merger (voir docs/REVIEW.md).
+
+*                                   @Primoux
+
+# Contrats partagés : un changement ici bloque tout le monde, il passe par une PR « contract: » seule.
+/packages/shared/src/protocol.ts    @Primoux
+/packages/shared/src/types.ts       @Primoux
+/packages/shared/src/schema.ts      @Primoux
+/packages/shared/src/constants.ts   @Primoux
+/packages/shared/src/map.ts         @Primoux
+/packages/server/src/systems/index.ts @Primoux
+
+# Règles du jeu et de la collaboration.
+/AGENTS.md                          @Primoux
+/CONTRIBUTING.md                    @Primoux
+/PLAN.md                            @Primoux
+/.github/                           @Primoux
