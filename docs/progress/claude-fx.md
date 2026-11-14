@@ -56,6 +56,13 @@
   - **idle** avec transfert de poids, **mort** en deux temps (genoux qui cèdent, chute, rebond — le corps ne passe plus sous le sol), **frappe** et **incantation** génériques engageant tout le corps.
   - Les couches s'appliquent sur une pose finale séparée (la pose de l'animateur reste propre pour les fondus).
 
+- **Refonte graphique hors champions + optimisations** (2026-11-14, à la demande de l'utilisateur, qui a autorisé la modification de `render/**` de claude-client — modèles des champions non touchés) :
+  - Sol procédural (masques + bruit en coordonnées monde : herbe nuancée, terre/cailloux aux bords organiques, sable humide, caustiques, dallage calculé avec incrustations d'équipe), falaises facettées, 3 variantes d'arbres à dégradés, brousses et touffes/fleurs au sol, rivière (profondeur, Fresnel, reflets HDR, écume, courant), fontaines (bassin magique en shader), éclairage d'appoint froid, liseré + occlusion de contact sur les modèles de `rig.ts`.
+  - Post-process : étalonnage + vignette dans la passe de sortie, bloom additionné par la sortie (plus de recomposition sur la cible MSAA), distorsion seulement si utilisée, MSAA ×2 en HiDPI.
+  - Ambiance (`fx/world/ambient.ts`) : lucioles, pollen, brume/reflets de rivière, étincelles des fontaines (système de particules dédié).
+  - Perf (bench `?maplab&bench`, 8 champions + 60 sbires, RTX 4050, fps non plafonnés) : **~305 → ~500-600 fps** en ratio 1, **~164 → ~200-290 fps** en ratio 2. Leviers : plus de second parcours de scène (distorsion inutilisée, `scene.matrixWorldAutoUpdate`), décor aux matrices figées, brousses en une passe opaque, matériaux de profondeur d'ombre par type (plus de `getProgram` par frame), PointLight des fontaines supprimées, résolution dynamique (`?dynres=0` pour la couper).
+  - Outils : `?stats` compte la frame entière ; maplab installe les FX (`&nofx` pour le brut).
+
 ## En cours
 - M4 : retouches au fil des retours (équilibrage visuel des ultimes, lisibilité à distance).
 
@@ -72,10 +79,13 @@
 
 - **codex-objectives** : les buffs posés via `world-ai/runtime.ts` n'ont pas de `fxKey` ; les FX les reconnaissent par `buffId` : `blue_buff`/`blue`, `red_buff`/`red`, `leviathan`/`leviathan_buff`, `elder`/`elder_buff`, `red_burn`, `elder_burn`, `elder_execute`. Merci de garder ces ids (ou de me prévenir).
 
+- **claude-client** : ⚠️ j'ai modifié tes fichiers avec l'accord explicite de l'utilisateur (refonte graphique) : `render/map/{terrain,vegetation,water}.ts`, `MapView.ts`, `GameRenderer.ts` (matrices, résolution dynamique, `?stats`), `MeshBatcher.ts` (1 ligne), `models/rig.ts` (rim + occlusion), `maplab.ts` (FX installés) ; nouveaux : `map/noise.ts`, `shadowDepth.ts`, `DynamicResolution.ts`. Les API publiques sont inchangées (`windTime` reste exporté, `Water.update` est conservé). À relire / reprendre à ta main si tu préfères.
+
 ## Contrats modifiés / API disponibles
 - `contract:` `client/src/main.ts` (claude-client) : ajout additif de l'entrée `?fxlab` (import dynamique) et `installFx(renderer)` au lieu de `installFx(renderer.scene)`. Le reste du démarrage est inchangé.
 - `fx/FxBus.ts` (à moi) : `dispatch(e, now?)`, `update(now?)`, `subscribe(fn, { immediate? })`, `delayMs` (0 par défaut). Compatible avec l'existant : `fxBus.dispatch(ev)` / `fxBus.subscribe(fn)` se comportent comme avant.
 - API exportée par `client/src/fx/index.ts` : `installFx(host)`, `setFxQuality('high'|'low')`, `fxIndicators`, `registerFx`, `onWorldEvent`, `fxBus`, type `FxHost`.
+- `fx/shaders/materials.ts` : `distortionUsers.count` — incrémenter quand un objet est posé sur `DISTORTION_LAYER` (sinon PostFx ne rend plus la couche). `PostFx.setGrade({...})` pour l'étalonnage.
 
 ## Notes techniques
 - Aucune nouvelle dépendance npm (post-process et OrbitControls viennent de `three/examples/jsm`). Aucun asset externe : toutes les textures sont procédurales (rien à ajouter dans `ASSETS.md`).

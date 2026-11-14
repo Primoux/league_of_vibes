@@ -43,18 +43,34 @@ export function material(color: number, opts: { emissive?: number; intensity?: n
 
 /**
  * Liseré de lumière (rim) : les bords tournés à l'opposé de la caméra s'éclaircissent légèrement, ce qui
- * détache les silhouettes du sol en vue plongeante (quelques instructions par pixel, aucun passage en plus).
+ * détache les silhouettes du sol en vue plongeante ; occlusion de contact près du sol. Quelques instructions
+ * par pixel, aucune passe en plus.
  */
 function addRim(m: THREE.MeshStandardMaterial): void {
   m.onBeforeCompile = (sh) => {
-    sh.fragmentShader = sh.fragmentShader.replace(
-      '#include <emissivemap_fragment>',
-      `#include <emissivemap_fragment>
-      float rimF = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
-      totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 0.97, 1.1) * rimF * rimF * rimF * 0.6;`,
-    );
+    // occlusion de contact : le bas des modèles s'assombrit près du sol (hauteur monde), ce qui les « pose »
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vAoY;')
+      .replace(
+        '#include <project_vertex>',
+        `#include <project_vertex>
+        #ifdef USE_INSTANCING
+          vAoY = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).y;
+        #else
+          vAoY = (modelMatrix * vec4(transformed, 1.0)).y;
+        #endif`,
+      );
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vAoY;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= mix(0.5, 1.0, smoothstep(-0.05, 0.55, vAoY));')
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+        float rimF = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+        totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 0.97, 1.1) * rimF * rimF * rimF * 0.6;`,
+      );
   };
-  m.customProgramCacheKey = () => 'rim';
+  m.customProgramCacheKey = () => 'rim-ao';
 }
 
 export function glow(color: number, intensity = 1.6): THREE.Material {
