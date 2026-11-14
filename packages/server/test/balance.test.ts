@@ -60,6 +60,12 @@ describe('équilibrage — données', () => {
     expect(MONSTERS.gromp.ad).toBeLessThanOrEqual(60);
     expect(MONSTERS.blue_buff.hp).toBeLessThanOrEqual(1600);
   });
+  it('monstres : XP de jungle suffisante (parité voie à 5 min mesurée en sim)', () => {
+    expect(MONSTERS.gromp.xp).toBeGreaterThanOrEqual(250);
+    expect(MONSTERS.blue_buff.xp).toBeGreaterThanOrEqual(250);
+    expect(MONSTERS.scuttle.xp).toBeGreaterThanOrEqual(150);
+    expect(MONSTERS.dragon.xp).toBeGreaterThanOrEqual(200);
+  });
 });
 
 describe('équilibrage — simulation', () => {
