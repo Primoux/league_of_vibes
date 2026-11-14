@@ -34,8 +34,9 @@ cd league_of_vibes
 scripts/setup.sh <ton-pseudo>      # ex. scripts/setup.sh enzo
 ```
 
-Le script écrit `.agent` (non versionné : il dit à tes IA qui elles sont sur cette machine), règle
-`git config user.name` — sinon toutes les contributions se ressemblent dans l'historique —, installe et teste.
+Le script écrit `.agent` — non versionné : il dit à tes IA qui elles sont sur cette machine — puis installe et
+teste. Il ne touche pas à ton identité git : la tienne est déjà la bonne, et GitHub rattache les commits à ton
+compte via ton adresse e-mail. Il te prévient seulement si `user.email` n'est pas réglé.
 
 Vérifie la version de Node : `.nvmrc` dit **24**, comme la CI. Avec une autre version, tu verras des échecs
 que personne d'autre ne voit.

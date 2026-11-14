@@ -51,23 +51,34 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
           BASE_REF: ${{ github.base_ref }}
         run: node scripts/check-areas.mjs
-      - name: Label de l'area
-        # Pose « area:<scope> » sur la PR pour qu'on puisse filtrer la file comme les issues.
+      - name: Labels des areas
+        # Pose « area:<nom> » pour chaque area déclarée, en réutilisant l'analyse du contrôle
+        # ci-dessus (mode --labels) : les labels ne peuvent donc pas diverger du périmètre vérifié.
         # Jamais bloquant : un label raté ne doit pas faire échouer une PR correcte.
         if: always()
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          scope=$(printf '%s' "$PR_TITLE" | sed -nE 's/^[a-z]+\(([^)]+)\)!?:.*/\1/p')
-          if printf '%s' "$PR_TITLE" | grep -qE '^contract(\(|:)'; then scope=contrat; fi
-          [ -n "$scope" ] || { echo "Pas de scope dans le titre, rien à labelliser."; exit 0; }
-          label=$([ "$scope" = contrat ] && echo contrat || echo "area:$scope")
-          gh label list --limit 200 --json name -q '.[].name' | grep -qxF "$label" \
-            && gh pr edit "$PR_NUMBER" --add-label "$label" && echo "Label posé : $label" \
-            || echo "Label « $label » inexistant (sync-labels le créera au prochain merge)."
+          wanted=$(node scripts/check-areas.mjs --labels || true)
+          [ -n "$wanted" ] || { echo "Aucune area déclarée, rien à labelliser."; exit 0; }
+          existing=$(gh label list --limit 200 --json name -q '.[].name')
+          args=()
+          while IFS= read -r label; do
+            [ -n "$label" ] || continue
+            if printf '%s\n' "$existing" | grep -qxF "$label"; then
+              args+=(--add-label "$label")
+            else
+              echo "Label « $label » inexistant (sync-labels le créera au prochain merge sur main)."
+            fi
+          done <<< "$wanted"
+          if [ ${#args[@]} -gt 0 ]; then
+            gh pr edit "$PR_NUMBER" "${args[@]}" && echo "Labels posés : ${args[*]//--add-label /}"
+          fi
 
   size:
     # Une PR relisible : au-delà, on découpe. Avertissement seulement, jamais bloquant.

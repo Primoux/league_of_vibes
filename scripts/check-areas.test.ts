@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 
 /** Lance le garde-fou de périmètre sur une liste de fichiers simulée. */
+function run(args: string[]): { ok: boolean; out: string } {
+  try {
+    const out = execFileSync('node', ['scripts/check-areas.mjs', ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    return { ok: true, out };
+  } catch (e) {
+    const err = e as { stdout?: string; stderr?: string };
+    return { ok: false, out: `${err.stdout ?? ''}${err.stderr ?? ''}` };
+  }
+}
+
+/** Les labels que la CI posera sur la PR, un par ligne. */
+const labels = (title: string, body = ''): string[] =>
+  run(['--labels', '--title', title, '--body', body, '--files', 'packages/client/src/ui/hud/Hud.tsx'])
+    .out.split('\n')
+    .filter(Boolean);
+
 function check(title: string, files: string[], body = ''): { ok: boolean; out: string } {
   try {
     const out = execFileSync('node', ['scripts/check-areas.mjs', '--title', title, '--files', files.join(','), '--body', body], {
@@ -133,5 +152,31 @@ describe('check-areas : fonctionnalité qui traverse plusieurs areas', () => {
   it('refuse toujours un contrat, même avec plusieurs areas', () => {
     const r = check('feat(ui-hud,ui-core): boutique', [...boutique, 'packages/shared/src/schema.ts']);
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('check-areas : labels posés sur la PR', () => {
+  it('une area → un label', () => {
+    expect(labels('feat(ui-hud): barre de mana')).toEqual(['area:ui-hud']);
+  });
+
+  it('plusieurs areas dans le titre → un label chacune', () => {
+    expect(labels('feat(ui-hud,ui-core): boutique')).toEqual(['area:ui-hud', 'area:ui-core']);
+  });
+
+  it('areas déclarées dans le corps → prises en compte', () => {
+    expect(labels('feat(input): mode jeu', 'Areas: input, ui-hud, client-net')).toEqual([
+      'area:input',
+      'area:ui-hud',
+      'area:client-net',
+    ]);
+  });
+
+  it('PR de contrat → label « contrat »', () => {
+    expect(labels('contract: ajoute visionScore')).toEqual(['contrat']);
+  });
+
+  it('area inconnue → aucun label inventé', () => {
+    expect(labels('feat(cuisine): soupe')).toEqual([]);
   });
 });

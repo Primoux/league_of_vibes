@@ -1,19 +1,23 @@
-# Relecteurs demandés automatiquement sur chaque PR.
-# GitHub ne gère pas « n'importe lequel d'un groupe » : toute personne listée ici est sollicitée.
-# Les mainteneurs sont les seuls à merger (voir docs/REVIEW.md).
+# Relecture demandée automatiquement — uniquement sur ce qu'on ne peut pas défaire.
+#
+# Pas de règle « * » : la relecture de fond passe par Fable (docs/REVIEW.md), sur la machine de
+# qui relit. Mettre un propriétaire sur tout le dépôt ne garantirait rien et noierait une seule
+# personne sous les demandes de relecture — exactement le goulot qu'on cherche à éviter.
+#
+# Ici on ne liste donc que les fichiers dont un changement engage tout le monde : les contrats
+# partagés, que chacun construit par-dessus, et les règles du projet.
 
-*                                   @Primoux
-
-# Contrats partagés : un changement ici bloque tout le monde, il passe par une PR « contract: » seule.
-/packages/shared/src/protocol.ts    @Primoux
-/packages/shared/src/types.ts       @Primoux
-/packages/shared/src/schema.ts      @Primoux
-/packages/shared/src/constants.ts   @Primoux
-/packages/shared/src/map.ts         @Primoux
+# Contrats partagés : un changement ici bloque les autres. Il passe par une PR « contract: » seule.
+/packages/shared/src/protocol.ts      @Primoux
+/packages/shared/src/types.ts         @Primoux
+/packages/shared/src/schema.ts        @Primoux
+/packages/shared/src/constants.ts     @Primoux
+/packages/shared/src/map.ts           @Primoux
 /packages/server/src/systems/index.ts @Primoux
 
-# Règles du jeu et de la collaboration.
-/AGENTS.md                          @Primoux
-/CONTRIBUTING.md                    @Primoux
-/PLAN.md                            @Primoux
-/.github/                           @Primoux
+# Règles du projet et outillage d'intégration.
+/AGENTS.md                            @Primoux
+/CONTRIBUTING.md                      @Primoux
+/PLAN.md                              @Primoux
+/docs/REVIEW.md                       @Primoux
+/.github/                             @Primoux
