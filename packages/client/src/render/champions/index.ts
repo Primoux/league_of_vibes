@@ -21,6 +21,7 @@ import { tharoxModel } from './models/tharox.ts';
 import { vrennaModel } from './models/vrenna.ts';
 import { zephyrModel } from './models/zephyr.ts';
 import { master67Model } from './models/master67.ts';
+import { portraitModel } from './portrait/index.ts';
 
 export { ProceduralChampionView, setRespawnHook } from './ChampionView.ts';
 
@@ -52,7 +53,7 @@ export interface AnimatedChampionView extends EntityView {
 const views = new Map<number, AnimatedChampionView>();
 
 export function modelFor(championId: string): ChampionModelDef {
-  return MODELS[championId] ?? genericFor(CHAMPIONS[championId]?.class ?? 'fighter');
+  return portraitModel(championId, MODELS[championId] ?? genericFor(CHAMPIONS[championId]?.class ?? 'fighter'));
 }
 
 /** Crée la vue d'un champion (null si le championId est inconnu → vue par défaut du renderer). */
