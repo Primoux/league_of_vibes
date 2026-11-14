@@ -2,11 +2,12 @@ import { CHAMPIONS, ITEM_LIST, ITEMS, type ChampionClass, type ItemCategory, typ
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
-import { hideTip, ItemCard, itemTip, tip } from '../components.tsx';
+import { hideTip, itemTip, tip } from '../components.tsx';
 import { selfEntity, useWorld } from '../game/world.ts';
 import { Glyph, ItemIcon } from '../icons/Icons.tsx';
-import { useSelect } from '../useStore.ts';
+import { formatStat, STAT_LABEL } from '../logic/format.ts';
 import { buildsInto, canBuy, CATEGORY_LABEL, CATEGORY_ORDER, filterItems, quoteItem, type ShopVerdict } from '../logic/shop.ts';
+import { useSelect } from '../useStore.ts';
 
 type Tab = ItemCategory | 'all' | 'reco';
 
@@ -19,25 +20,55 @@ const CLASS_STATS: Record<ChampionClass, (keyof Stats)[]> = {
   support: ['abilityHaste', 'maxMana', 'manaRegen', 'maxHp', 'ap'],
 };
 
+/** Objets achetables (`shop: false` = donné par un objectif, ex. Œil du colosse). */
+const SHOP_LIST = ITEM_LIST.filter((i) => i.shop !== false);
+
 function recommended(cls: ChampionClass | undefined): ItemDef[] {
   if (!cls) return [];
   const wanted = CLASS_STATS[cls];
   const score = (i: ItemDef) => Object.keys(i.stats).filter((k) => wanted.includes(k as keyof Stats)).length;
   return SHOP_LIST.filter((i) => i.category !== 'trinket' && (score(i) > 0 || i.category === 'consumable' || i.category === 'boots'))
     .sort((a, b) => score(b) - score(a) || b.cost - a.cost)
-    .slice(0, 14)
+    .slice(0, 16)
     .sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category) || a.cost - b.cost);
 }
-
-/** Objets achetables (`shop: false` = donné par un objectif, ex. Œil du colosse). */
-const SHOP_LIST = ITEM_LIST.filter((i) => i.shop !== false);
 
 const VERDICT_TEXT: Record<ShopVerdict, string> = {
   ok: 'Acheter',
   gold: 'Or insuffisant',
   full: 'Inventaire plein',
   unique: 'Déjà possédé',
-  closed: 'Hors de la fontaine',
+  closed: 'Retourne à la fontaine',
+};
+
+const TAB_GLYPH: Record<Tab, string> = {
+  reco: 'crown',
+  all: 'nexus',
+  starter: 'sword',
+  consumable: 'heart',
+  boots: 'bolt',
+  basic: 'inhibitor',
+  epic: 'dragon',
+  legendary: 'crown',
+  trinket: 'gold',
+};
+
+const SHORT_STAT: Partial<Record<keyof Stats, string>> = {
+  ad: 'AD',
+  ap: 'AP',
+  maxHp: 'PV',
+  maxMana: 'mana',
+  armor: 'armure',
+  mr: 'RM',
+  attackSpeed: 'VA',
+  critChance: 'crit',
+  moveSpeed: 'vitesse',
+  abilityHaste: 'accél.',
+  lifesteal: 'vol de vie',
+  armorPen: 'létalité',
+  magicPen: 'pén. mag.',
+  hpRegen: 'régén. PV',
+  manaRegen: 'régén. mana',
 };
 
 export function Shop() {
@@ -56,6 +87,7 @@ function ShopPanel() {
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState<string | null>(null);
   const [sellSlot, setSellSlot] = useState<number | null>(null);
+  const [flash, setFlash] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const canShop = d.canShop || d.dead;
 
@@ -66,11 +98,14 @@ function ShopPanel() {
 
   const reco = useMemo(() => recommended(d.cls), [d.cls]);
   const list = query ? filterItems(SHOP_LIST, query, 'all') : tab === 'reco' ? reco : filterItems(SHOP_LIST, '', tab);
-  const selected = sel ? ITEMS[sel] : undefined;
+  const selected = (sel ? ITEMS[sel] : undefined) ?? list[0];
 
   const buy = (id: string) => {
     const it = ITEMS[id];
-    if (it && canBuy(it, d.items, d.gold, canShop, ITEMS) === 'ok') net.send({ t: 'buy', itemId: id });
+    if (it && canBuy(it, d.items, d.gold, canShop, ITEMS) === 'ok') {
+      net.send({ t: 'buy', itemId: id });
+      setFlash((f) => f + 1);
+    }
   };
   const sell = () => {
     if (sellSlot !== null && d.items[sellSlot]) {
@@ -79,17 +114,21 @@ function ShopPanel() {
     }
   };
   const close = () => store.set({ shopOpen: false });
+  const count = (t: Tab) => (t === 'reco' ? reco.length : t === 'all' ? SHOP_LIST.length : SHOP_LIST.filter((i) => i.category === t).length);
 
   return (
-    <div class="lov-modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div class="lov-shop lov-frame" onContextMenu={(e) => e.preventDefault()}>
-        <header class="lov-shop-head">
-          <h2>Boutique</h2>
-          <label class="lov-search">
-            <Glyph name="search" size={14} />
+    <div class="lov-modal-backdrop lov-shop2-back" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+      <div class="lov-shop2" onContextMenu={(e) => e.preventDefault()}>
+        <header class="lov-shop2-head">
+          <div class="title">
+            <Glyph name="gold" size={20} />
+            <h2>Boutique</h2>
+          </div>
+          <label class="lov-search2">
+            <Glyph name="search" size={15} />
             <input
               ref={searchRef}
-              placeholder="Rechercher un objet…"
+              placeholder="Rechercher (nom, stat, effet…)"
               value={query}
               onInput={(e) => setQuery(e.currentTarget.value)}
               onKeyDown={(e) => {
@@ -99,16 +138,21 @@ function ShopPanel() {
               }}
             />
           </label>
-          {!canShop && <span class="lov-shop-closed">Retourne à la fontaine pour acheter</span>}
-          <span class="lov-shop-gold">
-            <Glyph name="gold" size={16} /> {Math.floor(d.gold)}
+          {!canShop && (
+            <span class="closed">
+              <Glyph name="lock" size={13} /> Hors de la fontaine
+            </span>
+          )}
+          <span class="wallet" key={flash}>
+            <span class="coin" />
+            <b>{Math.floor(d.gold)}</b>
           </span>
           <button class="lov-icon-btn" onClick={close} title="Fermer (P / Échap)">
             <Glyph name="close" size={16} />
           </button>
         </header>
 
-        <nav class="lov-shop-tabs">
+        <nav class="lov-shop2-nav">
           {(['reco', 'all', ...CATEGORY_ORDER] as Tab[]).map((t) => (
             <button
               key={t}
@@ -116,56 +160,70 @@ function ShopPanel() {
               onClick={() => {
                 setTab(t);
                 setQuery('');
+                setSel(null);
               }}
             >
-              {t === 'reco' ? 'Conseillés' : t === 'all' ? 'Tous' : CATEGORY_LABEL[t]}
+              <Glyph name={TAB_GLYPH[t]} size={15} />
+              <span>{t === 'reco' ? 'Conseillés' : t === 'all' ? 'Tous' : CATEGORY_LABEL[t]}</span>
+              <small>{count(t)}</small>
             </button>
           ))}
         </nav>
 
-        <section class="lov-shop-grid">
+        <section class="lov-shop2-grid">
           {list.length === 0 && <p class="lov-muted">Aucun objet trouvé.</p>}
-          {groupByCategory(list).map(([cat, items]) => (
-            <div key={cat} class="lov-shop-group">
-              <h3>{CATEGORY_LABEL[cat]}</h3>
-              <div class="items">
-                {items.map((it) => {
-                  const q = quoteItem(it.id, d.items, ITEMS);
-                  const v = canBuy(it, d.items, d.gold, canShop, ITEMS);
-                  return (
-                    <button
-                      key={it.id}
-                      class={`lov-shop-item ${sel === it.id ? 'sel' : ''} ${v === 'ok' ? 'ok' : 'no'} ${d.items.includes(it.id) ? 'owned' : ''}`}
-                      onClick={() => setSel(it.id)}
-                      onDblClick={() => buy(it.id)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        buy(it.id);
-                      }}
-                      {...tip(itemTip(it.id, q.price))}
-                    >
-                      <ItemIcon itemId={it.id} size={44} />
-                      <span class={`price ${q.price < it.cost ? 'disc' : ''}`}>{q.price}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+          {list.map((it, i) => {
+            const q = quoteItem(it.id, d.items, ITEMS);
+            const v = canBuy(it, d.items, d.gold, canShop, ITEMS);
+            const stats = Object.entries(it.stats).slice(0, 2) as [keyof Stats, number][];
+            const fx = it.active ?? it.passive;
+            return (
+              <button
+                key={it.id}
+                class={`lov-item-card cat-${it.category} ${selected?.id === it.id ? 'sel' : ''} ${v === 'ok' ? 'ok' : 'no'} ${d.items.includes(it.id) ? 'owned' : ''}`}
+                style={{ '--i': Math.min(i, 20) } as Record<string, number>}
+                onClick={() => setSel(it.id)}
+                onDblClick={() => buy(it.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  buy(it.id);
+                }}
+              >
+                <span class="ic">
+                  <ItemIcon itemId={it.id} size={46} />
+                </span>
+                <span class="body">
+                  <b>{it.name}</b>
+                  <span class="chips">
+                    {stats.map(([k, val]) => (
+                      <em key={k}>
+                        {formatStat(k, val, true)} {SHORT_STAT[k] ?? STAT_LABEL[k]}
+                      </em>
+                    ))}
+                    {stats.length === 0 && fx && <em>{fx.name}</em>}
+                  </span>
+                </span>
+                <span class={`price ${q.price < it.cost ? 'disc' : ''}`}>
+                  <span class="coin" />
+                  {q.price}
+                </span>
+                {d.items.includes(it.id) && <span class="owned-tag">Possédé</span>}
+              </button>
+            );
+          })}
         </section>
 
-        <aside class="lov-shop-detail">
-          {selected ? <Detail item={selected} inv={d.items} gold={d.gold} canShop={canShop} onBuy={buy} onPick={setSel} /> : <p class="lov-muted">Sélectionne un objet pour voir sa recette. Double-clic ou clic droit pour acheter.</p>}
-        </aside>
+        <aside class="lov-shop2-detail">{selected && <Detail item={selected} inv={d.items} gold={d.gold} canShop={canShop} onBuy={buy} onPick={setSel} />}</aside>
 
-        <footer class="lov-shop-inv">
+        <footer class="lov-shop2-inv">
+          <span class="lbl">Inventaire</span>
           <div class="slots">
             {Array.from({ length: 7 }, (_, i) => {
               const id = d.items[i] ?? null;
               return (
                 <button
                   key={i}
-                  class={`slot ${sellSlot === i ? 'sel' : ''} ${i === 6 ? 'trinket' : ''}`}
+                  class={`slot ${sellSlot === i ? 'sel' : ''} ${i === 6 ? 'trinket' : ''} ${id ? 'full' : ''}`}
                   disabled={!id}
                   onClick={() => setSellSlot(sellSlot === i ? null : i)}
                   onContextMenu={(e) => {
@@ -174,7 +232,7 @@ function ShopPanel() {
                   }}
                   {...(id && ITEMS[id] ? tip(itemTip(id)) : {})}
                 >
-                  <ItemIcon itemId={id} size={40} />
+                  <ItemIcon itemId={id} size={42} />
                 </button>
               );
             })}
@@ -184,53 +242,86 @@ function ShopPanel() {
               <Glyph name="undo" size={14} /> Annuler
             </button>
             <button class="lov-btn small danger" disabled={!canShop || sellSlot === null || !d.items[sellSlot] || sellSlot === 6} onClick={sell}>
-              Vendre{sellSlot !== null && d.items[sellSlot] ? ` (+${Math.floor((ITEMS[d.items[sellSlot]!]?.cost ?? 0) * 0.7)})` : ''}
+              Vendre{sellSlot !== null && d.items[sellSlot] ? ` · +${Math.floor((ITEMS[d.items[sellSlot]!]?.cost ?? 0) * 0.7)}` : ''}
             </button>
           </div>
+          <span class="hint">Double-clic / clic droit : acheter · clic droit sur l’inventaire : vendre</span>
         </footer>
       </div>
     </div>
   );
 }
 
-function groupByCategory(list: ItemDef[]): [ItemCategory, ItemDef[]][] {
-  const m = new Map<ItemCategory, ItemDef[]>();
-  for (const it of list) {
-    const arr = m.get(it.category) ?? [];
-    arr.push(it);
-    m.set(it.category, arr);
-  }
-  return [...m.entries()].sort((a, b) => CATEGORY_ORDER.indexOf(a[0]) - CATEGORY_ORDER.indexOf(b[0]));
-}
-
 function Detail({ item, inv, gold, canShop, onBuy, onPick }: { item: ItemDef; inv: (string | null)[]; gold: number; canShop: boolean; onBuy: (id: string) => void; onPick: (id: string) => void }) {
   const q = quoteItem(item.id, inv, ITEMS);
   const v = canBuy(item, inv, gold, canShop, ITEMS);
   const into = buildsInto(item.id, SHOP_LIST);
+  const stats = Object.entries(item.stats) as [keyof Stats, number][];
   return (
-    <div class="lov-shop-det">
+    <div class={`lov-shop2-det cat-${item.category}`} key={item.id}>
+      <div class="hero">
+        <span class="halo" />
+        <ItemIcon itemId={item.id} size={84} />
+      </div>
+      <h3>{item.name}</h3>
+      <span class="cat">{CATEGORY_LABEL[item.category]}</span>
+      {stats.length > 0 && (
+        <ul class="stats">
+          {stats.map(([k, val]) => (
+            <li key={k}>
+              <b>{formatStat(k, val, true)}</b> {STAT_LABEL[k]}
+            </li>
+          ))}
+        </ul>
+      )}
+      {item.passive && (
+        <p class="fx">
+          <b class="pas">Passif · {item.passive.name}</b>
+          {item.passive.description}
+        </p>
+      )}
+      {item.active && (
+        <p class="fx">
+          <b class="act">
+            Actif · {item.active.name}
+            {item.active.cooldown > 0 && <em> ({item.active.cooldown} s)</em>}
+          </b>
+          {item.active.description}
+        </p>
+      )}
+      {!item.passive && !item.active && stats.length === 0 && <p class="fx">{item.description}</p>}
+
+      {item.buildsFrom.length > 0 && (
+        <div class="tree">
+          <small>Recette</small>
+          <RecipeTree id={item.id} inv={inv} onPick={onPick} root />
+        </div>
+      )}
       {into.length > 0 && (
         <div class="into">
           <small>Utilisé dans</small>
           <div>
             {into.map((i) => (
               <button key={i.id} onClick={() => onPick(i.id)} {...tip(itemTip(i.id))}>
-                <ItemIcon itemId={i.id} size={30} />
+                <ItemIcon itemId={i.id} size={34} />
               </button>
             ))}
           </div>
         </div>
       )}
-      <RecipeTree id={item.id} inv={inv} onPick={onPick} root />
-      <ItemCard item={item} price={q.price} />
-      <button class={`lov-btn primary big ${v === 'ok' ? 'glow' : ''}`} disabled={v !== 'ok'} onClick={() => onBuy(item.id)}>
-        {v === 'ok' ? (
-          <>
-            Acheter · <Glyph name="gold" size={14} /> {q.price}
-          </>
-        ) : (
-          VERDICT_TEXT[v]
-        )}
+
+      <button class="lov-cta lov-buy" disabled={v !== 'ok'} onClick={() => onBuy(item.id)}>
+        <span class="lov-cta-shine" />
+        <span class="lov-cta-label">{v === 'ok' ? 'Acheter' : VERDICT_TEXT[v]}</span>
+        <small>
+          {q.price < item.cost ? (
+            <>
+              <s>{item.cost}</s> {q.price} or · composants déduits
+            </>
+          ) : (
+            <>{q.price} or</>
+          )}
+        </small>
       </button>
     </div>
   );
@@ -243,7 +334,7 @@ function RecipeTree({ id, inv, onPick, root }: { id: string; inv: (string | null
   return (
     <div class={`lov-recipe ${root ? 'root' : ''}`}>
       <button class={`node ${owned ? 'owned' : ''}`} onClick={() => onPick(id)} {...tip(itemTip(id))}>
-        <ItemIcon itemId={id} size={root ? 46 : 34} />
+        <ItemIcon itemId={id} size={root ? 44 : 34} />
         <span>{it.cost}</span>
         {owned && (
           <i class="ok">

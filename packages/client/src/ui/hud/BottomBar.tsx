@@ -150,9 +150,11 @@ function Bars({ ent, champ, self }: BarData) {
   return (
     <div class="lov-bars">
       <div class="lov-bar hp">
+        <i class="trail" style={{ width: `${hpPct}%` }} />
         <i class="fill" style={{ width: `${hpPct}%` }} />
         {shield > 0 && <i class="shield" style={{ left: `${hpPct}%`, width: `${shPct}%` }} />}
         <i class="ticks" style={{ '--seg': `${(100 * 100) / denom}%` } as Record<string, string>} />
+        <i class="gloss" />
         <span>
           {formatInt(ent.hp)} / {formatInt(maxHp)}
           {shield > 0 && <em> (+{formatInt(shield)})</em>}
@@ -162,6 +164,7 @@ function Bars({ ent, champ, self }: BarData) {
       {resClass !== 'none' && (
         <div class={`lov-bar ${resClass}`}>
           <i class="fill" style={{ width: `${maxMana > 0 ? ((ent.mana ?? 0) / maxMana) * 100 : 0}%` }} />
+          <i class="gloss" />
           <span>
             {formatInt(ent.mana ?? 0)} / {formatInt(maxMana)}
           </span>

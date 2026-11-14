@@ -1,9 +1,11 @@
 import { CHAMPION_LIST, CHAMPIONS, DRAFT_TURN_SECONDS, SUMMONER_IDS, SUMMONERS, type ChampionDef, type DraftPick, type Role, type SummonerId, type Team } from '@lov/shared';
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { net } from '../../net/client.ts';
 import { AbilityCard, SummonerCard, TimerRing, tip, useCountdown } from '../components.tsx';
 import { AbilityIcon, ChampionPortrait, ClassEmblem, Glyph, RoleIcon, SummonerIcon } from '../icons/Icons.tsx';
 import { CLASS_LABEL, ROLE_LABEL } from '../logic/format.ts';
+import { ChampionStage } from '../stage/ChampionStage.tsx';
+import { RiftBackground } from '../stage/RiftBackground.tsx';
 import { useSelect } from '../useStore.ts';
 
 const FINALIZE_SECONDS = 15;
@@ -19,10 +21,16 @@ export function Draft() {
   const remaining = useCountdown(finalizing ? (draft.finalizeEndsAt ?? null) : draft.turnEndsAt);
   const total = finalizing ? FINALIZE_SECONDS : DRAFT_TURN_SECONDS;
 
-  const [selected, setSelected] = useState<string | null>(myPick?.hoverChampionId ?? myPick?.championId ?? null);
+  const [selected, setSelected] = useState<string | null>(myPick?.championId ?? myPick?.hoverChampionId ?? null);
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
+  const [pulse, setPulse] = useState(0);
+  const wasLocked = useRef(!!myPick?.locked);
   useEffect(() => {
-    if (myPick?.locked && myPick.championId) setSelected(myPick.championId);
+    if (myPick?.locked && myPick.championId) {
+      setSelected(myPick.championId);
+      if (!wasLocked.current) setPulse((p) => p + 1);
+    }
+    wasLocked.current = !!myPick?.locked;
   }, [myPick?.locked, myPick?.championId]);
 
   const takenBy = new Map<string, DraftPick>();
@@ -31,7 +39,7 @@ export function Draft() {
   for (const p of draft.picks) if (p.team === myTeam && !p.locked && p.hoverChampionId && p.playerId !== me) allyHover.set(p.hoverChampionId, p);
 
   const pick = (id: string) => {
-    if (takenBy.has(id)) return;
+    if (takenBy.has(id) && takenBy.get(id)!.playerId !== me) return;
     setSelected(id);
     if (myTurn) net.send({ t: 'draftHover', championId: id });
   };
@@ -42,85 +50,101 @@ export function Draft() {
   const list = CHAMPION_LIST.filter((c) => roleFilter === 'all' || c.roles.includes(roleFilter));
 
   let phaseText: string;
-  if (finalizing) phaseText = 'Finalisation — choisis tes sorts d’invocateur';
+  if (finalizing) phaseText = 'Prépare-toi au combat';
   else if (myTurn) phaseText = 'À toi de choisir !';
   else if (turnTeam === myTeam) phaseText = 'Ton équipe choisit…';
   else phaseText = 'L’équipe adverse choisit…';
 
   return (
-    <div class={`lov-screen lov-draft ${myTurn ? 'my-turn' : ''}`}>
-      <div class="lov-aurora dim" />
+    <div class={`lov-screen lov-draft2 ${myTurn ? 'my-turn' : ''} ${turnTeam ?? ''}-turn`} style={{ '--champ': champ?.palette.primary ?? '#3ee6c8', '--champ2': champ?.palette.accent ?? '#f6dc94' } as Record<string, string>}>
+      <RiftBackground tint={champ?.palette.primary ?? '#3ee6c8'} intensity={0.8} />
+      <div class="lov-draft2-glow" />
+
       <TeamPanel team="blue" picks={draft.picks} myTeam={myTeam} turnPlayers={finalizing ? [] : turnPlayers} me={me} names={names} />
 
-      <main class="lov-draft-center">
-        <header class="lov-draft-head">
-          <div class="lov-draft-phase">
-            <small>
-              {finalizing ? 'Finalisation' : `Tour ${draft.currentTurn + 1} / ${draft.turns.length}`}
-            </small>
+      <main class="lov-draft2-center">
+        <header class="lov-draft2-head">
+          <div class="phase">
+            <small>{finalizing ? 'Finalisation' : `Phase de sélection · tour ${draft.currentTurn + 1}/${draft.turns.length}`}</small>
             <h1 class={myTurn ? 'pulse' : ''}>{phaseText}</h1>
             <TurnTrack turns={draft.turns} current={draft.currentTurn} picks={draft.picks} />
           </div>
-          <TimerRing remaining={remaining} total={total} size={78} />
+          <TimerRing remaining={remaining} total={total} size={84} />
         </header>
 
-        <div class="lov-draft-filters">
-          <button class={`lov-chip ${roleFilter === 'all' ? 'on' : ''}`} onClick={() => setRoleFilter('all')}>
-            Tous
-          </button>
-          {(['top', 'jungle', 'mid', 'bot'] as const).map((r) => (
-            <button key={r} class={`lov-chip ${roleFilter === r ? 'on' : ''}`} onClick={() => setRoleFilter(r)}>
-              <RoleIcon role={r} size={14} /> {ROLE_LABEL[r]}
-            </button>
-          ))}
-        </div>
-
-        <div class="lov-champ-grid">
-          {list.map((c) => {
-            const taken = takenBy.get(c.id);
-            const hov = allyHover.get(c.id);
-            return (
-              <button
-                key={c.id}
-                class={`lov-champ-tile ${taken ? 'taken' : ''} ${selected === c.id ? 'sel' : ''} ${taken?.team ?? ''}`}
-                onClick={() => pick(c.id)}
-                onDblClick={() => {
-                  pick(c.id);
-                  if (myTurn && !taken) net.send({ t: 'draftLock', championId: c.id });
-                }}
-                disabled={!!taken}
-              >
-                <ChampionPortrait id={c.id} size="100%" grayscale={!!taken} />
-                <span class="name">{c.name}</span>
-                <span class="cls">
-                  <ClassEmblem cls={c.class} size={12} />
+        <section class="lov-draft2-stage">
+          {champ ? (
+            <>
+              <ChampionStage championId={champ.id} pulse={pulse} class="stage" spin={0.25} />
+              <ChampionInfo champ={champ} key={champ.id} />
+              <div class="lov-draft2-name" key={`n-${champ.id}`}>
+                <span>
+                  <ClassEmblem cls={champ.class} size={14} /> {CLASS_LABEL[champ.class]}
                 </span>
-                {taken && (
-                  <span class="lock">
-                    <Glyph name="lock" size={18} />
-                  </span>
-                )}
-                {hov && <span class="hover-tag">{names.get(hov.playerId) ?? 'Allié'}</span>}
-              </button>
-            );
-          })}
-        </div>
+                <h2>{champ.name}</h2>
+                <p>{champ.title}</p>
+              </div>
+            </>
+          ) : (
+            <div class="lov-draft2-empty">
+              <Glyph name="nexus" size={42} />
+              <p>Choisis un champion dans la galerie</p>
+            </div>
+          )}
+        </section>
 
-        {finalizing || myPick?.locked ? (
-          <SummonerPicker pick={myPick} />
-        ) : (
-          <div class="lov-draft-lockbar">
-            <button class="lov-btn primary big glow lock" disabled={!myTurn || !selected || takenBy.has(selected)} onClick={lock}>
-              {myTurn ? (selected ? `Verrouiller ${CHAMPIONS[selected]?.name ?? ''}` : 'Choisis un champion') : 'En attente de ton tour'}
+        <section class="lov-draft2-dock">
+          <div class="lov-draft-filters">
+            <button class={`lov-chip ${roleFilter === 'all' ? 'on' : ''}`} onClick={() => setRoleFilter('all')}>
+              Tous
             </button>
+            {(['top', 'jungle', 'mid', 'bot'] as const).map((r) => (
+              <button key={r} class={`lov-chip ${roleFilter === r ? 'on' : ''}`} onClick={() => setRoleFilter(r)}>
+                <RoleIcon role={r} size={14} /> {ROLE_LABEL[r]}
+              </button>
+            ))}
           </div>
-        )}
-        {myPick?.locked && !finalizing && <p class="lov-muted center">Champion verrouillé. Prépare tes sorts d’invocateur pendant que les autres choisissent.</p>}
+          <div class="lov-gallery">
+            {list.map((c, i) => {
+              const taken = takenBy.get(c.id);
+              const hov = allyHover.get(c.id);
+              const mine = taken?.playerId === me;
+              return (
+                <button
+                  key={c.id}
+                  class={`lov-gal-tile ${taken && !mine ? 'taken' : ''} ${selected === c.id ? 'sel' : ''} ${taken?.team ?? ''}`}
+                  style={{ '--c': c.palette.primary, '--i': i } as Record<string, string | number>}
+                  onClick={() => pick(c.id)}
+                  onDblClick={() => {
+                    pick(c.id);
+                    if (myTurn && !taken) net.send({ t: 'draftLock', championId: c.id });
+                  }}
+                  disabled={!!taken && !mine}
+                  title={`${c.name}, ${c.title}`}
+                >
+                  <ChampionPortrait id={c.id} size="100%" grayscale={!!taken && !mine} />
+                  <span class="name">{c.name}</span>
+                  {taken && !mine && (
+                    <span class="lock">
+                      <Glyph name="lock" size={16} />
+                    </span>
+                  )}
+                  {hov && <span class="hover-tag">{names.get(hov.playerId) ?? 'Allié'}</span>}
+                </button>
+              );
+            })}
+          </div>
+          {finalizing || myPick?.locked ? (
+            <SummonerPicker pick={myPick} />
+          ) : (
+            <button class="lov-cta lov-lock-cta" disabled={!myTurn || !selected || takenBy.has(selected)} onClick={lock}>
+              <span class="lov-cta-shine" />
+              <span class="lov-cta-label">{myTurn ? 'Verrouiller' : 'Patience…'}</span>
+              <small>{myTurn ? (selected ? `${CHAMPIONS[selected]?.name ?? ''} entre dans la Faille` : 'Choisis un champion') : 'Ce n’est pas encore ton tour'}</small>
+            </button>
+          )}
+        </section>
       </main>
-
-      <aside class="lov-draft-side">
-        {champ ? <ChampionInfo champ={champ} /> : <div class="lov-draft-empty">Survole ou clique un champion pour voir son kit.</div>}
-      </aside>
 
       <TeamPanel team="red" picks={draft.picks} myTeam={myTeam} turnPlayers={finalizing ? [] : turnPlayers} me={me} names={names} />
     </div>
@@ -148,27 +172,27 @@ function TeamPanel({ team, picks, myTeam, turnPlayers, me, names }: { team: Team
   const tp = picks.filter((p) => p.team === team);
   const ally = team === myTeam;
   return (
-    <aside class={`lov-draft-team ${team}`}>
+    <aside class={`lov-draft2-team ${team}`}>
       <h2>{team === 'blue' ? 'Équipe bleue' : 'Équipe rouge'}</h2>
-      {tp.map((p) => {
+      {tp.map((p, i) => {
         const showId = p.locked ? p.championId : ally ? p.hoverChampionId : null;
         const c = showId ? CHAMPIONS[showId] : undefined;
         const active = turnPlayers.includes(p.playerId) && !p.locked;
         return (
-          <div key={p.playerId} class={`lov-pick ${p.locked ? 'locked' : ''} ${active ? 'active' : ''} ${p.playerId === me ? 'me' : ''}`}>
-            <div class="lov-pick-art">
-              {showId ? <ChampionPortrait id={showId} size="100%" class={p.locked ? '' : 'ghost'} /> : <div class="lov-pick-empty">?</div>}
-            </div>
-            <div class="lov-pick-info">
+          <div key={p.playerId} class={`lov-pick2 ${p.locked ? 'locked' : ''} ${active ? 'active' : ''} ${p.playerId === me ? 'me' : ''}`} style={{ '--c': c?.palette.primary ?? '#334', '--i': i } as Record<string, string | number>}>
+            <div class="art">{showId ? <ChampionPortrait id={showId} size="100%" class={p.locked ? '' : 'ghost'} /> : <span class="q">?</span>}</div>
+            <div class="info">
+              <small>{names.get(p.playerId) ?? 'Invocateur'}</small>
               <b>{c ? c.name : active ? 'Choisit…' : '—'}</b>
-              <span>{names.get(p.playerId) ?? 'Invocateur'}</span>
+              {c && <span>{CLASS_LABEL[c.class]}</span>}
             </div>
             {ally && (
-              <div class="lov-pick-sums">
-                <SummonerIcon id={p.summoners[0]} size={20} />
-                <SummonerIcon id={p.summoners[1]} size={20} />
+              <div class="sums">
+                <SummonerIcon id={p.summoners[0]} size={18} />
+                <SummonerIcon id={p.summoners[1]} size={18} />
               </div>
             )}
+            {active && <i class="sweep" />}
           </div>
         );
       })}
@@ -189,19 +213,19 @@ function SummonerPicker({ pick }: { pick: DraftPick | undefined }) {
     setSlot(other);
   };
   return (
-    <div class="lov-sum-picker">
-      <div class="lov-sum-slots">
+    <div class="lov-sum-picker2">
+      <div class="slots">
         {(['D', 'F'] as const).map((k, i) => (
-          <button key={k} class={`lov-sum-slot ${slot === i ? 'on' : ''}`} onClick={() => setSlot(i as 0 | 1)} {...tip(() => <SummonerCard id={cur[i]!} />)}>
-            <SummonerIcon id={cur[i]!} size={44} />
+          <button key={k} class={`slot ${slot === i ? 'on' : ''}`} onClick={() => setSlot(i as 0 | 1)} {...tip(() => <SummonerCard id={cur[i]!} />)}>
+            <SummonerIcon id={cur[i]!} size={46} />
             <kbd>{k}</kbd>
           </button>
         ))}
       </div>
-      <div class="lov-sum-grid">
+      <div class="opts">
         {SUMMONER_IDS.map((id) => (
-          <button key={id} class={`lov-sum-opt ${cur.includes(id) ? 'used' : ''}`} onClick={() => choose(id)} {...tip(() => <SummonerCard id={id} />)}>
-            <SummonerIcon id={id} size={36} />
+          <button key={id} class={`opt ${cur.includes(id) ? 'used' : ''}`} onClick={() => choose(id)} {...tip(() => <SummonerCard id={id} />)}>
+            <SummonerIcon id={id} size={34} />
             <span>{SUMMONERS[id].name}</span>
           </button>
         ))}
@@ -212,7 +236,7 @@ function SummonerPicker({ pick }: { pick: DraftPick | undefined }) {
 
 const STAT_BARS: { label: string; get: (c: ChampionDef) => number; max: number }[] = [
   { label: 'Dégâts', get: (c) => c.baseStats.ad + (c.perLevel.ad ?? 0) * 10, max: 120 },
-  { label: 'Résistance', get: (c) => c.baseStats.maxHp / 10 + c.baseStats.armor + (c.perLevel.maxHp ?? 0) / 3, max: 160 },
+  { label: 'Robustesse', get: (c) => c.baseStats.maxHp / 10 + c.baseStats.armor + (c.perLevel.maxHp ?? 0) / 3, max: 160 },
   { label: 'Portée', get: (c) => c.baseStats.attackRange, max: 650 },
   { label: 'Mobilité', get: (c) => c.baseStats.moveSpeed - 300 + Object.values(c.abilities).filter((a) => a.targeting === 'dash' || a.targeting === 'targetedDash').length * 25, max: 100 },
 ];
@@ -222,30 +246,19 @@ function ChampionInfo({ champ }: { champ: ChampionDef }) {
   const [focus, setFocus] = useState<(typeof slots)[number]>('P');
   const ab = focus === 'P' ? champ.passive : champ.abilities[focus];
   return (
-    <div class="lov-champ-info" key={champ.id}>
-      <div class="lov-champ-hero">
-        <ChampionPortrait id={champ.id} variant="splash" size="100%" />
-        <div class="lov-champ-hero-text">
-          <h2>{champ.name}</h2>
-          <p>{champ.title}</p>
-        </div>
-      </div>
-      <div class="lov-champ-tags">
-        <span class="lov-tag">
-          <ClassEmblem cls={champ.class} size={13} /> {CLASS_LABEL[champ.class]}
-        </span>
+    <div class="lov-draft2-info">
+      <div class="tags">
         {champ.roles.map((r) => (
           <span class="lov-tag" key={r}>
             <RoleIcon role={r} size={13} /> {ROLE_LABEL[r]}
           </span>
         ))}
+        <span class="lov-tag">{champ.ranged ? 'Distance' : 'Mêlée'}</span>
         <span class="lov-tag diff" title="Difficulté">
           {'◆'.repeat(champ.difficulty)}
           <i>{'◆'.repeat(3 - champ.difficulty)}</i>
         </span>
-        <span class="lov-tag">{champ.ranged ? 'Distance' : 'Mêlée'}</span>
       </div>
-      <p class="lov-lore">{champ.lore}</p>
       <div class="lov-stat-bars">
         {STAT_BARS.map((b) => (
           <div key={b.label}>
@@ -259,13 +272,14 @@ function ChampionInfo({ champ }: { champ: ChampionDef }) {
           const a = s === 'P' ? champ.passive : champ.abilities[s];
           return (
             <button key={s} class={`lov-kit-btn ${focus === s ? 'on' : ''}`} onMouseEnter={() => setFocus(s)} onClick={() => setFocus(s)}>
-              <AbilityIcon ability={a} championId={champ.id} size={44} />
+              <AbilityIcon ability={a} championId={champ.id} size={42} />
               <kbd>{s === 'P' ? '•' : s}</kbd>
             </button>
           );
         })}
       </div>
       <AbilityCard ability={ab} championId={champ.id} />
+      <p class="lov-lore">{champ.lore}</p>
     </div>
   );
 }
