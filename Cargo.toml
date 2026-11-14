@@ -1,0 +1,25 @@
+# Workspace Rust de League of Vibes (migration en cours, voir AGENTS.md § « Migration vers Rust »).
+# Il cohabite avec les paquets TypeScript de `packages/` jusqu'à la bascule.
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+# Le moteur de jeu est inutilisable sans optimisation : on optimise les dépendances même en dev,
+# et un peu notre code, pour garder des temps de compilation courts.
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

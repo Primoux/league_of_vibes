@@ -1,0 +1,9 @@
+[package]
+name = "lov-client"
+description = "Client natif de League of Vibes : rendu, FX, interface, audio, entrées."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

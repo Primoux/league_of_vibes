@@ -1,0 +1,9 @@
+[package]
+name = "lov-server"
+description = "Serveur de League of Vibes : WebSocket, salles, draft, boucle de simulation, snapshots."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
