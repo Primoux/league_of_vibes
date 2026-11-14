@@ -7,3 +7,6 @@ publish.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+lov-shared = { path = "../lov-shared" }

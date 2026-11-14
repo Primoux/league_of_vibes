@@ -8,3 +8,5 @@
 //! - chaque système porté arrive avec les tests de `packages/server/test/` qui le couvrent.
 //!
 //! Squelette : les modules arrivent un par un, une issue chacun.
+
+pub mod nav;
