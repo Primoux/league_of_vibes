@@ -1,6 +1,6 @@
 import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { CHAMPION_LIST, LANE_PATHS, TICK_DT, type Lane } from '@lov/shared';
+import { CHAMPION_LIST, LANE_PATHS, SNAPSHOT_RATE, TICK_DT, TICK_RATE, type Lane } from '@lov/shared';
 import { ClientView, ScoreTracker, SnapshotFrame } from '../src/net/snapshot.ts';
 import { createSystems } from '../src/systems/index.ts';
 import { World, createChampion } from '../src/world.ts';
@@ -45,15 +45,15 @@ describe('performance', () => {
     const full = JSON.stringify(view.build(new SnapshotFrame(w, [], score.score()), 'p0', 'blue'));
     let bytes = 0;
     let zbytes = 0;
-    for (let i = 0; i < 20; i++) {
-      w.step(TICK_DT);
-      w.step(TICK_DT);
+    // Une seconde de snapshots à la cadence réelle.
+    for (let i = 0; i < SNAPSHOT_RATE; i++) {
+      for (let k = 0; k < TICK_RATE / SNAPSHOT_RATE; k++) w.step(TICK_DT);
       const raw = JSON.stringify({ t: 'snapshot', snap: view.build(new SnapshotFrame(w, w.events.drain(), score.score()), 'p0', 'blue') });
       bytes += raw.length;
       zbytes += deflateRawSync(raw).length; // ≈ permessage-deflate sans contexte partagé
     }
     // Info utile en CI.
-    console.log(`[perf] tick ${perTick.toFixed(2)} ms, snapshot complet ${full.length} o, delta ~${Math.round(bytes / 20)} o (x20/s = ${Math.round(bytes / 1024)} Ko/s brut, ${Math.round(zbytes / 1024)} Ko/s compressé)`);
+    console.log(`[perf] tick ${perTick.toFixed(2)} ms, snapshot complet ${full.length} o, delta ~${Math.round(bytes / SNAPSHOT_RATE)} o (x${SNAPSHOT_RATE}/s = ${Math.round(bytes / 1024)} Ko/s brut, ${Math.round(zbytes / 1024)} Ko/s compressé)`);
     // Pire cas (68 unités visibles en combat permanent) : < 30 Ko/s une fois compressé (permessage-deflate).
     expect(zbytes).toBeLessThan(30 * 1024);
   });

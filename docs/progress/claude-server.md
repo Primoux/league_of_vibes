@@ -21,6 +21,12 @@
 - **Revue lead (13/11)** : PR ouvertes `pr/mistral-economy` et `pr/feat/champion-melenchon` vérifiées fusionnées avec `main` dans un worktree propre → typecheck + tests (396 / 393) + build verts. Melenchon : conflit trivial sur `ASSETS.md` uniquement. codex-champions utilise correctement `hooks.canMove/canAttack/isTargetable` et délègue ses dashes à `movement`.
 - **Workflow** : intégration par PR (`pr/claude-server` → `main`), plus de push direct sur `main`.
 
+- **Lag réseau (14/11)** — mesuré avec `packages/client/tools/netcheck.ts` (vrai pipeline client), 8 joueurs, 75 s :
+  - Causes : snapshots irréguliers dès le serveur (30 Hz / 20 Hz = 1,5 tick par snapshot + `setInterval` → intervalles 33/67 ms, jusqu'à 83 ms) et débit qui explose avec les sbires (entité entière renvoyée à chaque mouvement : ~110 Ko/s JSON/client après 75 s).
+  - Correctifs : boucle à échéances fixes (sans dérive) ; snapshot à **chaque tick (30 Hz)** horodaté à l'instant prévu du tick ; **patches par champ** (`Snapshot.patches`, protocole v2) ; rafraîchissement complet étalé (chaque entité renvoyée en entier toutes les 2 s → auto-réparation) ; arrondis du `SelfState`.
+  - Résultat (latence 40 ± 10 ms) : intervalle p95 78 → **47 ms**, max 100 → **56 ms** ; marge tampon p5 28 → **55 ms** ; débit 80 → **44 Ko/s** JSON. Gigue ±30 ms : 0 % d'extrapolation (15 Hz testé : 7,4 %).
+  - `LOV_PERF=1` : métriques de la boucle serveur dans les logs.
+
 ## En cours
 - Étendre le test d'intégration M2 aux sbires/tours (codex-objectives, pas encore en PR) et à l'or/achat (mistral-economy, PR ouverte).
 
@@ -28,12 +34,15 @@
 - **mistral-ui** : le serveur fait maintenant un vrai draft (`draft` puis `loading` puis `gameStart`). L'UI bootstrap n'a pas d'écran de draft : en attendant, l'auto-pick fait avancer la partie (salle dev : 10 s/tour + 3 s + 2 s), ou lancer le serveur avec `SKIP_DRAFT=1`. Messages : `draftHover`, `draftLock`, `draftSummoners`. Les survols/sorts ennemis arrivent masqués (`hoverChampionId: null`).
 - **mistral-ui** : écran de fin → bouton « Retour au lobby » = `{ t: 'returnToLobby' }`.
 - **claude-client** : `netPing { clientTime }` → `pong { serverTime, clientTime }` disponible pour le RTT.
+- **claude-client** : j'ai ajouté l'application de `snap.patches` dans `net/snapshots.ts` (correction d'intégration, à relire). Snapshots maintenant à 30 Hz. Les « saccades » restantes de netcheck (40–55 u, Vrenna/Corvin/sbires mêlée) existaient avant et semblent venir de dashes / poussées de collision côté simulation, pas du réseau : je creuse côté movement.
 - **codex-champions** : enregistre tes CC via `world.hooks.canMove/canAttack` (et `isTargetable` pour stase/untargetable) ; dashes via `data.dash` (movement émet l'événement `dash`).
 - **codex-objectives** : tours/sbires/monstres peuvent utiliser `attackTarget` + `data.attackConfig` ; montée en dégâts des tours via `hooks.beforeAttackHit` (filtrer `ctx.attacker.kind === 'tower'`) ; `getObjectiveTimers` → `hooks.objectiveTimers`. Mettre `data.keepCorpse = true` si tu gères toi-même la disparition d'un monstre.
 - **mistral-economy** : primes via `hooks.bounty`, `data.goldEarned` pour l'écran de fin, `hooks.selfState` pour `canShop`/`recalling`.
 - **Environnement** : le projet exige Node ≥ 22 (`engines`). Avec Node 21, `vitest` échoue (binding natif rolldown manquant). Utiliser Node 24 comme la CI.
 
 ## Contrats modifiés
+- `contract:` **protocole v2** : `Snapshot.patches?: EntityPatch[]` (champs modifiés seulement + `u` = champs supprimés), `applyEntityPatch(prev, patch)` dans `protocol.ts`. `SNAPSHOT_RATE` 20 → 30 (doit diviser `TICK_RATE`).
+- Intégration client (claude-client, correction signalée) : `SnapshotBuffer.push` applique `snap.patches` (6 lignes dans `net/snapshots.ts`).
 - `contract:` `ClientMsg` + `{ t: 'netPing'; clientTime }` (→ `pong { serverTime, clientTime }`) et `{ t: 'returnToLobby' }` (phase `end` → lobby).
 - Sémantique delta confirmée et documentée dans `Snapshot.removed` : `removed` défini ⇒ delta (claude-client : ✅ c'est bien ta règle).
 - `contract:` `GameEvent` + `{ type: 'respawn'; target; pos }` (émis quand un champion réapparaît à la fontaine).
