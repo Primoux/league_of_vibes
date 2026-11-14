@@ -4,9 +4,10 @@
  * les actifs sont déclenchés par la commande `useItem` (useItem).
  * Les dégâts passent EXCLUSIVEMENT par applyDamage/applyHeal/applyShield (combat/damage.ts).
  */
-import { ITEMS, dist, type Stats, type Team, type Vec2 } from '@lov/shared';
+import { ITEMS, MAP_SIZE, clamp, dist, type Stats, type Team, type Vec2 } from '@lov/shared';
 import { registerStatSource } from '../combat/buffs.ts';
-import { applyHeal, applyShield, creditOf } from '../combat/damage.ts';
+import { applyDamage, applyHeal, applyShield, creditOf } from '../combat/damage.ts';
+import { navGrid } from '../nav/grid.ts';
 import type { Entity, World } from '../world.ts';
 import { econ, type EconomyState } from './state.ts';
 
@@ -88,10 +89,15 @@ export function registerItemHooks(world: World): void {
   });
 
   // Blessure grave (hache du bourreau) : réduit les soins subis par la cible.
+  // Vengeance (carapace du roc) : renvoie 10 % des dégâts subis à l'attaquant.
   world.hooks.afterDamage.push((ctx, dealt, w) => {
     const credit = ctx.credit;
     if (credit?.champ && ctx.target.team !== credit.team && dealt > 0 && hasPassive(credit, 'grievous')) {
       econ(ctx.target).grievousUntil = w.time + 3;
+    }
+    // Un renvoi est marqué (ability) : on ne renvoie jamais un renvoi (pas de récursion entre deux porteurs).
+    if (hasPassive(ctx.target, 'vengeance') && credit && credit.team !== ctx.target.team && !credit.dead && dealt > 0 && ctx.type !== 'true' && ctx.ability !== 'item_vengeance') {
+      applyDamage(w, { source: ctx.target, target: credit, amount: dealt * 0.1, type: 'magic', silent: true, ability: 'item_vengeance' });
     }
   });
 
@@ -222,6 +228,36 @@ export function useItem(world: World, ent: Entity, slot: number, _targetPos?: Ve
         }
       }
       if (best) applyShield(world, { source: ent, target: best, amount: 120, duration: 2.5, id: 'encensoir' });
+      break;
+    }
+    case 'frappe_spectrale': {
+      // Dash de 400 u vers la position visée (arrêt au mur), annule le rappel.
+      const dir = _targetPos ?? { x: ent.pos.x + Math.cos(ent.facing) * 400, y: ent.pos.y + Math.sin(ent.facing) * 400 };
+      let to = { x: clamp(dir.x, 0, MAP_SIZE), y: clamp(dir.y, 0, MAP_SIZE) };
+      const d = dist(ent.pos, to);
+      if (d > 400) to = { x: ent.pos.x + ((to.x - ent.pos.x) / d) * 400, y: ent.pos.y + ((to.y - ent.pos.y) / d) * 400 };
+      to = navGrid().nearestWalkable(to);
+      ent.data.dash = { to, speed: 1400 };
+      const st2 = econ(ent);
+      if (st2.recall) {
+        st2.recall = null;
+        world.events.emit({ type: 'recallEnd', target: ent.id, completed: false });
+      }
+      break;
+    }
+    case 'soin_rapide': {
+      applyHeal(world, { source: ent, target: ent, amount: 150 });
+      let best: Entity | undefined;
+      let bestD = 850;
+      for (const o of world.query('champion')) {
+        if (o === ent || o.team !== ent.team || o.dead) continue;
+        const d = dist(ent.pos, o.pos);
+        if (d < bestD) {
+          bestD = d;
+          best = o;
+        }
+      }
+      if (best) applyHeal(world, { source: ent, target: best, amount: 150 });
       break;
     }
     case 'colosse':
