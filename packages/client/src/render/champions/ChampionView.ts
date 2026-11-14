@@ -306,6 +306,7 @@ export class ProceduralChampionView implements ChampionView {
         m.transparent = on;
         m.opacity = on ? 0.3 : 1;
         m.depthWrite = !on;
+        m.needsUpdate = true; // La variante opaque du shader doit changer avec la transparence.
       }
     }
     for (const o of this.built.outlines) o.visible = !on && !this.state.dead;
