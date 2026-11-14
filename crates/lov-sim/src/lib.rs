@@ -8,3 +8,11 @@
 //! - chaque système porté arrive avec les tests de `packages/server/test/` qui le couvrent.
 //!
 //! Squelette : les modules arrivent un par un, une issue chacun.
+
+pub mod world;
+
+pub use world::{
+    AttackContext, ChampionState, CreateChampion, DamageContext, DataTable, Entity, EventBus,
+    EventKind, HealContext, HookList, Listener, QueuedCommand, Rng, Subscription, System, World,
+    WorldHooks, create_champion,
+};

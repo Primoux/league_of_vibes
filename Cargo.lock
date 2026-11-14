@@ -27,6 +27,9 @@ dependencies = [
 [[package]]
 name = "lov-sim"
 version = "0.0.0"
+dependencies = [
+ "lov-shared",
+]
 
 [[package]]
 name = "memchr"
