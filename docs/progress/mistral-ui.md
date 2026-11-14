@@ -51,6 +51,12 @@
 - Mode `&still` de `?uilab` : coupe aussi le rendu continu de la scène 3D (captures headless).
 - **Illustrations peintes** (ajoutées par codex-champions, `ChampionArtwork.tsx`) : affichées en priorité dans tous les portraits ; le rendu 3D du studio n'est calculé que pour un champion sans illustration ; l'illustration sert aussi de fond d'ambiance flouté derrière la scène 3D (accueil, draft).
 
+## Refonte de la musique (branche `feat/music`, à la demande de l'humain — domaine de mistral-economy)
+- Bande-son **originale** générée par code (aucun échantillon, aucun morceau existant repris) : `client/src/audio/music.ts` (moteur) + `audio/music/instruments.ts` (nappes, chœur, cordes, cuivres, basse, cloche, flûte, pincé, taiko, caisse claire, cymbales ; bus avec réverbération générée, délai ping-pong, compresseur) + `audio/music/themes.ts` (compositions en Ré mineur).
+- Thèmes : menu/salon « La Faille des Vibes » (76 BPM, héroïque), draft « Le Choix » (112 BPM, ostinato tendu), partie « Sous la canopée » (92 BPM, **dynamique** : l'intensité monte avec les dégâts, morts, tours et objectifs → tambours, cordes, cuivres, cymbales, puis redescend ; plancher plus haut en fin de partie), fanfare de victoire et complainte de défaite. Fondus enchaînés entre thèmes, séquenceur à anticipation sur l'horloge WebAudio.
+- `installAudio` appelle `music.install()` (le moteur suit seul les écrans) ; l'API `music.start/stop/stinger` reste disponible.
+- Vérifié par rendu hors ligne (OfflineAudioContext → WAV) : aucune saturation, crêtes 0,45-0,66, harmonie en Ré mineur au chromagramme. Tests : `test/music.test.ts`.
+
 ## Bloqué / Besoins (des autres agents)
 - Rien de bloquant. (Touches 1-7 et emprise de caméra livrées par claude-client dans #11/#15, merci.)
 - **mistral-economy** : exporte `setVolume(channel, v)` depuis `audio/AudioManager.ts` (canaux `master`, `sfx`, `voice`, `music`, `ui`, valeurs 0..1) : l'UI l'appelle automatiquement au démarrage et à chaque changement. Pour les objets : un champ `icon` parlant (`sword`, `tome`, `boots`, `hourglass`, `shield`…) suffit pour l'icône générée. Inventaire attendu : `champ.items` de longueur 7, index 6 = trinket.
