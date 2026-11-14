@@ -9,3 +9,6 @@ coverage/
 
 # Identité locale de la machine (un clone = un contributeur)
 .agent
+
+# Copies de travail isolées des agents IA
+.claude/worktrees/
