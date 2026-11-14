@@ -1,7 +1,8 @@
 import { CHAMPIONS, ITEMS, type Stats, type Team } from '@lov/shared';
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
-import { store, type Quality } from '../../state.ts';
+import { exitGameMode, enterGameMode, fullscreenSupported, keyboardLockSupported } from '../../input/gameMode.ts';
+import { DEFAULT_GAME_SETTINGS, store, type Quality } from '../../state.ts';
 import { itemTip, tip } from '../components.tsx';
 import { champMemo, useWorld } from '../game/world.ts';
 import { ChampionPortrait, Glyph, ItemIcon, RoleIcon, SummonerIcon } from '../icons/Icons.tsx';
@@ -137,8 +138,9 @@ const CHANNEL_LABEL: Record<AudioChannel, string> = { master: 'Général', sfx: 
 const KEYS: [string, string][] = [
   ['Clic droit', 'Se déplacer / attaquer'],
   ['A + clic', 'Attaque-déplacement'],
-  ['Q W E R', 'Sorts'],
-  ['Ctrl + Q/W/E/R', 'Monter un sort'],
+  ['Q W E R', 'Sorts (maintenir pour viser, relâcher pour lancer)'],
+  ['Maj + Q/W/E/R', 'Inverser lancement rapide / normal'],
+  ['Alt (ou Ctrl) + Q/W/E/R', 'Monter un sort'],
   ['D / F', 'Sorts d’invocateur'],
   ['1-3, 5-7 / 4', 'Objets / balise'],
   ['B', 'Rappel'],
@@ -146,10 +148,14 @@ const KEYS: [string, string][] = [
   ['P', 'Boutique'],
   ['Tab', 'Tableau des scores (maintenir)'],
   ['C', 'Statistiques'],
+  ['² / ` (maintenir)', 'Ne cibler que les champions'],
+  ['Clic molette (maintenir)', 'Faire glisser la caméra'],
   ['Espace', 'Centrer la caméra'],
   ['Y', 'Verrouiller la caméra'],
   ['Alt + clic', 'Ping'],
   ['Échap', 'Fermer / paramètres'],
+  ['F11', 'Mode jeu (plein écran)'],
+  ['Échap (maintenir)', 'Quitter le plein écran en mode jeu'],
 ];
 
 type SetTab = 'audio' | 'game' | 'video' | 'keys';
@@ -163,6 +169,7 @@ export function SettingsPanel() {
 export function SettingsModal({ onClose }: { onClose: () => void }) {
   const s = useMini(settings, (x) => x, (a, b) => a === b);
   const game = useSelect((st) => st.settings, (a, b) => a === b);
+  const fullscreen = useSelect((st) => st.fullscreen);
   const [tab, setTab] = useState<SetTab>('audio');
   const row = (label: string, ctrl: ComponentChildren) => (
     <label class="lov-set-row">
@@ -207,7 +214,20 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
             )}
           {tab === 'game' && (
             <>
-              {row('Lancement rapide des sorts (sans confirmation)', toggle(game.quickCast, (v) => store.setSettings({ quickCast: v })))}
+              {row(
+                'Mode jeu : plein écran, barre du navigateur masquée' + (keyboardLockSupported() ? ', Ctrl+W/Ctrl+Q capturés' : ''),
+                fullscreenSupported() ? (
+                  <button class="lov-btn small" onClick={() => void (fullscreen ? exitGameMode() : enterGameMode())}>
+                    {fullscreen ? 'Quitter (F11)' : 'Activer (F11)'}
+                  </button>
+                ) : (
+                  <span class="lov-muted">Non disponible</span>
+                ),
+              )}
+              {row('Mode jeu automatique au premier clic en partie', toggle(game.autoFullscreen, (v) => store.setSettings({ autoFullscreen: v })))}
+              {row('Confirmer avant de quitter ou recharger la page en partie', toggle(game.confirmLeave, (v) => store.setSettings({ confirmLeave: v })))}
+              {row('Lancement rapide des sorts (dès l’appui, sans viser)', toggle(game.quickCast, (v) => store.setSettings({ quickCast: v })))}
+              {row('Attaque-déplacement au clic gauche', toggle(game.leftClickAttackMove, (v) => store.setSettings({ leftClickAttackMove: v })))}
               {row('Défilement aux bords de l’écran', toggle(game.edgePan, (v) => store.setSettings({ edgePan: v })))}
               {row(
                 'Vitesse de la caméra',
@@ -254,7 +274,7 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
         <footer>
-          <button class="lov-btn ghost small" onClick={() => (settings.set(DEFAULT_SETTINGS), store.setSettings({ quickCast: false, quality: 'high', edgePan: true, cameraSpeed: 3000 }))}>
+          <button class="lov-btn ghost small" onClick={() => (settings.set(DEFAULT_SETTINGS), store.setSettings({ ...DEFAULT_GAME_SETTINGS }))}>
             Réinitialiser
           </button>
           <button class="lov-btn primary" onClick={onClose}>
