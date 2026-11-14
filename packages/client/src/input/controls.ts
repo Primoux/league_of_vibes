@@ -3,8 +3,11 @@
  *
  * - Clic droit : sur un ennemi = attaque, sur le sol = déplacement (+ marqueur). Maintenu = suit le curseur.
  * - A puis clic gauche : attaque-déplacement (quick-cast : immédiat).
- * - Q W E R : cast normal (indicateur, clic gauche pour confirmer, clic droit/Échap pour annuler) ou
- *   quick-cast selon les paramètres ; Maj+touche inverse le mode. Ctrl+QWER : monter le sort.
+ * - Q W E R : cast normal (touche maintenue = indicateur, relâcher la touche ou clic gauche pour lancer,
+ *   clic droit/Échap pour annuler) ou quick-cast selon les paramètres ; Maj+touche inverse le mode.
+ *   Ctrl+QWER ou Alt+QWER : monter le sort (Alt évite les raccourcis Ctrl+W/Ctrl+Q du navigateur hors mode jeu).
+ * - ² / ` (maintenu) : ne cibler que les champions. Clic molette maintenu : faire glisser la caméra.
+ * - Option : clic gauche au sol = attaque-déplacement.
  * - D / F : sorts d'invocateur. 1 2 3 5 6 7 : objets actifs. 4 : balise. B : rappel. S : stop.
  * - Espace (maintenu) : centrer la caméra. Y : verrouiller/déverrouiller. Flèches : déplacer la caméra.
  * - P : boutique. Tab (maintenu) : scores. C : stats. Échap : annuler / fermer / paramètres.
@@ -14,6 +17,7 @@ import { CHAMPIONS, SUMMONERS, type AbilitySlot, type EntityId, type EntitySnaps
 import { net, snapshots } from '../net/client.ts';
 import type { GameRenderer } from '../render/GameRenderer.ts';
 import { store, type Targeting } from '../state.ts';
+import { keyLetter } from './gameMode.ts';
 import { digitAction, isAttackable, needsTarget } from './rules.ts';
 
 const ATTACK_CURSOR = cursorSvg('#ff5a4a');
@@ -31,6 +35,14 @@ export function installControls(renderer: GameRenderer): void {
   let mouseX = 0;
   let mouseY = 0;
   let rightHeld = false;
+  /** Clic molette maintenu : point du sol « attrapé » qui doit rester sous le curseur. */
+  let dragAnchor: Vec2 | null = null;
+  const dragTmp: Vec2 = { x: 0, y: 0 };
+  /** Touche ² / ` maintenue : seuls les champions sont ciblables. */
+  let championsOnly = false;
+  const championFilter = (e: EntitySnapshot) => e.kind === 'champion';
+  /** Touche physique (e.code) qui a ouvert l'indicateur de sort en cours : la relâcher lance le sort. */
+  let castHeldCode: string | null = null;
   let lastFollowSend = 0;
   const lastFollowPos: Vec2 = { x: 0, y: 0 };
 
@@ -48,6 +60,7 @@ export function installControls(renderer: GameRenderer): void {
   };
 
   const setTargeting = (t: Targeting) => {
+    if (!t) castHeldCode = null;
     if (store.state.targeting !== t) store.set({ targeting: t });
     updateCursor();
   };
@@ -61,7 +74,7 @@ export function installControls(renderer: GameRenderer): void {
     const g = renderer.pickGround(mouseX, mouseY, cursor);
     hasCursor = !!g;
     store.setQuiet('cursorGame', hasCursor ? cursor : null);
-    const hover = renderer.pickEntity(mouseX, mouseY);
+    const hover = renderer.pickEntity(mouseX, mouseY, championsOnly ? championFilter : undefined);
     if (hover !== store.state.hover) {
       store.set({ hover });
       updateCursor();
@@ -70,6 +83,11 @@ export function installControls(renderer: GameRenderer): void {
 
   // Le picking dépend de la caméra qui bouge : on le rafraîchit à chaque frame.
   renderer.onFrame(() => {
+    // clic molette : la caméra suit la main (après la mise à jour caméra de la frame, matrices à jour)
+    if (dragAnchor && inGame() && renderer.pickGround(mouseX, mouseY, dragTmp)) {
+      const c = renderer.cam.center;
+      renderer.cam.jumpTo({ x: c.x + dragAnchor.x - dragTmp.x, y: c.y + dragAnchor.y - dragTmp.y });
+    }
     refreshPointer();
     if (rightHeld && hasCursor && inGame()) {
       const now = performance.now();
@@ -93,6 +111,9 @@ export function installControls(renderer: GameRenderer): void {
   addEventListener('blur', () => {
     renderer.cam.clearMouse();
     rightHeld = false;
+    castHeldCode = null;
+    dragAnchor = null;
+    championsOnly = false;
     renderer.cam.centerHeld = false;
     if (store.state.scoreboardOpen) store.set({ scoreboardOpen: false });
   });
@@ -103,6 +124,7 @@ export function installControls(renderer: GameRenderer): void {
 
   addEventListener('pointerup', (e) => {
     if (e.button === 2) rightHeld = false;
+    if (e.button === 1) dragAnchor = null;
   });
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -112,6 +134,15 @@ export function installControls(renderer: GameRenderer): void {
     refreshPointer();
     const pos = hasCursor ? { x: cursor.x, y: cursor.y } : null;
 
+    if (e.button === 1) {
+      e.preventDefault();
+      if (pos) {
+        dragAnchor = pos;
+        if (store.state.cameraLocked) store.set({ cameraLocked: false });
+      }
+      return;
+    }
+
     if (e.button === 0) {
       if (e.altKey && pos) {
         net.send({ t: 'ping', pos, kind: enemyHover() !== null ? 'danger' : 'generic' });
@@ -119,6 +150,7 @@ export function installControls(renderer: GameRenderer): void {
       }
       const t = store.state.targeting;
       if (t) confirmTargeting(t, pos);
+      else if (store.state.settings.leftClickAttackMove) confirmTargeting({ kind: 'attackMove' }, pos);
       return;
     }
 
@@ -185,7 +217,7 @@ export function installControls(renderer: GameRenderer): void {
   }
 
   /** QWER / DF : cast normal ou rapide. */
-  function castKey(t: NonNullable<Targeting>, invertQuick: boolean): void {
+  function castKey(t: NonNullable<Targeting>, invertQuick: boolean, code: string): void {
     const st = self();
     const targeting = t.kind === 'ability' ? abilityTargeting(t.slot) : t.kind === 'summoner' ? summonerTargeting(t.slot) : null;
     if (st && t.kind === 'ability' && st.abilityLevels[t.slot] === 0) return;
@@ -196,6 +228,7 @@ export function installControls(renderer: GameRenderer): void {
       return;
     }
     setTargeting(t);
+    castHeldCode = code;
   }
 
   addEventListener('keydown', (e) => {
@@ -219,6 +252,11 @@ export function installControls(renderer: GameRenderer): void {
       e.preventDefault();
       return;
     }
+    if (code === 'Backquote') {
+      championsOnly = true;
+      e.preventDefault();
+      return;
+    }
     if (e.repeat) return;
 
     // rangée du haut : objets (1 2 3 5 6 7) et balise (4), par position physique
@@ -231,16 +269,16 @@ export function installControls(renderer: GameRenderer): void {
     }
     // on se fie à e.code (position physique) pour QWER/DF... sauf en AZERTY où l'utilisateur attend les lettres :
     // e.key est donc prioritaire pour les lettres.
-    const key = e.key.length === 1 ? e.key.toUpperCase() : '';
+    const key = keyLetter(e);
     if (key === 'Q' || key === 'W' || key === 'E' || key === 'R') {
       e.preventDefault();
-      if (e.ctrlKey) net.send({ t: 'levelAbility', slot: key });
-      else castKey({ kind: 'ability', slot: key }, e.shiftKey);
+      if (e.ctrlKey || e.altKey || e.metaKey) net.send({ t: 'levelAbility', slot: key });
+      else castKey({ kind: 'ability', slot: key }, e.shiftKey, code);
       return;
     }
     if (key === 'D' || key === 'F') {
       e.preventDefault();
-      castKey({ kind: 'summoner', slot: key }, e.shiftKey);
+      castKey({ kind: 'summoner', slot: key }, e.shiftKey, code);
       return;
     }
     switch (key) {
@@ -275,6 +313,16 @@ export function installControls(renderer: GameRenderer): void {
   });
 
   addEventListener('keyup', (e) => {
+    // cast au relâchement : la touche qui a ouvert l'indicateur lance le sort (si toujours actif)
+    if (castHeldCode !== null && e.code === castHeldCode) {
+      castHeldCode = null;
+      const t = store.state.targeting;
+      if (t && inGame() && (t.kind === 'ability' || t.kind === 'summoner')) {
+        refreshPointer();
+        confirmTargeting(t, hasCursor ? { x: cursor.x, y: cursor.y } : null);
+      }
+      return;
+    }
     if (e.key === 'Tab') {
       if (store.state.scoreboardOpen) store.set({ scoreboardOpen: false });
       return;
@@ -284,5 +332,6 @@ export function installControls(renderer: GameRenderer): void {
       return;
     }
     if (e.code === 'Space') renderer.cam.centerHeld = false;
+    if (e.code === 'Backquote') championsOnly = false;
   });
 }

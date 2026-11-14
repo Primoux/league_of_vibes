@@ -16,6 +16,7 @@ import type { FxHost } from './core/host.ts';
 import { defaultFx } from './defaults.ts';
 import { FxDispatcher } from './dispatcher.ts';
 import { PostFx, type FxQuality } from './post/PostFx.ts';
+import { AmbientFx } from './world/ambient.ts';
 import { fxIndicators } from './telegraph/indicators.ts';
 import { installAutoAttackFx } from './world/autoAttacks.ts';
 import { installStatusFx } from './world/status.ts';
@@ -37,6 +38,8 @@ export interface FxInstance {
   readonly stats: { updateMs: number };
   dispatcher: FxDispatcher;
   post: PostFx | null;
+  /** Particules d'ambiance de la carte (null sans carte). */
+  ambient: AmbientFx | null;
   /** Avance les FX (appelé automatiquement sauf si `manualUpdate`). */
   update(dt: number): void;
   dispose(): void;
@@ -61,6 +64,8 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
     installWorldFx();
   }
   const runtime = new FxRuntime(host);
+  // ambiance de la carte (lucioles, pollen, brume) : seulement si l'hôte affiche la carte (pas dans le fxlab)
+  const ambient = 'map' in host ? new AmbientFx(runtime.root) : null;
   const dispatcher = new FxDispatcher(runtime, defaultFx);
   setRespawnHook((id) => respawnFx(runtime, id));
   fxIndicators.attach(runtime.root);
@@ -79,6 +84,7 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
     const t0 = performance.now();
     fxBus.update();
     runtime.update(Math.min(dt, 0.1));
+    ambient?.update(Math.min(dt, 0.1));
     stats.updateMs += (performance.now() - t0 - stats.updateMs) * 0.05;
   };
 
@@ -98,6 +104,7 @@ export function installFx(host: FxHost, opts: InstallOptions = {}): FxInstance {
 
   current = {
     runtime,
+    ambient,
     stats,
     dispatcher,
     post,
@@ -121,4 +128,5 @@ export function setFxQuality(q: FxQuality): void {
   if (!current) return;
   if (current.post) current.post.quality = q;
   current.runtime.ps.density = q === 'low' ? 0.5 : 1;
+  if (current.ambient) current.ambient.ps.density = q === 'low' ? 0.4 : 1;
 }

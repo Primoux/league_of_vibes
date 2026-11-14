@@ -1,0 +1,30 @@
+import { ability, defineChampion, stats } from './_helpers.ts';
+
+export default defineChampion({
+  id: 'master67', name: '67 Master', title: 'le Grand Maître du Six-Sept', class: 'mage', roles: ['mid', 'bot'],
+  difficulty: 1, ranged: true, resource: 'mana',
+  baseStats: stats({ maxHp: 607, maxMana: 367, manaRegen: 8.7, ad: 57, armor: 27, mr: 30, attackRange: 567, attackSpeed: .67, moveSpeed: 337 }),
+  perLevel: { maxHp: 97, maxMana: 37, ad: 2.7, armor: 4.3, mr: 1.3, attackSpeed: .017, manaRegen: .7 },
+  attackWindup: .27, projectileSpeed: 1667,
+  palette: { primary: '#8061ff', secondary: '#15213d', accent: '#35e6e0' },
+  lore: "Personnage original. Personne ne connaît son niveau, son âge ni le sens de ses gestes. Six témoins parlent de génie. Sept demandent qu'il arrête. Ses mains ont refusé de commenter.",
+  passive: ability({ id: 'master67_p', slot: 'P', name: 'Le compte est bon. Enfin presque.', targeting: 'self', range: 0, fxKey: 'master67_p',
+    description: "Chaque impact de sort sur un champion donne un cumul pendant 6,7 s (un maximum toutes les 0,67 s). Le 7e impact consomme les cumuls et inflige 67 (+20 % AP) dégâts magiques supplémentaires. Il comptait sur ses doigts. Il a quand même vérifié.",
+    params: { maxStacks: 7, duration: 6.7, hitLockout: .67, damage: 67, damageAp: .2 } }),
+  abilities: {
+    Q: ability({ id: 'master67_q', slot: 'Q', name: 'Six.', targeting: 'skillshot', range: 967, width: 107, speed: 1667, castTime: .17,
+      cooldown: [6.7, 6.2, 5.7, 5.2, 4.7], cost: [47], damage: { type: 'magic', base: [66, 96, 126, 156, 186], ap: .6 }, fxKey: 'master67_q',
+      description: "Envoie un 6 lumineux sur le premier ennemi : 66/96/126/156/186 (+60 % AP) dégâts magiques et ralentissement de 27 % pendant 1,67 s. La main gauche avait quelque chose à dire.", params: { slow: .27, slowDuration: 1.67 } }),
+    W: ability({ id: 'master67_w', slot: 'W', name: 'Seven.', targeting: 'ground', range: 767, radius: 267, castTime: .17,
+      cooldown: [12.7, 11.7, 10.7, 9.7, 8.7], cost: [67], damage: { type: 'magic', base: [77, 107, 137, 167, 197], ap: .55 }, fxKey: 'master67_w',
+      description: "Après 0,67 s, un 7 géant tombe sur la zone : 77/107/137/167/197 (+55 % AP) dégâts magiques et immobilisation de 0,67 s. La main droite exigeait un droit de réponse.", params: { delay: .67, root: .67 } }),
+    E: ability({ id: 'master67_e', slot: 'E', name: 'Les mains en l’air', targeting: 'dash', range: 367,
+      cooldown: [16.7, 15.7, 14.7, 13.7, 12.7], cost: [47], fxKey: 'master67_e',
+      description: "Se téléporte jusqu'à 367 unités et gagne un bouclier de 67/87/107/127/147 (+35 % AP) pendant 2,67 s. Les pieds se déplacent. Les mains restent au travail.",
+      params: { shield: [67, 87, 107, 127, 147], shieldAp: .35, duration: 2.67 } }),
+    R: ability({ id: 'master67_r', slot: 'R', name: 'SIX… SEVEN !', targeting: 'self', range: 0, radius: 467, castTime: .67,
+      cooldown: [107, 87, 67], cost: [100], damage: { type: 'magic', base: [67, 107, 147], ap: .3 }, fxKey: 'master67_r',
+      description: "Après 0,67 s, déclenche deux ondes espacées de 0,67 s. Chacune inflige 67/107/147 (+30 % AP) dégâts magiques. SIX ralentit de 37 % pendant 1,34 s ; SEVEN projette en l'air pendant 0,67 s. Le débat est clos. Les mains continuent.",
+      params: { delay: .67, slow: .37, slowDuration: 1.34, knockup: .67 } }),
+  },
+});

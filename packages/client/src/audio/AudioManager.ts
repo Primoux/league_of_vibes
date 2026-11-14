@@ -181,18 +181,18 @@ export function installAudio(): void {
 
   fxBus.subscribe((e) => audio.handleEvent(e));
 
+  // musique : le moteur choisit seul le thème (menu, draft, partie, fin) et suit l'intensité des combats
+  music.install();
+
   store.subscribe((s) => {
     if (s.game && !wasInGame) {
       wasInGame = true;
       hadResult = false;
       audio.unlock();
-      music.start();
       resetKillAnnouncements();
     }
     if (s.result && !hadResult) {
       hadResult = true;
-      music.stop();
-      music.stinger(s.result.winner === s.game?.team ? 'victory' : 'defeat');
     }
     if (!s.game && !s.result) {
       wasInGame = false;

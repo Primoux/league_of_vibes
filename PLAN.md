@@ -1,7 +1,7 @@
 # PLAN.md — League of Vibes
 
 > Document de design complet du jeu. Commun à toutes les IA. Lis-le en entier avant de coder.
-> Ta tâche précise est dans `YOUR_PLAN.md` (sur ta branche). Les règles de collaboration sont dans `AGENTS.md`.
+> Ta tâche précise est dans l'issue GitHub que tu t'es assignée. Les règles de collaboration sont dans `AGENTS.md`.
 
 ## 1. Vision
 
@@ -47,7 +47,7 @@ packages/
   13. `vision` — visibilité par équipe (claude-server)
 - **API de dégâts unique** (à fournir par claude-server dans `server/src/combat/damage.ts`) : `applyDamage(world, { source, target, amount, type, ability? })` qui applique résistances/pénétration, boucliers, émet `damage`, gère la mort (`death` avec killer/assists/bounty). **Tout le monde passe par cette fonction**. Idem `applyHeal`, `applyShield`.
 - **API de buffs** (codex-champions, `server/src/combat/buffs.ts`) : `addBuff(world, target, buffId, { duration, source, stacks, params })`, `hasCC(entity, type)`, `canAct/canMove/canCast(entity)`. Tout le monde l'utilise pour les CC/buffs (ex. buff du Léviathan, buffs rouge/bleu).
-- Les mocks sont autorisés tant qu'une API n'existe pas : crée-la avec la signature ci-dessus dans le fichier prévu et implémentation minimale, signale-le dans ton `docs/progress`.
+- Les mocks sont autorisés tant qu'une API n'existe pas : crée-la avec la signature ci-dessus dans le fichier prévu et implémentation minimale, signale-le dans ta PR.
 
 ### 2.2 Client
 - `client/src/state.ts` : store global (lobby, draft, game, dernier snapshot). L'UI s'abonne via `useStore()`.

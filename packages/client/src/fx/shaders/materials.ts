@@ -153,6 +153,11 @@ export function createWaterMaterial(color = new THREE.Color(0.03, 0.18, 0.42), f
 // ---------------------------------------------------------------- Distorsion (chaleur, ondes)
 /** Couche Three.js réservée aux objets de distorsion : invisibles dans le rendu principal, lus par PostFx. */
 export const DISTORTION_LAYER = 3;
+/**
+ * Nombre d'objets de distorsion vivants : PostFx ne rend la couche (second parcours complet de la scène)
+ * que s'il y en a. Incrémenter à l'ajout d'un objet sur DISTORTION_LAYER, décrémenter au retrait.
+ */
+export const distortionUsers = { count: 0 };
 
 const HEAT_FRAG = /* glsl */ `
 uniform float uTime;

@@ -3,6 +3,7 @@
  * débris balistiques qui rebondissent. Pierre (Grondak), glace (Ilyra), éclats divers.
  */
 import * as THREE from 'three';
+import { assignShadowDepth } from '../../render/shadowDepth.ts';
 import { rng } from '../core/rng.ts';
 
 export type BurstMode = 'spike' | 'debris' | 'static';
@@ -65,6 +66,7 @@ export class MeshBurstSystem {
       this.mesh.setMatrixAt(i, ZERO);
       this.mesh.setColorAt(i, new THREE.Color(1, 1, 1));
     }
+    assignShadowDepth(this.mesh);
     const f = (): Float32Array => new Float32Array(capacity);
     this.px = f(); this.py = f(); this.pz = f();
     this.vx = f(); this.vy = f(); this.vz = f();

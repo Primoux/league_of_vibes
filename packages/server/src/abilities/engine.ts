@@ -30,7 +30,7 @@ function resolveTarget(world: World, source: Entity, slot: AbilitySlot, targetId
   if (ally) return target.team === source.team && target.kind === 'champion' ? target : undefined;
   if (id === 'nyx' && slot === 'E') return (isUnit(target) || target.kind === 'ward') && target.id !== source.id ? target : undefined;
   if (target.team === source.team || !isUnit(target)) return;
-  if (slot === 'R' && ['kaelen', 'vrenna', 'nyx'].includes(id) && !target.champ) return;
+  if (slot === 'R' && ['kaelen', 'vrenna', 'nyx', 'touilleur'].includes(id) && !target.champ) return;
   return target;
 }
 export function interruptCast(e: Entity): void {

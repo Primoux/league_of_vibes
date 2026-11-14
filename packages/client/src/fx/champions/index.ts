@@ -3,6 +3,8 @@
  * Les champions absents d'ici utilisent les FX génériques (`defaults.ts`).
  */
 import './grondak.ts';
+import './master67.ts';
+import './touilleur.ts';
 import './ilyra.ts';
 import './tharox.ts';
 import './kaelen.ts';

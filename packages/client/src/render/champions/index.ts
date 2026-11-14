@@ -8,6 +8,7 @@ import { fxBus } from '../../fx/FxBus.ts';
 import { registerChampionFactory } from '../EntityView.ts';
 import type { EntityView } from '../EntityView.ts';
 import { MelenchonView } from './melenchon.ts';
+import { TouilleurView } from './TouilleurView.ts';
 import { ProceduralChampionView, TEAM_HEX, type ChampionModelDef } from './ChampionView.ts';
 import { genericFor } from './models/generic.ts';
 import { grondakModel } from './models/grondak.ts';
@@ -20,6 +21,9 @@ import { solenneModel } from './models/solenne.ts';
 import { tharoxModel } from './models/tharox.ts';
 import { vrennaModel } from './models/vrenna.ts';
 import { zephyrModel } from './models/zephyr.ts';
+import { master67Model } from './models/master67.ts';
+import { touilleurModel } from './models/touilleur.ts';
+import { portraitModel } from './portrait/index.ts';
 
 export { ProceduralChampionView, setRespawnHook } from './ChampionView.ts';
 
@@ -34,6 +38,8 @@ const MODELS: Record<string, ChampionModelDef> = {
   corvin: corvinModel,
   nyx: nyxModel,
   solenne: solenneModel,
+  master67: master67Model,
+  touilleur: touilleurModel,
 };
 
 /** Contrat commun aux modèles articulés et aux caricatures originales. */
@@ -50,7 +56,7 @@ export interface AnimatedChampionView extends EntityView {
 const views = new Map<number, AnimatedChampionView>();
 
 export function modelFor(championId: string): ChampionModelDef {
-  return MODELS[championId] ?? genericFor(CHAMPIONS[championId]?.class ?? 'fighter');
+  return portraitModel(championId, MODELS[championId] ?? genericFor(CHAMPIONS[championId]?.class ?? 'fighter'));
 }
 
 /** Crée la vue d'un champion (null si le championId est inconnu → vue par défaut du renderer). */
@@ -58,7 +64,9 @@ export function createChampionView(snap: Pick<EntitySnapshot, 'id' | 'subtype' |
   const id = snap.subtype;
   if (!id || !CHAMPIONS[id]) return null;
   const team = snap.team in TEAM_HEX ? (snap.team as keyof typeof TEAM_HEX) : 'neutral';
-  const view = id === 'melenchon' ? new MelenchonView(false, team) : new ProceduralChampionView(snap.id, id, team, modelFor(id));
+  const view = id === 'melenchon' ? new MelenchonView(false, team)
+    : id === 'touilleur' ? new TouilleurView(snap.id, team)
+    : new ProceduralChampionView(snap.id, id, team, modelFor(id));
   views.set(snap.id, view);
   const dispose = view.dispose.bind(view);
   view.dispose = () => {

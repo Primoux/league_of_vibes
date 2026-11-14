@@ -5,6 +5,7 @@ import { itemTip, tip } from '../components.tsx';
 import { ChampionPortrait, Glyph, ItemIcon } from '../icons/Icons.tsx';
 import { formatClock, formatGoldShort, formatInt, formatKdaRatio } from '../logic/format.ts';
 import { mvpScore } from '../logic/game.ts';
+import { RiftBackground } from '../stage/RiftBackground.tsx';
 import { useSelect } from '../useStore.ts';
 
 export function EndScreen() {
@@ -26,6 +27,7 @@ export function EndScreen() {
 
   return (
     <div class={`lov-screen lov-end ${won ? 'win' : 'lose'}`}>
+      <RiftBackground tint={won ? '#f6dc94' : '#ff5a5a'} intensity={1.2} />
       <div class="lov-end-burst" />
       <h1 class="lov-end-title">{won ? 'Victoire' : 'Défaite'}</h1>
       <p class="lov-end-sub">

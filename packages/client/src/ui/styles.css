@@ -108,6 +108,10 @@ kbd { font-family: var(--font); font-size: 0.72em; font-weight: 700; padding: 1p
 @keyframes lov-glow { 50% { box-shadow: 0 0 0 1px rgba(255, 240, 200, 0.6), 0 0 34px rgba(246, 220, 148, 0.55), 0 0 60px rgba(62, 230, 200, 0.18); } }
 
 .lov-icon-btn { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: rgba(0, 0, 0, 0.55); border: 1px solid var(--line); color: var(--gold-hi); cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
+.lov-gamemode-btn.off { animation: lov-gamemode-pulse 2.4s ease-in-out 3; }
+.lov-gamemode-btn:hover { transform: scale(1.08) !important; }
+@keyframes lov-gamemode-pulse { 50% { border-color: var(--gold-hi); box-shadow: 0 0 10px rgba(255, 210, 120, 0.55); } }
+.lov-reduce-motion .lov-gamemode-btn.off { animation: none; }
 .lov-icon-btn:hover { transform: rotate(20deg) scale(1.06); border-color: var(--gold-hi); }
 
 .lov-input { width: 100%; font: inherit; font-size: 1em; color: var(--text); background: rgba(3, 5, 12, 0.75); border: 1px solid rgba(217, 178, 95, 0.3); border-radius: 4px; padding: 11px 13px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }

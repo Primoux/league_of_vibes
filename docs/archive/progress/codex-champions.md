@@ -1,0 +1,136 @@
+# Progress — codex-champions
+
+Date : 2026-11-14. Branche de travail actuelle : `feat/touilleur` (extension demandée par l'utilisateur).
+
+## Extension : Le Touilleur
+
+- Nouveau mage de mêlée jouable `touilleur`, treizième champion : trois impacts de sorts espacés déclenchent dégâts/vitesse, Q projectile/slow, W zone retardée/slow, E blink/bouclier, R ciblé avec passage derrière et stun de 2 s de base pendant une canalisation burlesque.
+- Départ de la branche des modèles ; PR #32 fusionnée pendant le travail. Synchronisation avec `main` jusqu'à `5f3e3f8` (UI et audio récents conservés). Conflit README résolu en conservant la nouvelle structure de main puis en réappliquant le kit/la ligne du Touilleur. Aucun conflit de code, YOUR_PLAN.md de main inchangé.
+- R : préparation interruptible de 0,25 s, uniquement sur champion ennemi visible/ciblable et en portée. Arrivée respectant la navigation et les rayons, dans le dos uniquement ; aucun impact si l'arrivée est bloquée. Le lanceur fait face à la cible puis canalise sur place. Ténacité réduit le stun et le canal ensemble ; Purification arrête immédiatement les deux. Contrôle dur/silence du lanceur, ordre de déplacement/attaque/stop/rappel, mort, stase, suppression d'entité ou rupture de proximité annulent le canal et son propre stun. Les contrôles d'une autre source sont conservés. Aucun tick de dégâts différé ne survit à l'annulation.
+- Modèle sculpté d'après le nouveau portrait : manteau turquoise/laiton, col relevé, lavallière ivoire, cheveux/moustache cuivrés, gant et index levé. L'index appartient à l'os prop, compensé indépendamment du bras ; horloge continue entre les animations, sans allocation par frame. Repos/course/AA/QWER/rappel conservent le moulinet ; mort/CC restent traités normalement. 7 300 triangles visibles hors contours, 5 meshes au maximum, budget avec contours <16 000 triangles.
+- Portrait original généré avec l'outil intégré, WebP 512 × 512 de 42 930 octets ; prompt intégral dans le manifest. Modèle, portrait et FX déclarés dans ASSETS.md. Rendu CPU de contrôle inspecté ; comparaison dans `docs/previews/touilleur.webp`. Pas de contrôle WebGL interactif ni de FPS revendiqué.
+- FX : spirale projectile, télégraphie/tourbillon, trace d'esquive et moulinet derrière le haut du manteau de la cible avec les étoiles du stun commun. La durée et la suppression suivent le vrai buff serveur, avec destruction idempotente des géométries/matières. L'animation du canal suit aussi le buff pour s'arrêter en cas de purification/interruption.
+- Disponible au draft, chargement/HUD/scores, `?modellab&champ=touilleur` et `?fxlab&champ=touilleur&close=1`. Les registres existants distribuent automatiquement les données et le portrait ; aucune nouvelle dépendance npm.
+- Validation : **644 tests / 63 fichiers**, typage et build verts. Trente tests serveur spécifiques, cinq tests client (doigt vertical et trajet circulaire dans les états vivants, budget, mort/retour, annulation d'animation et de FX, ressources). Les garde-fous communs couvrent maintenant 156 duels déterministes et les coûts/CD des 52 sorts, ainsi que les 13 modèles/portraits. Le test shared exige 13 identifiants uniques.
+- Réseau réel : huit clients WebSocket, draft déterministe de huit champions distincts, Touilleur confirmé dans gameStart, puis 15 s de commandes simultanées. **29,8 snapshots/s sur chacun des huit clients, aucune erreur**, sortie 0 (cadence cible actuelle : 30 Hz). JSON décompressé 35,3–35,7 Ko/s/client ; ne certifie pas le débit compressé. Harness temporaire dérivé de scripts/bots.ts, sans modification du bot livré.
+- Publication dans une nouvelle PR via `scripts/open-pr.sh`, revue/fusion laissées à Fable.
+
+### Contrats modifiés pour Le Touilleur
+
+- Commit `contract:` : ajouts d'une entrée de modèle et d'un import de FX aux registres client. Extension client explicitement demandée dans la tâche.
+- Commit `contract:` : fabrique dédiée `TouilleurView`, qui étend la vue procédurale et synchronise seulement son animation de canal avec `touilleur_r_channel`. Les autres vues conservent leur comportement.
+- Aucun nouveau message/champ de protocole : événements de dash, sorts et buffs existants ; stun générique à fxKey dédiée, pour les CC/étoiles/animations/Purification communs. Moteur de ciblage : ajout de Touilleur à la liste des R réservés aux champions.
+
+## Historique : modèles inspirés des portraits
+
+## Extension : modèles inspirés des portraits
+
+- Demande explicite de retravailler largement les modèles client d'après les images. Départ sur la branche des portraits ; PR #22 désormais fusionnée. Synchronisation avec `main` jusqu'à `09a9b72`, incluant les travaux graphiques, audio et UI récents ; aucun conflit et YOUR_PLAN.md de main conservé.
+- Douze modèles retravaillés : visages, cheveux/tresses/boucles, capuches ouvertes, capes épaisses, robes plissées, mains/doigts, armures, plumes, défenses, failles de roche et armes sculptées d'après les portraits. Géométrie originale générée par code, sans dépendance ni asset tiers.
+- Onze modèles utilisent la nouvelle construction `portrait/` autour des rigs/clips/extras existants. Mélenchon garde son rig et ses gestes, avec visage/costume/cravate/mèches affinés et pièces fixes fusionnées par articulation/matière : 27 meshes visibles au repos contre 66 auparavant ; 10 148 triangles visibles.
+- Le 67 Master conserve ses paumes vers le haut et leur alternance en repos/course/sorts/rappel. Son modèle reste à 3 meshes avec contour, moins de 16 000 triangles. Les budgets existants ne sont pas relâchés.
+- Atelier sans serveur `?modellab`, choix des douze champions, portrait de référence, rotation/zoom, vues portrait/jeu, course/attaque/QWER/mort-retour. Le labo FX existant conserve les vrais sorts simulés.
+- Validation complète : **573 tests / 60 fichiers**, typage et build verts. Seize nouveaux garde-fous pour géométrie/index/poids, déformations pendant QWER, budgets incluant contours, normales sculptées sous transformation, matières, invisibilité de Nyx et libération des géométries/matières fusionnées.
+- Rendus PBR CPU des douze véritables vues skinnées inspectés et affinés (yeux, ouvertures des capuches, mèches, plis et ornements). Planche `docs/previews/champion-models.webp`, export et script Blender reproductibles documentés dans `docs/champion-models.md`. Cette planche exclut contour GPU/bloom ; pas de contrôle WebGL interactif ni de FPS revendiqué dans cet environnement.
+- Publication dans une nouvelle PR via `scripts/open-pr.sh` ; revue et fusion laissées à Fable. Les portraits d'origine et le gameplay ne sont pas modifiés.
+
+### Contrats modifiés pour les modèles
+
+- Commits `contract:` : options additives `smooth`, `sculptedSurfaces()` et `metal()` du builder ; lot de métal facultatif, fusion skinnée existante conservée. Normales sculptées transformées correctement ; modèles sans option conservés à facettes.
+- Branchement de la nouvelle géométrie dans la fabrique commune et ajout de `?modellab` dans main. Contrats de vue, rigs, clips, port d'arme et effets existants conservés. Aucun contrat réseau ajouté.
+- Extension de l'invisibilité du client à toutes les matières des lots opaques/émissifs, pour que les nouvelles dagues métalliques de Nyx deviennent translucides avec elle. Test de régression dédié.
+
+## Historique : portraits de sélection et 67 Master
+
+## Extension : portraits de sélection et 67 Master
+
+- Base initiale : `main` à `c945df9`, puis synchronisation avec `bca314e` (animations et correctifs FX récents préservés) ; les précédentes PR de champions sont fusionnées. Installation, typage et 483 tests verts avant les ajouts.
+- Douze portraits originaux générés avec l'outil de génération d'images intégré, palettes et descriptions tirées des données/modèles existants ; Mélenchon conserve sa ressemblance caricaturale et le 67 Master est un personnage adulte fictif. Prompts et provenance dans `client/src/assets/champions/manifest.json`.
+- WebP 512 × 512, ~650 Ko pour les douze fichiers ; import Vite avec URL hashée compatible sous-chemin, réutilisation dans le cadre SVG commun (draft, chargement, HUD, feed et scores). Portrait procédural existant conservé en dessous et réaffiché en cas d'erreur réseau/image inconnue. Aucun service distant sollicité par le jeu pour les illustrations.
+- Nouveau mage jouable `master67` : Q projectile/slow, W zone retardée/root, E blink/bouclier, R deux ondes retardées (slow puis knockup), passif au septième impact de sort confirmé sur champion, avec verrouillage anti-multi-proc de 0,67 s et expiration des cumuls. Mort avant la seconde onde = seconde onde annulée.
+- Modèle procédural dédié dans le pipeline skinné commun : hoodie violet, cheveux bouclés, sourire, doigts et deux paumes ouvertes qui alternent continuellement en idle, course, attaques, Q/W/E/R et rappel. Mort et CC utilisent les comportements communs. Trois meshes, ~1 100 triangles de géométrie opaque/émissive ; tests de direction des paumes et d'alternance.
+- FX dédiés par événements réels : 6 projectile, 7 qui tombe, trace de téléportation et deux ondes numérotées. Aucun changement de protocole, aucune dépendance npm ajoutée.
+- Branchement hors domaine demandé explicitement par l'utilisateur, isolé dans un commit `contract:` : une illustration optionnelle dans le cadre SVG de `ui/icons/Icons.tsx`, une entrée de modèle et l'import des FX. Pas de remplacement de l'interface ni des autres modèles.
+- Validation : **525 tests / 53 fichiers**, typage et build verts. Les garde-fous couvrent désormais 132 duels déterministes (66 paires × deux niveaux) et les coûts/CD des 48 sorts. Tests des dimensions/format/poids/unicité des douze images, du repli, des gestes, des délais, des cibles, des cumuls et de la mort entre deux ondes. Portraits et géométrie skinnée inspectés localement ; aucun contrôle WebGL interactif revendiqué.
+- Test réseau réel à huit clients, picks distincts et 67 Master confirmé dans gameStart : 15 s de commandes, **20 snapshots/s sur chacun des huit clients, aucune erreur**, sortie 0. JSON décompressé : 44,1–44,5 Ko/s/client ; ce chiffre ne certifie pas le débit compressé. Script temporaire dérivé de scripts/bots.ts, non livré.
+- Publication : l'intégration GitHub refuse les écritures (403). La connexion GitHub CLI a été rétablie par le flux officiel après préparation des commits et de la description de PR ; publication via scripts/open-pr.sh, revue et fusion laissées à Fable.
+
+## Historique : Mélenchon
+
+## Extension : Mélenchon
+
+- Mise à jour de la PR #7 : conflit dans ASSETS.md résolu en conservant les polices de l'interface et les deux déclarations d'assets procéduraux de Mélenchon. Aucun changement de gameplay ni de contrat ; YOUR_PLAN.md de main conservé.
+
+- La PR #2 des dix kits est fusionnée. Cette nouvelle PR ne contient que le champion satirique et son intégration ; synchronisation avec `main` jusqu'à `b689267` (PR #3, #4 et #6 incluses).
+- Mage mana complet : Indignation permanente (trois impacts espacés, bouclier et vitesse), Q projectile/slow, W zone retardée/silence, E blink/bouclier/hologramme explosif au départ, R « La République, c’est moi ! » interruptible, dégâts/provocation/bouclier. Valeurs et descriptions dans shared.
+- Modèle original sans texture importée : cheveux gris en arrière, lunettes rectangulaires, nez marqué, costume marine, cravate rouge, dossier et index accusateur. Gestes Q/R, marche, respiration, mort/réapparition et aura du buff R ; hologramme translucide. Budget testé <14 000 triangles, géométries partagées dans chaque modèle, ressources libérées à dispose.
+- FX : micro projectile, amendements, clone bleu au point de départ, télégraphies et onde tricolore avec pancarte de l'ultime. La pancarte n'apparaît qu'à l'impact confirmé par le serveur, pas au début d'une incantation interrompue.
+- Démo autonome `?melenchonlab`, portrait/silhouette, Q/W/E/R, marche et contrôles caméra ; disponible également dans le labo FX commun et le draft.
+- L'utilisateur a explicitement demandé un modèle ressemblant, ce qui autorise cette extension aux fichiers client/FX en plus du domaine serveur initial. Intégration additive isolée dans des commits `contract:` : main (démo), DefaultViews (secours), fabrique de modèles (interface AnimatedChampionView conservant les opérations existantes), index FX et type de vue dans fxlab. Aucun nouveau message réseau ni champ de protocole, aucune dépendance npm.
+- Validation : **393 tests / 37 fichiers**, typecheck et build verts. Tests spécifiques de gameplay, ciblage, interruptions, expiration du passif et ressources du modèle ; 110 duels déterministes (55 paires × deux niveaux), 44 sorts vérifiés pour coûts/CD. Le navigateur distant ne peut pas accéder au serveur local et refuse les URL fichier : pas de validation WebGL interactive revendiquée. Silhouette/portrait inspectés avec un rendu CPU local de la géométrie, puis affinés.
+- Test réseau réel : draft déterministe de huit champions distincts, Mélenchon confirmé dans le gameStart, puis 15 s de commandes simultanées ; **20 snapshots/s sur chacun des huit clients, aucune erreur**, sortie 0. Script de smoke temporaire basé sur scripts/bots.ts, sans modification du bot de charge du dépôt. Débit JSON brut 36,7–37,4 Ko/s ; ne certifie pas le débit compressé.
+- Assets procéduraux documentés dans ASSETS.md. Pas de photo, son ou asset tiers ajouté. L'équilibrage compétitif reste à confirmer en partie humaine.
+
+## Historique : dix champions initiaux
+
+## Fait
+- **M1** : moteur de sorts serveur autoritaire. Validation des rangs, ressources, cooldowns, CC, visibilité, cible et portée ; approche automatique des cibles hors portée, annulable par un nouvel ordre. Incantations interruptibles, animations `cast_Q/W/E/R`, haste, recasts et charges.
+- Primitives : projectiles avec collisions balayées triées par distance (première cible / perçants / ciblés / retour), zones instantanées, retardées avec télégraphie et persistantes, cônes, dashes, blinks respectant les murs, liens interruptibles par la distance.
+- Buffs : stun/root/slow/silence/knockup/taunt/suppress/blind/grounded ; ténacité sauf knockup/suppress ; ralentissement le plus fort, y compris plusieurs sorts du même lanceur. Boucliers temporaires indépendants, invisibilité, révélation, anti-soin et hooks de stase.
+- Recalcul des stats par statAtLevel + objets + buffs + hooks ; supports des unités non championnes sans accumulation des modificateurs. Mana, énergie de Nyx et absence de ressource de Kaelen ; régénération, XP partagée à 1400 u, niveaux 1–18, points de compétence, rangs QWE et paliers R 6/11/16.
+- **M2** : Grondak et Ilyra, quatre sorts et passifs testés ; neuf invocateurs : Flash, Ignite, Heal, Barrier, Exhaust, Teleport, Smite, Ghost, Cleanse. Flash ne laisse pas le rayon du champion dans un mur ; Teleport s'interrompt sur dégâts, CC, ordre ou disparition de la cible.
+- **M3** : les dix kits complets : Grondak, Tharox, Kaelen, Vrenna, Ilyra, Zephyr, Sable, Corvin, Nyx, Solenne. Attaques renforcées, marques, saignement, riposte, trois fentes/rayons, orbe aller-retour, pièges limités, invisibilité, marque de mort et soins/boucliers amplifiés.
+- **M4 — garde-fous** : 90 duels (45 paires × niveaux 6 et 11, équipements par classe), déterministes, sur les vrais systèmes combat/movement/vision. Contrôle des ressources, valeurs finies, dégâts aberrants et répétabilité. 40 tests de coûts/CD des sorts ; descriptions FR alignées sur les paramètres. Cela ne remplace pas l'équilibrage en partie humaine.
+- Dernière validation complète : **331 tests / 32 fichiers**, `npm run typecheck`, `npm test`, `npm run build` verts sur Node 24.22.1. Avertissement de chunk client >500 Ko préexistant, hors de ce domaine.
+- Synchronisation avec main jusqu'à `acc60fbe479e866fb4ecb115dbd8750853464703`. Conflits résolus en conservant **strictement l'API damage.ts de claude-server**, et les deux ensembles d'événements partagés. Aucun changement des systèmes des autres domaines.
+- Aucune dépendance ni asset ajouté.
+
+## En cours
+- Publication par GitHub CLI authentifié et ouverture de la PR pour revue par Fable.
+
+## Validation réseau
+- Serveur réel et 8 clients WebSocket : draft, chargement, puis 15 secondes de commandes simultanées.
+- **20,0 snapshots/s par client, aucune erreur**, test terminé avec code 0.
+- Débit JSON décompressé mesuré : 36,8–37,2 Ko/s par client (compression WebSocket active). Ce chiffre brut ne certifie pas le budget réseau compressé <30 Ko/s.
+- `node --import tsx` utilisé pour contourner uniquement le pipe IPC du CLI tsx indisponible dans cet environnement.
+
+## Bloqué / Besoins
+- L'intégration ChatGPT utilisée pour la lecture refuse les écritures (403). Une connexion GitHub CLI officielle a été validée par l'utilisateur ; la publication utilise cette connexion.
+- Les nouvelles règles d'AGENTS.md sont prises en compte : publication via `pr/codex-champions`, YOUR_PLAN de main conservé, revue/merge par Fable uniquement.
+- Le réglage compétitif, les visuels et l'ergonomie nécessitent les parties humaines et les branches client/FX/UI ; le moteur expose les événements et états requis.
+
+## Contrats modifiés
+- Ajouts **optionnels** dans `shared/types.ts`, commit `contract:` : `fxKey` sur abilityCast, summonerCast, buffApplied, buffRemoved, levelUp ; `stacks` sur buffApplied. Événements respawn et extensions autoAttack de claude-server préservés. Aucun champ supprimé/renommé.
+- `SummonerDef.params?` (schema possédé) contient les valeurs de gameplay des invocateurs.
+- L'API de dégâts de secours livrée au premier jalon a été **retirée lors de la synchronisation** : le fichier final `combat/damage.ts` est identique à celui de main. Tous les sorts passent par cette API et ses hooks.
+
+## API disponibles / intégration
+
+### Buffs — `server/src/combat/buffs.ts`
+- `addBuff(world, target, id, { duration, source?, stacks?, params?, definition? })`, `removeBuff`, `getBuff`, `getBuffs`, `hasBuff`, `hasCC`, `canAct/canMove/canAttack/canCast`, `getTenacity`, `getStatMods`, `cleanse`.
+- `params.statMods` / `statPercentMods` : bonus plats / relatifs ; `amount` : ralentissement ; `tenacity`, `damageReduction`, `damageDealtReduction`, `grievous`, `invisible`, `ghosted`, `revealed` : effets.
+- `registerStatSource((world, entity) => ({ flat, percent, tenacity }))` retourne un désabonnement. Les stats brutes d'ITEMS[champ.items] sont déjà additionnées ; le hook ajoute les passifs, sans compter deux fois ces stats.
+- `setBaseStats(world, entity, stats)` : mise à jour de la base des sbires/monstres dont les stats progressent alors qu'un buff est actif.
+- Enregistrement automatique sur `world.hooks.canMove/canAttack/isTargetable/beforeAttackHit/beforeDamage/beforeHeal/entitySnapshot`.
+- Snapshot : buffs `{id, remaining, stacks?}` via entitySnapshot ; `data.invisible`, `data.ghost`, `data.revealedUntil` compatibles avec movement/vision de claude-server.
+
+### Combat, boucliers et passifs
+- `abilities/effects.ts` re-exporte applyDamage/applyHeal et adapte applyShield avec `{ source, target, amount, duration?, buffId?, fxKey? }`. Le bouclier réel reste exclusivement dans `combatData(target).shields`, via l'API de claude-server ; les buffs n'en stockent qu'une vue/identité.
+- `abilities/combatHooks.ts` : registerDamageModifier(world, fn), branchement direct sur hooks.beforeDamage.
+- Passifs : **hooks.afterDamage**, précision non arrondie et `ctx.isAutoAttack` pour les impacts confirmés. L'événement `autoAttack` de départ brise l'invisibilité, sans compter deux fois les impacts. La marque de Nyx stocke seulement les PV effectivement retirés, pas les boucliers ni l'overkill.
+- Dashes : primitives.startDash produit le contrat `DashData` de movement (targetId, stopDistance, ignoreWalls, onArrive). Le mouvement avance une seule fois et émet l'événement ; abilities assure collisions/CC/fin. Secours local seulement si movementSystem absent du World.
+
+### Progression et FX
+- `grantXP`, `levelAbility`, `maxAbilityRank`, `xpToNextLevel`, `xpForLevel`, `cooldownWithHaste` dans systems/leveling.ts.
+- `world.hooks.selfState` renseigne xpToNext. XP de mort : `data.xpReward`, sinon `data.minion.xp` / `data.jungle.xp` / `data.monster.xp` ; `data.xpGlobal` pour les objectifs globaux.
+- abilityCast, projectileSpawn/Hit, dash, areaEffect, buffApplied/Removed, summonerCast, levelUp avec fxKey. Télégraphies `<sort>_telegraph`, impacts/variantes conservent les clés des données.
+
+## Vérification reproductible
+```bash
+npm ci
+npm run typecheck
+npm test
+npm run build
+# CI réseau : démarrer le serveur, puis scripts/bots.ts --bots 8 --seconds 15.
+# L'environnement local n'autorise pas le pipe IPC du CLI tsx : utiliser node --import tsx.
+```

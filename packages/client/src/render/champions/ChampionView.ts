@@ -300,11 +300,14 @@ export class ProceduralChampionView implements ChampionView {
   /** Invisibilité (visible seulement des alliés) : modèle translucide. */
   private setInvisible(on: boolean): void {
     this.invisible = on;
-    for (const m of [this.built.material, this.built.glowMaterial]) {
-      if (!m) continue;
-      m.transparent = on;
-      m.opacity = on ? 0.3 : 1;
-      m.depthWrite = !on;
+    for (const mesh of [...this.built.meshes, ...this.built.glows]) {
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of materials) {
+        m.transparent = on;
+        m.opacity = on ? 0.3 : 1;
+        m.depthWrite = !on;
+        m.needsUpdate = true; // La variante opaque du shader doit changer avec la transparence.
+      }
     }
     for (const o of this.built.outlines) o.visible = !on && !this.state.dead;
   }

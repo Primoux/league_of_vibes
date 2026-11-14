@@ -1,5 +1,6 @@
 /** Logique boutique côté UI (pure, testée). La boutique autoritaire reste côté serveur (mistral-economy). */
-import type { ItemCategory, ItemDef } from '@lov/shared';
+import type { ItemCategory, ItemDef, Stats } from '@lov/shared';
+import { STAT_LABEL } from './format.ts';
 
 export interface RecipeQuote {
   /** Prix à payer après déduction des composants possédés. */
@@ -81,8 +82,43 @@ export function filterItems(list: readonly ItemDef[], query: string, category: I
   const q = normalize(query.trim());
   return list
     .filter((i) => (category === 'all' ? true : i.category === category))
-    .filter((i) => !q || normalize(`${i.name} ${i.description} ${i.passive?.name ?? ''}`).includes(q))
+    .filter((i) => !q || searchText(i).includes(q))
     .sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category) || a.cost - b.cost || a.name.localeCompare(b.name));
+}
+
+const searchCache = new WeakMap<ItemDef, string>();
+/** Texte indexé : nom, description, passif/actif et libellés des stats (« armure », « vol de vie »…). */
+function searchText(i: ItemDef): string {
+  let t = searchCache.get(i);
+  if (t === undefined) {
+    const stats = (Object.keys(i.stats) as (keyof Stats)[]).map((k) => STAT_LABEL[k] ?? k).join(' ');
+    t = normalize(`${i.name} ${i.description} ${i.passive?.name ?? ''} ${i.passive?.description ?? ''} ${i.active?.name ?? ''} ${stats}`);
+    searchCache.set(i, t);
+  }
+  return t;
+}
+
+export type ShopSort = 'category' | 'priceAsc' | 'priceDesc' | 'name';
+
+/** Trie (copie) selon le mode ; le prix utilisé est celui après déduction des composants. */
+export function sortItems(list: readonly ItemDef[], mode: ShopSort, price: (i: ItemDef) => number = (i) => i.cost): ItemDef[] {
+  const out = [...list];
+  if (mode === 'priceAsc') out.sort((a, b) => price(a) - price(b) || a.name.localeCompare(b.name));
+  else if (mode === 'priceDesc') out.sort((a, b) => price(b) - price(a) || a.name.localeCompare(b.name));
+  else if (mode === 'name') out.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  else out.sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category) || a.cost - b.cost || a.name.localeCompare(b.name));
+  return out;
+}
+
+/** Objets qui réutilisent au moins un composant de l'inventaire (prix réduit), du moins cher au plus cher. */
+export function upgradesFor(inventory: readonly (string | null)[], list: readonly ItemDef[], items: Record<string, ItemDef>): ItemDef[] {
+  if (!inventory.some((x) => x)) return [];
+  return list
+    .filter((i) => i.buildsFrom.length > 0 && !(i.unique && inventory.includes(i.id)))
+    .map((i) => ({ i, p: quoteItem(i.id, inventory, items).price }))
+    .filter(({ i, p }) => p < i.cost)
+    .sort((a, b) => a.p - b.p)
+    .map(({ i }) => i);
 }
 
 /** Valeur estimée d'un inventaire (affichée au tableau des scores, comme l'or des objets). */

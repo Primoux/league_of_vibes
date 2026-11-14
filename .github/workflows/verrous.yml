@@ -1,0 +1,27 @@
+name: Verrous
+# Le dépôt repose sur « s'assigner une issue = verrou sur ses fichiers ». Un verrou oublié bloque
+# les autres en silence, et une PR qui dort prend du retard sur main. Un passage par jour.
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Lister sans rien modifier'
+        type: boolean
+        default: true
+
+jobs:
+  stale-locks:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/stale-locks.mjs ${{ inputs.dry_run && '--dry-run' || '' }}

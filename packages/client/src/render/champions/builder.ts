@@ -1,7 +1,7 @@
 /**
- * Construction des modèles low-poly : les pièces attachées à une même articulation sont fusionnées en UN mesh
- * à couleurs de sommets (1 draw call par articulation), les parties lumineuses (yeux, cristaux) forment un
- * second mesh émissif, et un contour par coque inversée est ajouté à chaque mesh opaque.
+ * Construction des modèles : les pièces de toutes les articulations sont fusionnées par matière
+ * (corps, métal optionnel et lumières), avec squelette et couleurs de sommets.
+ * Un contour par coque inversée est ajouté à chaque lot opaque.
  */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -12,6 +12,8 @@ export interface PartOpts {
   pos?: [number, number, number];
   rot?: [number, number, number];
   scale?: [number, number, number] | number;
+  /** Conserve les normales sculptées de la pièce ; défaut : facettes historiques. */
+  smooth?: boolean;
 }
 
 // ---------------------------------------------------------------- primitives
@@ -111,10 +113,10 @@ const _e = new THREE.Euler();
 const _s = new THREE.Vector3();
 const _p = new THREE.Vector3();
 
-/** Géométrie non indexée, position seule, transformée par les options de la pièce. */
+/** Géométrie non indexée, avec normales optionnelles, transformée par les options de la pièce. */
 function prepare(src: THREE.BufferGeometry, o: PartOpts): THREE.BufferGeometry {
   const g = src.index ? src.toNonIndexed() : src.clone();
-  for (const name of Object.keys(g.attributes)) if (name !== 'position') g.deleteAttribute(name);
+  for (const name of Object.keys(g.attributes)) if (name !== 'position' && !(o.smooth && name === 'normal')) g.deleteAttribute(name);
   const sc = o.scale ?? 1;
   _s.set(...(typeof sc === 'number' ? ([sc, sc, sc] as [number, number, number]) : sc));
   _q.setFromEuler(_e.set(...(o.rot ?? [0, 0, 0])));
@@ -142,7 +144,7 @@ function mergeParts(parts: Part[], rig: Rig): THREE.BufferGeometry {
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
     g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4));
     g.setAttribute('skinWeight', new THREE.BufferAttribute(w, 4));
-    g.computeVertexNormals();
+    if (!g.hasAttribute('normal')) g.computeVertexNormals();
     return g;
   });
   const merged = mergeGeometries(geos, false)!;
@@ -162,7 +164,18 @@ export interface BuiltModel {
 
 export class ModelBuilder {
   private readonly solids: Part[] = [];
+  private readonly metals: Part[] = [];
   private readonly glowParts: Part[] = [];
+  private sculpted = false;
+
+  /** Les nouveaux modèles combinent surfaces lisses et arêtes sculptées dans le même lot. */
+  sculptedSurfaces(): this { this.sculpted = true; return this; }
+
+  /** Lot métallique distinct : la peau et le tissu gardent leur propre rugosité. */
+  metal(joint: JointName, g: THREE.BufferGeometry, color: THREE.ColorRepresentation, o: PartOpts = {}): this {
+    this.metals.push({ geo: prepare(g, o), joint: J[joint], color: new THREE.Color(color) });
+    return this;
+  }
 
   /** Pièce opaque de couleur `color` (hex/CSS, sRGB) attachée à `joint`. */
   add(joint: JointName, g: THREE.BufferGeometry, color: THREE.ColorRepresentation, o: PartOpts = {}): this {
@@ -177,12 +190,12 @@ export class ModelBuilder {
   }
 
   /**
-   * Fusionne tout en 3 SkinnedMesh (corps, contour, lumières) liés au squelette du rig :
-   * 3 draw calls par champion au lieu d'un mesh par articulation.
+   * Fusionne en 3 SkinnedMesh au maximum (corps, contour, lumières), ou 5 avec métal distinct.
+   * Les éventuels effets propres au champion s'ajoutent à ces lots.
    */
   build(rig: Rig, opts: { outline?: boolean; roughness?: number } = {}): BuiltModel {
     rig.root.updateMatrixWorld(true);
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: opts.roughness ?? 0.78, metalness: 0.05 });
+    const material = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: !this.sculpted, roughness: opts.roughness ?? (this.sculpted ? 0.7 : 0.78), metalness: this.sculpted ? 0 : 0.05 });
     const out: BuiltModel = { material, glowMaterial: null, outlines: [], glows: [], meshes: [] };
     const skinned = (g: THREE.BufferGeometry, m: THREE.Material): THREE.SkinnedMesh => {
       const mesh = new THREE.SkinnedMesh(g, m);
@@ -206,6 +219,17 @@ export class ModelBuilder {
     if (this.glowParts.length) {
       out.glowMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
       out.glows.push(skinned(mergeParts(this.glowParts, rig), out.glowMaterial));
+    }
+    if (this.metals.length) {
+      const metal = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.32, metalness: 0.72 });
+      const g = mergeParts(this.metals, rig);
+      const armor = skinned(g, metal);
+      armor.castShadow = true; armor.receiveShadow = true;
+      out.meshes.push(armor);
+      if (opts.outline !== false) {
+        const hull = skinned(hullGeometry(g), getOutlineMaterial());
+        hull.userData.noDissolve = true; out.outlines.push(hull);
+      }
     }
     return out;
   }
