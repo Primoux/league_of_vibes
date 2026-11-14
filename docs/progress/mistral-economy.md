@@ -12,6 +12,11 @@
 ## En cours
 - M4 : mixage audio en conditions réelles (à valider en partie dev avec les autres agents).
 
+## Note équilibrage
+- L'équilibrage global (tours/sbires/monstres : PV, armure, backdoor, AD, XP jungle) a été
+  déplacé sur la branche `codex-objectives-balance` (base `origin/codex-objectives`, PR via
+  `pr/codex-objectives-balance`) car les fichiers touchés appartiennent à codex-objectives.
+
 ## M4 fait
 - Stats d'objets : le recalc est désormais la propriété de codex-champions (`combat/buffs.ts` `recalculateStats`,
   qui somme `ITEMS[champ.items].stats`) — mon delta par tick a été retiré pour éviter le double compte.
