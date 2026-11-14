@@ -46,9 +46,9 @@ export const minionsSystem: System = {
   name: 'minions',
   init(world) {
     waves.set(world, { next: scaled(TIMERS.minionFirstWave), count: 0 });
-    world.events.on('damage', event => {
-      if (event.amount <= 0) return;
-      const source = world.get(event.source); const target = world.get(event.target);
+    world.hooks.afterDamage.push((ctx, dealt) => {
+      if (dealt <= 0) return;
+      const source = ctx.credit ?? ctx.source; const target = ctx.target;
       if (!source || !target || source.team === target.team || source.kind !== 'champion' || target.kind !== 'champion') return;
       for (const e of world.query('minion')) {
         if (e.dead || !e.data.minion || e.team !== target.team || !inRange(e, source, 600)) continue;

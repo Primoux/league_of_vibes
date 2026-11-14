@@ -8,7 +8,7 @@
  *   d'échantillonner la position/orientation à un instant donné (interpolation, extrapolation bornée).
  * - Les sauts (Flash, respawn, téléportation) ne sont pas interpolés : l'historique est réinitialisé.
  */
-import type { EntityId, EntitySnapshot, Snapshot } from '@lov/shared';
+import { applyEntityPatch, type EntityId, type EntitySnapshot, type Snapshot } from '@lov/shared';
 
 export interface Sample {
   t: number; // temps serveur (ms)
@@ -91,6 +91,13 @@ export class SnapshotBuffer {
     if (snap.removed) {
       for (const id of snap.removed) this.remove(id, onRemoved);
       for (const e of snap.entities) this.upsert(e, t);
+      // Mises à jour partielles (protocole v2, claude-server) : seuls les champs modifiés.
+      if (snap.patches) {
+        for (const p of snap.patches) {
+          const prev = this.entities.get(p.id);
+          if (prev) this.upsert(applyEntityPatch(prev, p), t);
+        }
+      }
     } else {
       // snapshot complet : marquer les présents, supprimer les autres
       const present = new Set<EntityId>();

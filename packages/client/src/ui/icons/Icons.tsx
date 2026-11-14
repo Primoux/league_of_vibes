@@ -1,11 +1,15 @@
 /**
- * Icônes générées en SVG (aucun asset externe). Propriétaire : mistral-ui.
- * Portraits de champions procéduraux (palette + emblème de classe + motif déterministe),
+ * Icônes générées en SVG et portraits illustrés locaux. Propriétaire : mistral-ui.
+ * Portraits de secours procéduraux (palette + emblème de classe + motif déterministe),
  * icônes de sorts, d'objets, de sorts d'invocateur et de rôles.
  */
 import { CHAMPIONS, ITEMS, type AbilityDef, type ItemDef, type Role, type SummonerId } from '@lov/shared';
 import type { JSX } from 'preact';
 import { hashString } from '../logic/format.ts';
+import { ChampionArtwork, championArtworkUrl } from './ChampionArtwork.tsx';
+import { abilityGlyph } from './glyphs.ts';
+import { getShot, studio } from '../stage/studio.ts';
+import { useMini } from '../useStore.ts';
 
 type SvgProps = { size?: number | string; class?: string; title?: string };
 
@@ -29,8 +33,9 @@ export function ClassEmblem({ cls, size = 16, color = 'currentColor' }: { cls: s
 
 // ------------------------------------------------------------------ portrait de champion
 /**
- * Portrait procédural : fond dégradé de la palette, motif radial déterministe, emblème de classe en filigrane,
- * initiale gravée. `variant="splash"` : format portrait 3:4 pour les cartes de chargement / draft.
+ * Illustration locale avec portrait procédural de secours si l'image manque ou échoue.
+ * Le cadre SVG conserve le recadrage, les états et l'accessibilité de toutes les vues existantes.
+ * `variant="splash"` : format portrait 3:4 pour les cartes de chargement / draft.
  */
 export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls, grayscale }: { id: string; size?: number | string; variant?: 'square' | 'splash' | 'round'; class?: string; grayscale?: boolean }) {
   const c = CHAMPIONS[id];
@@ -45,6 +50,10 @@ export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls
   const rot = (h >> 4) % 360;
   const ringR = 26 + ((h >> 9) % 10);
   const letter = (c?.name ?? id).charAt(0).toUpperCase();
+  useMini(studio, (s) => s.version);
+  // illustration peinte (codex-champions) en priorité ; rendu 3D du modèle en secours, puis l'initiale
+  const art = championArtworkUrl(id);
+  const shot = art ? null : getShot(id, variant === 'splash' ? 'full' : 'bust');
   const rayPaths: JSX.Element[] = [];
   for (let i = 0; i < rays; i++) {
     const a0 = ((rot + (i * 360) / rays) * Math.PI) / 180;
@@ -90,74 +99,87 @@ export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls
       <g fill={pal.accent} opacity="0.09">{rayPaths}</g>
       <circle cx={cx} cy={cy} r={ringR} fill="none" stroke={pal.accent} stroke-opacity="0.35" stroke-width="1.2" />
       <circle cx={cx} cy={cy} r={ringR + 6} fill="none" stroke={pal.primary} stroke-opacity="0.4" stroke-width="0.6" stroke-dasharray="2 3" />
-      <g transform={`translate(${cx - 34} ${cy - 34}) scale(2.83)`} opacity="0.22">
+      <g transform={`translate(${cx - 34} ${cy - 34}) scale(2.83)`} opacity={shot || art ? 0.1 : 0.22}>
         <path d={EMBLEM[c?.class ?? 'mage']} fill={pal.accent} fill-rule="evenodd" />
       </g>
       <g fill={pal.accent}>{shards}</g>
+      {shot ? (
+        <>
+          <ellipse cx={cx} cy={H * 0.93} rx={W * 0.42} ry={H * 0.06} fill="#000" opacity="0.35" />
+          <image href={shot} x="0" y={variant === 'splash' ? 4 : 2} width={W} height={H} preserveAspectRatio={variant === 'splash' ? 'xMidYMax meet' : 'xMidYMid slice'} />
+        </>
+      ) : (
       <text
-        x={cx}
-        y={cy + 15}
-        text-anchor="middle"
-        font-family="Cinzel, 'Times New Roman', serif"
-        font-weight="800"
-        font-size="44"
-        fill={`url(#${uid}-glyph)`}
-        stroke="#0a0a12"
-        stroke-width="1.6"
-        paint-order="stroke"
-      >
-        {letter}
-      </text>
+          x={cx}
+          y={cy + 15}
+          text-anchor="middle"
+          font-family="Cinzel, 'Times New Roman', serif"
+          font-weight="800"
+          font-size="44"
+          fill={`url(#${uid}-glyph)`}
+          stroke="#0a0a12"
+          stroke-width="1.6"
+          paint-order="stroke"
+        >
+          {letter}
+        </text>
+      )}
+      <ChampionArtwork id={id} width={W} height={H} />
       <rect width={W} height={H} fill={`url(#${uid}-vig)`} />
     </svg>
   );
 }
 
 // ------------------------------------------------------------------ icônes de sorts
-const TARGET_GLYPH: Record<string, string> = {
-  skillshot: 'M3 13 L15 13 L15 9 L22 12 L15 15 L15 11 L3 11 Z M3 8 L9 8 L9 9.4 L3 9.4 Z M3 14.6 L9 14.6 L9 16 L3 16 Z',
-  targeted: 'M11 2 H13 V7 H11 Z M11 17 H13 V22 H11 Z M2 11 H7 V13 H2 Z M17 11 H22 V13 H17 Z M12 8.5 A3.5 3.5 0 1 1 11.99 8.5 Z',
-  ground: 'M12 4 A8 8 0 1 1 11.99 4 Z M12 6.5 A5.5 5.5 0 1 0 12.01 6.5 Z M12 9.5 A2.5 2.5 0 1 1 11.99 9.5 Z',
-  cone: 'M3 12 L21 3 C23 9 23 15 21 21 Z M8 12 L18 7.5 C19 10.5 19 13.5 18 16.5 Z',
-  self: 'M12 3 A9 9 0 1 1 11.99 3 Z M12 5 A7 7 0 1 0 12.01 5 Z M12 8 A4 4 0 1 1 11.99 8 Z',
-  dash: 'M2 5 L9 12 L2 19 L5 19 L12 12 L5 5 Z M10 5 L17 12 L10 19 L13 19 L20 12 L13 5 Z',
-  targetedDash: 'M2 6 L8 12 L2 18 L4.5 18 L10.5 12 L4.5 6 Z M9 6 L15 12 L9 18 L11.5 18 L17.5 12 L11.5 6 Z M20 9.5 A2.5 2.5 0 1 1 19.99 9.5 Z',
-  global: 'M12 2 A10 10 0 1 1 11.99 2 Z M12 4 A8 8 0 1 0 12.01 4 Z M11 3 H13 V21 H11 Z M3 11 H21 V13 H3 Z M12 4 C7 8 7 16 12 20 C9 16 9 8 12 4 Z M12 4 C17 8 17 16 12 20 C15 16 15 8 12 4 Z',
-  passive: 'M12 2 L20.7 7 V17 L12 22 L3.3 17 V7 Z M12 5 L18 8.5 V15.5 L12 19 L6 15.5 V8.5 Z M12 8 L15.5 10 V14 L12 16 L8.5 14 V10 Z',
-};
-
-const SLOT_HUE: Record<string, number> = { P: 0, Q: 0, W: 35, E: -35, R: 70 };
 
 export function AbilityIcon({ ability, championId, size = 48 }: { ability: AbilityDef; championId: string; size?: number | string }) {
   const pal = CHAMPIONS[championId]?.palette ?? { primary: '#888', secondary: '#222', accent: '#eee' };
   const uid = `la-${ability.id}`;
-  const glyph = ability.slot === 'P' ? TARGET_GLYPH.passive : (TARGET_GLYPH[ability.targeting] ?? TARGET_GLYPH.self);
-  const hue = SLOT_HUE[ability.slot] ?? 0;
+  const glyph = abilityGlyph(ability);
   const dmg = ability.damage?.type;
-  const tint = dmg === 'physical' ? '#ffb36b' : dmg === 'magic' ? '#c79bff' : dmg === 'true' ? '#ffffff' : pal.accent;
+  const tint = dmg === 'physical' ? '#ffb36b' : dmg === 'magic' ? '#d2a8ff' : dmg === 'true' ? '#ffffff' : pal.accent;
   const h = hashString(ability.id);
+  const ang = (h % 360) * (Math.PI / 180);
+  const rays = [];
+  for (let i = 0; i < 6; i++) {
+    const a = ang + (i * Math.PI) / 3;
+    rays.push(<path key={i} d={`M24 24 L${24 + Math.cos(a) * 40} ${24 + Math.sin(a) * 40} L${24 + Math.cos(a + 0.22) * 40} ${24 + Math.sin(a + 0.22) * 40} Z`} />);
+  }
   return (
     <svg viewBox="0 0 48 48" width={size} height={size} class="lov-ability-icon" role="img" aria-label={ability.name}>
       <defs>
-        <linearGradient id={`${uid}-bg`} x1="0" y1="0" x2="1" y2="1" gradientTransform={`rotate(${h % 90})`}>
-          <stop offset="0%" stop-color={pal.primary} style={{ filter: `hue-rotate(${hue}deg)` }} />
-          <stop offset="100%" stop-color={pal.secondary} />
-        </linearGradient>
+        <radialGradient id={`${uid}-bg`} cx="30%" cy="25%" r="95%">
+          <stop offset="0%" stop-color={pal.primary} />
+          <stop offset="55%" stop-color={pal.secondary} />
+          <stop offset="100%" stop-color="#05060c" />
+        </radialGradient>
         <radialGradient id={`${uid}-glow`} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color={tint} stop-opacity="0.55" />
+          <stop offset="0%" stop-color={tint} stop-opacity="0.7" />
+          <stop offset="60%" stop-color={tint} stop-opacity="0.12" />
           <stop offset="100%" stop-color={tint} stop-opacity="0" />
         </radialGradient>
+        <linearGradient id={`${uid}-glyph`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ffffff" />
+          <stop offset="55%" stop-color={pal.accent} />
+          <stop offset="100%" stop-color={tint} />
+        </linearGradient>
+        <filter id={`${uid}-f`} x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="1.6" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
       <rect width="48" height="48" fill={`url(#${uid}-bg)`} />
-      <g opacity="0.18" stroke={pal.accent} stroke-width="0.8" fill="none">
-        <circle cx="24" cy="24" r={10 + (h % 8)} />
-        <circle cx="24" cy="24" r={18 + ((h >> 3) % 6)} stroke-dasharray="3 4" />
+      <g fill={pal.accent} opacity="0.1">{rays}</g>
+      <circle cx="24" cy="24" r="20" fill={`url(#${uid}-glow)`} />
+      <circle cx="24" cy="24" r={13 + (h % 5)} fill="none" stroke={pal.accent} stroke-opacity="0.22" stroke-width="0.7" stroke-dasharray="2 3" />
+      <g transform="translate(7 7) scale(1.4167)" filter={`url(#${uid}-f)`}>
+        <path d={glyph} fill={`url(#${uid}-glyph)`} fill-rule="evenodd" stroke="#05060c" stroke-width="0.7" paint-order="stroke" />
       </g>
-      <circle cx="24" cy="24" r="18" fill={`url(#${uid}-glow)`} />
-      <g transform="translate(8 8) scale(1.333)">
-        <path d={glyph} fill={pal.accent} fill-rule="evenodd" stroke="#08080e" stroke-width="0.6" paint-order="stroke" />
-      </g>
-      {ability.slot === 'R' && <path d="M0 0 H14 L0 14 Z M48 48 H34 L48 34 Z" fill={tint} opacity="0.7" />}
+      <path d="M0 0 H48 V16 C32 10 16 10 0 16 Z" fill="#fff" opacity="0.08" />
+      {ability.slot === 'R' && <path d="M0 0 H12 L0 12 Z M48 48 H36 L48 36 Z M48 0 V12 L36 0 Z M0 48 V36 L12 48 Z" fill={tint} opacity="0.75" />}
     </svg>
   );
 }
