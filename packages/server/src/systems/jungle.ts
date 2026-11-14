@@ -2,14 +2,16 @@ import { CAMPS, TIMERS, scaled } from '@lov/shared';
 import type { Entity, System, World } from '../world.ts';
 import { applyHeal } from '../combat/damage.ts';
 import { addBuff, applyDamage, retire } from '../world-ai/runtime.ts';
+import { refreshBurn, takeBurnTick } from '../world-ai/burns.ts';
 import { aggroMonster, spawnMonster, updateMonster, type MonsterState } from '../world-ai/monsters.ts';
 interface CampState { ids: number[]; next: number }
 interface JungleBuffs { blue?: number; red?: number }
 const camps = new WeakMap<World, Map<string, CampState>>();
 function grant(world: World, champion: Entity, color: 'blue' | 'red', expiresAt = world.time + 120): void {
   const buffs = (champion.data.jungleBuffs ??= {}) as JungleBuffs;
+  expiresAt = Math.max(expiresAt, buffs[color] ?? 0);
   buffs[color] = expiresAt;
-  addBuff(world, champion, `${color}_buff`, { duration: Math.max(0, expiresAt - world.time), params: color === 'blue' ? { manaRegen: 25, abilityHaste: 10 } : { slow: 0.2, burn: 12 } });
+  addBuff(world, champion, `${color}_buff`, { duration: Math.max(0, expiresAt - world.time), params: color === 'blue' ? { manaRegen: 25, abilityHaste: 10 } : { onHitSlow: 0.2, burn: 12 } });
 }
 export function getCampTimers(world: World): Record<string, number> {
   const result: Record<string, number> = {};
@@ -21,16 +23,16 @@ export const jungleSystem: System = {
   init(world) {
     const states = new Map<string, CampState>(); camps.set(world, states);
     for (const camp of CAMPS) states.set(camp.id, { ids: [], next: scaled(camp.monster === 'scuttle' ? TIMERS.scuttleFirstSpawn : TIMERS.jungleFirstSpawn) });
-    world.events.on('damage', event => {
-      if (event.amount <= 0) return;
-      const target = world.get(event.target); const source = world.get(event.source);
-      if (!source || !target) return;
+    world.hooks.afterDamage.push((ctx, dealt) => {
+      if (dealt <= 0) return;
+      const target = ctx.target; const source = ctx.credit ?? ctx.source;
+      if (!source) return;
       const monster = target.data.monster as MonsterState | undefined;
       if (monster?.camp) for (const id of states.get(monster.camp)?.ids ?? []) { const ally = world.get(id); if (ally) aggroMonster(world, ally, source); }
       const buffs = source.data.jungleBuffs as JungleBuffs | undefined;
-      if (!source.dead && (buffs?.red ?? 0) > world.time && !event.ability && target.kind === 'champion') {
+      if (ctx.isAutoAttack && ctx.source?.champ && source.champ && !source.dead && (buffs?.red ?? 0) > world.time && target.team !== source.team && target.hp > 0 && (target.kind === 'champion' || target.kind === 'minion' || target.kind === 'monster')) {
         addBuff(world, target, 'red_slow', { duration: 2, source, params: { slow: 0.2 } });
-        target.data.redBurn = { source: source.id, until: world.time + 3, next: world.time + 1 };
+        refreshBurn(world, target, 'redBurn', source);
       }
     });
     world.events.on('death', event => {
@@ -80,9 +82,9 @@ export const jungleSystem: System = {
           }
         }
       }
-      const burn = entity.data.redBurn as { source: number; until: number; next: number } | undefined;
-      if (burn && !entity.dead && world.time >= burn.next && world.time <= burn.until) {
-        burn.next += 1; const source = world.get(burn.source); if (source) applyDamage(world, { source, target: entity, amount: 12, type: 'true', ability: 'red_burn' });
+      let burnSource: Entity | undefined;
+      while ((burnSource = takeBurnTick(world, entity, 'redBurn'))) {
+        applyDamage(world, { source: burnSource, target: entity, amount: 12, type: 'true', ability: 'red_burn' });
       }
       const buffs = entity.data.jungleBuffs as JungleBuffs | undefined;
       if (buffs && !entity.dead && (buffs.blue ?? 0) > world.time) entity.mana = Math.min(entity.stats.maxMana, entity.mana + entity.stats.maxMana * 0.01 * dt);
