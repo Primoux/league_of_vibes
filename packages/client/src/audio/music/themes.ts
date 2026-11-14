@@ -3,7 +3,7 @@
  * Un thème = tempo + boucle de N mesures de 16 doubles-croches + fonction qui joue un pas.
  * `intensity` (0..1) ajoute des couches (percussions, cuivres, cordes) pendant les combats.
  */
-import { bass, bell, brass, choir, crash, flute, pad, pluck, snare, strings, swell, taiko, type MusicBus } from './instruments.ts';
+import { bass, bell, brass, choir, crash, flute, kalimba, pad, pluck, snare, softPad, strings, swell, taiko, type MusicBus } from './instruments.ts';
 
 export type ThemeId = 'menu' | 'draft' | 'game';
 
@@ -119,56 +119,111 @@ const draft: Theme = {
   },
 };
 
-// ------------------------------------------------------------------ PARTIE : « Sous la canopée » (exploration → combat)
-const GAME_PROG: ChordName[] = ['Dm', 'F', 'C', 'Gm', 'Dm', 'Bb', 'C', 'A'];
-const GAME_MELODY: Phrase = [
-  [0, 74, 6], [6, 76, 2], [8, 77, 8],
-  [16, 81, 6], [22, 79, 2], [24, 77, 4], [28, 76, 4],
-  [32, 72, 8], [40, 76, 4], [44, 79, 4],
-  [48, 77, 12], [60, 74, 4],
-  [64, 74, 4], [68, 77, 4], [72, 81, 8],
-  [80, 82, 6], [86, 81, 2], [88, 77, 8],
-  [96, 79, 4], [100, 76, 4], [104, 72, 8],
-  [112, 73, 8], [120, 76, 8],
+// ------------------------------------------------------------------ PARTIE : « Sous la canopée » (ambiance douce, générative)
+// Ré dorien, tempo lent, harmonie qui change toutes les 2 mesures. Chaque boucle tire une progression
+// et des motifs différents (aléatoire déterministe par boucle/mesure) : rien ne se répète à l'identique.
+// Le combat ajoute seulement de légères couches (pulsation sourde, arpège feutré) : jamais de cuivres ni de caisse claire.
+
+/** Accords ouverts et doux (nappes) + fondamentale grave. */
+const AMB: Record<string, { notes: number[]; root: number }> = {
+  Dm9: { notes: [57, 60, 64, 65], root: 38 },
+  Fmaj9: { notes: [57, 60, 64, 67], root: 41 },
+  G69: { notes: [57, 59, 62, 64], root: 43 },
+  Am7: { notes: [55, 60, 64, 69], root: 45 },
+  Cadd9: { notes: [55, 62, 64, 67], root: 48 },
+  Bbmaj7: { notes: [57, 62, 65, 69], root: 46 },
+};
+const AMB_PROGS: string[][] = [
+  ['Dm9', 'Fmaj9', 'Cadd9', 'G69'],
+  ['Dm9', 'Bbmaj7', 'Fmaj9', 'Am7'],
+  ['Bbmaj7', 'Cadd9', 'Dm9', 'Dm9'],
+  ['Dm9', 'G69', 'Am7', 'Fmaj9'],
+  ['Fmaj9', 'Am7', 'Bbmaj7', 'Cadd9'],
 ];
-const GAME_ARP = [0, 2, 1, 2];
+/** Pentatonique de Ré mineur (consonante sur tous les accords ci-dessus). */
+const PENTA = [62, 65, 67, 69, 72, 74, 77, 79, 81, 84];
+const MOTIF_STEPS = [0, 2, 4, 6, 8, 10, 12];
+
+/** Aléatoire déterministe dans [0, 1) (pur, testable). */
+export function hash3(a: number, b: number, c: number): number {
+  let h = (a * 374761393 + b * 668265263 + c * 2147483647) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/** Leitmotiv rare (une boucle sur quatre, au calme) : [pas, note, durée]. */
+const GAME_MELODY: Phrase = [
+  [0, 74, 6], [8, 72, 4], [12, 69, 8],
+  [32, 67, 6], [40, 69, 10],
+  [64, 74, 4], [70, 77, 4], [76, 74, 8],
+  [96, 72, 6], [104, 69, 16],
+];
+
+export interface AmbientBar {
+  chord: string;
+  /** notes du motif : [pas dans la mesure, note MIDI, durée en pas] */
+  motif: [number, number, number][];
+}
+
+/** Plan d'une mesure du thème de partie : accord + motif généré (pur, testé). */
+export function gameBar(loop: number, bar: number): AmbientBar {
+  const prog = AMB_PROGS[Math.floor(hash3(loop, 0, 7) * AMB_PROGS.length)]!;
+  const chord = prog[Math.floor(bar / 2)]!;
+  const motif: [number, number, number][] = [];
+  // une boucle sur quatre (à partir de la 3e) : respiration, nappe seule
+  const breath = loop % 4 === 2;
+  // le motif apparaît dans ~40 % des mesures, jamais deux mesures de suite
+  const prevPlayed = bar > 0 && hash3(loop, bar - 1, 1) < 0.4;
+  if (breath || prevPlayed || hash3(loop, bar, 1) >= 0.4) return { chord, motif };
+  const count = 2 + Math.floor(hash3(loop, bar, 2) * 3); // 2 à 4 notes
+  let idx = 2 + Math.floor(hash3(loop, bar, 3) * 5);
+  let pos = Math.floor(hash3(loop, bar, 4) * 3) * 2;
+  for (let i = 0; i < count && pos < 16; i++) {
+    const next = MOTIF_STEPS.find((p) => p > pos + 1 + Math.floor(hash3(loop, bar, 10 + i) * 4)) ?? 16;
+    motif.push([pos, PENTA[idx]!, Math.max(2, next - pos)]);
+    // petit pas mélodique (-2..+2), tendance descendante pour rester apaisé
+    idx = Math.max(0, Math.min(PENTA.length - 1, idx + Math.floor(hash3(loop, bar, 20 + i) * 5) - 2 - (i % 2)));
+    pos = next;
+  }
+  return { chord, motif };
+}
 
 const game: Theme = {
   id: 'game',
-  bpm: 92,
+  bpm: 66,
   bars: 8,
   play(bus, step, loop, t, intensity, sd) {
     const bar = Math.floor(step / 16);
     const s = step % 16;
-    const name = GAME_PROG[bar]!;
-    const chord = CH[name];
-    const calm = 1 - intensity;
-    if (s === 0) {
-      pad(bus, [...chord], t, sd * 16, 0.03 + 0.012 * intensity, 0.7 + intensity * 0.6);
-      bass(bus, ROOT[name], t, sd * (intensity > 0.4 ? 3.5 : 14), 0.1);
+    const plan = gameBar(loop, bar);
+    const ch = AMB[plan.chord]!;
+    // nappe et basse : une par accord (toutes les 2 mesures), qui se chevauchent en fondu
+    if (s === 0 && bar % 2 === 0) {
+      softPad(bus, ch.notes, t, sd * 34, 0.022 + 0.008 * intensity, 0.8 + intensity * 0.5);
+      bass(bus, ch.root, t, sd * 30, 0.05 + 0.02 * intensity);
     }
-    // basse pulsée en combat
-    if (intensity > 0.4 && (s === 4 || s === 8 || s === 12)) bass(bus, ROOT[name] + (s === 8 ? 12 : 0), t, sd * 3.5, 0.08);
-    // arpège doux (exploration)
-    if (s % 4 === 0 && calm > 0.2) pluck(bus, chord[GAME_ARP[s / 4]!]! + 12, t, 0.02 * calm + 0.008);
-    // mélodie à la flûte, une boucle sur deux, seulement au calme
-    if (loop % 2 === 1 && intensity < 0.5) for (const [at, note, len] of GAME_MELODY) if (at === step) flute(bus, note, t, len * sd, 0.038);
-    // couche combat 1 : tambours
-    if (intensity > 0.25) {
-      if (s === 0 || s === 8) taiko(bus, t, 0.14 + 0.18 * intensity);
-      if (s === 6 || s === 14) taiko(bus, t, 0.08 + 0.1 * intensity, 1.3);
+    // de temps en temps, une quinte grave au milieu de l'accord
+    if (s === 0 && bar % 2 === 1 && hash3(loop, bar, 30) < 0.35) bass(bus, ch.root + 7, t, sd * 12, 0.035);
+    // motif généré (kalimba ou flûte selon la boucle), atténué en combat
+    if (intensity < 0.7) {
+      const useFlute = hash3(loop, 0, 40) < 0.35;
+      for (const [at, note, len] of plan.motif)
+        if (at === s) {
+          if (useFlute) flute(bus, note, t, len * sd, 0.022 * (1 - intensity));
+          else kalimba(bus, note, t, 0.03 * (1 - intensity * 0.8));
+        }
     }
-    // couche combat 2 : cordes en ostinato + caisse claire
-    if (intensity > 0.5) {
-      if (s % 2 === 0) strings(bus, ROOT[name] + 24 + (s % 8 === 6 ? 7 : 0), t, sd * 1.7, 0.02 + 0.015 * intensity);
-      if (s === 4 || s === 12) snare(bus, t, 0.05 + 0.05 * intensity);
-    }
-    // couche combat 3 : cuivres héroïques et cymbales
-    if (intensity > 0.75) {
-      if (s === 0 || s === 10) brass(bus, [...chord], t, sd * (s === 0 ? 5 : 3), 0.028 + 0.02 * intensity);
-      if (s === 0 && bar % 4 === 0) crash(bus, t, 0.04);
-    }
-    if (step === 7 * 16 + 8 && intensity > 0.3) swell(bus, t, sd * 8, 0.04);
+    // leitmotiv, rarement et seulement au calme
+    if (loop % 4 === 3 && intensity < 0.3) for (const [at, note, len] of GAME_MELODY) if (at === step) flute(bus, note, t, len * sd, 0.02);
+    // étincelles aiguës très rares
+    if (s === 6 && hash3(loop, bar, 50) < 0.12) bell(bus, PENTA[6 + Math.floor(hash3(loop, bar, 51) * 4)]! + 12, t, 0.012, 2.5);
+    // combat 1 : pulsation sourde et lointaine
+    if (intensity > 0.3 && (s === 0 || s === 8)) taiko(bus, t, 0.04 + 0.07 * intensity, 0.75);
+    // combat 2 : arpège feutré en croches sur l'accord
+    if (intensity > 0.55 && s % 2 === 0) pluck(bus, ch.notes[(s / 2) % ch.notes.length]! + 12, t, 0.008 + 0.01 * intensity);
+    // combat 3 : souffle qui monte avant chaque nouvelle boucle
+    if (intensity > 0.8 && step === 7 * 16) swell(bus, t, sd * 16, 0.025);
   },
 };
 

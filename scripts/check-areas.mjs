@@ -6,7 +6,9 @@
 //
 // Règles (voir AGENTS.md §2) :
 //   1. Le titre suit le commit conventionnel : type(area): résumé — ou « contract: ... ».
-//   2. Une PR normale ne touche que les chemins de son area (+ tests, + docs) et AUCUN fichier de contrat.
+//      Une fonctionnalité qui traverse plusieurs areas les déclare : type(a,b): résumé,
+//      ou une ligne « Areas: a, b, c » dans le corps de la PR.
+//   2. Une PR normale ne touche que les chemins de ses areas (+ tests, + docs) et AUCUN fichier de contrat.
 //   3. Une PR « contract: » ne touche QUE des fichiers de contrat (+ docs) : elle est mergée seule.
 //   4. Une PR « champion » ne touche qu'un seul champion à la fois (tranche verticale).
 import { readFileSync } from 'node:fs';
@@ -19,6 +21,7 @@ const arg = (name, fallback) => {
 
 const cfg = JSON.parse(readFileSync(new URL('../.github/areas.json', import.meta.url), 'utf8'));
 const title = arg('title', process.env.PR_TITLE ?? '');
+const body = arg('body', process.env.PR_BODY ?? '');
 const base = arg('base', process.env.BASE_REF ? `origin/${process.env.BASE_REF}` : 'origin/main');
 
 /** Glob minimal : `**` = n'importe quels segments, `*` = un segment sans `/`. */
@@ -61,6 +64,14 @@ const areaNames = Object.keys(cfg.areas).sort();
 const isContract = /^contract(\(|:)/.test(title);
 const scope = title.match(/^[a-z]+\(([^)]+)\)!?:/)?.[1];
 
+/** Areas déclarées : le scope du titre, plus une éventuelle ligne « Areas: a, b » dans le corps. */
+const declared = [];
+for (const src of [scope, body.match(/^\s*Areas?\s*:(.+)$/im)?.[1]]) {
+  for (const name of (src ?? '').split(',').map((s) => s.trim()).filter(Boolean)) {
+    if (!declared.includes(name)) declared.push(name);
+  }
+}
+
 if (!isContract && !scope) {
   fail(
     `Titre de PR invalide : « ${title || '(vide)'} ».\n` +
@@ -93,10 +104,21 @@ if (isContract) {
 }
 
 // --- cas 2 : PR normale ---
-const area = cfg.areas[scope];
-if (!area) {
-  fail(`Area inconnue : « ${scope} ».\n  Areas disponibles : ${areaNames.join(', ')}\n  (ajoute la tienne dans .github/areas.json, dans une PR infra séparée)`);
+const unknown = declared.filter((n) => !cfg.areas[n]);
+if (unknown.length) {
+  fail(
+    `Area inconnue : ${unknown.map((n) => `« ${n} »`).join(', ')}.\n  Areas disponibles : ${areaNames.join(', ')}\n` +
+      '  (ajoute la tienne dans .github/areas.json, dans une PR infra séparée)',
+  );
   process.exit(1);
+}
+const areas = declared.map((n) => cfg.areas[n]);
+const allowed = areas.flatMap((a) => a.paths);
+if (declared.length > 3) {
+  console.log(
+    `⚠ ${declared.length} areas déclarées (${declared.join(', ')}) : c'est le signe d'une PR trop large. ` +
+      'Découpe-la si les morceaux tiennent debout séparément.',
+  );
 }
 
 if (touchedContracts.length) {
@@ -107,19 +129,22 @@ if (touchedContracts.length) {
   );
 }
 
-const strays = files.filter((f) => !matchesAny(area.paths, f) && !isDoc(f) && !isTest(f) && !cfg.contracts.includes(f));
+const strays = files.filter((f) => !matchesAny(allowed, f) && !isDoc(f) && !isTest(f) && !cfg.contracts.includes(f));
 if (strays.length) {
   fail(
-    `Fichiers hors de l'area « ${scope} » (${area.desc}) :\n    ` +
+    `Fichiers hors des areas déclarées (${declared.join(', ')}) :\n    ` +
       strays.join('\n    ') +
-      `\n  Périmètre de « ${scope} » :\n    ` +
-      area.paths.join('\n    ') +
-      '\n  Découpe la PR par area : une PR = une area = une issue.',
+      '\n  Périmètre déclaré :\n    ' +
+      allowed.join('\n    ') +
+      "\n  Soit tu découpes la PR, soit tu déclares l'area manquante : type(a,b): … " +
+      'ou une ligne « Areas: a, b » dans le corps de la PR.',
   );
 }
 
 // --- cas 3 : tranche verticale « champion » : un seul champion par PR ---
-if (area.vertical === 'champion') {
+const vertical = areas.find((a) => a.vertical === 'champion');
+if (vertical) {
+  const area = vertical;
   const names = new Set();
   for (const f of files) {
     if (!matchesAny(area.paths, f)) continue;
@@ -135,4 +160,7 @@ if (area.vertical === 'champion') {
   if (!process.exitCode && names.size === 1) console.log(`✓ Tranche verticale « ${[...names][0]} » : ${files.length} fichier(s).`);
 }
 
-if (!process.exitCode) console.log(`✓ PR dans le périmètre de « ${scope} » : ${files.length} fichier(s).`);
+if (!process.exitCode) {
+  const where = declared.length > 1 ? `des areas ${declared.join(', ')}` : `de « ${declared[0]} »`;
+  console.log(`✓ PR dans le périmètre ${where} : ${files.length} fichier(s).`);
+}
