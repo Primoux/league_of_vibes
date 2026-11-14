@@ -57,3 +57,15 @@ Session : 2026-11-13, branche `codex-objectives`.
 - Ajout de `minions.performance.test.ts` : vraies vagues sur les trois voies, >60 sbires, 900 ticks à 30 Hz, budget moyen <2 ms. Régression aggro avec larvelette alliée ajoutée.
 - Validation locale : typecheck/build verts, 475 tests en 3,28 s (avant récupération du dernier main dans la branche de PR).
 - Deuxième passe de Fable lue : cache d'attaquabilité dans `structureState` par tick/révision ajouté, invalidé immédiatement sur destruction et réapparition d'inhibiteur. Les assertions existantes couvrent déjà l'ouverture de la structure suivante dans le même tick. Fréquence d'acquisition des sbires conservée pour éviter de modifier le comportement ; le budget demandé est atteint sans la réduire.
+
+## Chasse aux bugs — 2026-11-14
+- Base synchronisée avec main ; installation, typecheck et 483 tests verts avant modification.
+- Buff rouge : le paramètre de ralentissement de la cible était interprété comme un CC sur le porteur (335 → 268 de vitesse). Séparation du paramètre d'effet à l'impact ; le porteur n'est plus ralenti/cleanseable.
+- Déclenchement rouge : vérification de isAutoAttack réel, cibles ennemies champions/sbires/monstres ; plus de déclenchement sur un dégât de sort sans ability et plus d'absence d'effet en jungle.
+- Brûlures rouge/Ancien : un rafraîchissement repoussait le prochain tick, donc des attaques rapides empêchaient la brûlure. Ordonnanceur partagé borné à trois ticks, prochain tick conservé, rattrapage des ticks échus et tolérance aux erreurs flottantes. Aucun tableau ni callback alloué par tick.
+- Buffs transférés : une durée restante plus courte chez la victime ne raccourcit plus celle du tueur.
+- Coups létaux : les larves et âmes ne réinfligent plus de dégâts à une victime dont les PV sont déjà épuisés avant l'événement death ; cela empêchait les événements de dégâts négatifs. L'explosion infernale continue de toucher les voisins vivants.
+- Précision : aggro sbires/tours/camps/épiques, plaques et effets d'objectifs utilisent hooks.afterDamage (dealt réel), au lieu du damage arrondi pour le réseau. Les impacts positifs <0,5 PV ne sont plus ignorés. Crédit du propriétaire des projectiles conservé.
+- Régressions : 17 nouveaux cas dans jungle.bugs.test.ts, objectives.bugs.test.ts et structures.bugs.test.ts ; dix premiers cas reproduits en échec avant correction, puis quatre échecs supplémentaires de précision reproduits.
+- Aucun fichier d'un autre domaine, aucune dépendance, aucun contrat partagé modifié.
+- Validation de la chasse aux bugs : typecheck/build et 500 tests verts en 3,29 s, dont 17 régressions nouvelles ; les garde-fous de performance restent verts.

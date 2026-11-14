@@ -16,7 +16,8 @@ import type {
   Vec2,
 } from './types.ts';
 
-export const PROTOCOL_VERSION = 1;
+/** v2 : `Snapshot.patches` (mises à jour partielles des entités dans les snapshots delta). */
+export const PROTOCOL_VERSION = 2;
 export const WS_PATH = '/ws';
 
 export type RoomPhase = 'lobby' | 'draft' | 'loading' | 'game' | 'end';
@@ -76,6 +77,12 @@ export interface Snapshot {
    * plus visibles). Sinon le snapshot est COMPLET (toute entité absente est supprimée).
    */
   removed?: EntityId[];
+  /**
+   * Snapshots delta uniquement : mises à jour PARTIELLES d'entités déjà connues du client (seuls les champs modifiés,
+   * + `u` = champs optionnels à supprimer). Appliquer avec `applyEntityPatch(prev, patch)`. Une entité nouvelle ou
+   * redevenue visible arrive toujours complète dans `entities`.
+   */
+  patches?: EntityPatch[];
   events: GameEvent[];
   self?: SelfState;
   /** Timers d'objectifs connus de l'équipe (secondes de jeu du prochain spawn). */
@@ -150,6 +157,17 @@ export type ServerMsg =
   | { t: 'pong'; serverTime: number; clientTime?: number };
 
 export type ServerMsgType = ServerMsg['t'];
+
+/** Mise à jour partielle d'une entité (voir `Snapshot.patches`). */
+export type EntityPatch = Partial<Omit<EntitySnapshot, 'id'>> & { id: EntityId; /** champs supprimés */ u?: (keyof EntitySnapshot)[] };
+
+/** Applique un patch : retourne une NOUVELLE entité (prev n'est pas modifiée). */
+export function applyEntityPatch(prev: EntitySnapshot, patch: EntityPatch): EntitySnapshot {
+  const next = { ...prev } as Record<string, unknown>;
+  for (const k in patch) if (k !== 'u') next[k] = (patch as Record<string, unknown>)[k];
+  if (patch.u) for (const k of patch.u) delete next[k];
+  return next as unknown as EntitySnapshot;
+}
 
 export function encode(msg: ClientMsg | ServerMsg): string {
   return JSON.stringify(msg);
