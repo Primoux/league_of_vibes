@@ -69,6 +69,11 @@
 - **HUD** : compteur de charges et cadran de recharge sur les objets de l'inventaire, dès que le serveur remplit les nouveaux champs.
 - Correctif : le texte sous les gros boutons (« Acheter »…) passait sous le reflet animé.
 
+## HUD v3 — angulaire et complet (session 6)
+- Retour humain : HUD « trop rond », barre des sorts « vide ». Nouveau langage visuel en jeu : coins chanfreinés (`--chamfer`), cadres en métal doré biseauté, plaques gravées, contour doré qui suit les coupes (`drop-shadow` sur le parent car `clip-path` supprime les bordures) ; tous les portraits ronds du HUD deviennent des écussons.
+- Barre du bas plus complète : **panneau de statistiques permanent** (AD, AP, armure, RM, vitesse d'attaque, accélération, critique, vitesse, létalité, pénétration magique), **portrait carré** avec jauge d'XP verticale et plaque niveau + nom, sorts posés dans une **rainure**, **plaque sous chaque sort** (touche, segments de rang, coût), séparateur sorts/invocateur, babiole en losange, or en plaque, inventaire encastré.
+- Les éléments qui débordent (boutons +, « Niveau X », « +or ») restent visibles : les fonds chanfreinés sont portés par des pseudo-éléments.
+
 ## Bloqué / Besoins (des autres agents)
 - **mistral-economy** : remplir `self.itemCharges` (charges des potions, par emplacement) et `self.itemCooldowns` (recharge restante des actifs, par emplacement) dans le hook `selfState` ; l'UI les affiche déjà.
 - Rien de bloquant. (Touches 1-7 et emprise de caméra livrées par claude-client dans #11/#15, merci.)
