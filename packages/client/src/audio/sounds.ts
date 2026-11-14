@@ -43,6 +43,32 @@ CHAMPION_LIST.forEach((c, ci) => {
   });
 });
 
+// ---------------------------------------------------------------- recettes dédiées (Ults d'abord)
+// On enregistre ici les sons sur mesure des ults, par fxKey ; ils priment sur la recette
+// procédurale du champion. `customFxKeys` permet aussi de réserver l'événement areaEffect.
+const customRecipes = new Map<string, Recipe>();
+const customFxKeys = new Set<string>();
+
+// Mélenchon — R « La République, c'est moi ! » : déclaration solennelle (0,6 s) puis onde
+// tricolore (bleu #203452 / rouge #ef3340 / cyan #5de2ff, la palette du champion).
+customFxKeys.add('melenchon_r');
+customRecipes.set('melenchon_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    // 0 -> 0,6 s : montée grave de la déclaration
+    tone(ctx, d, { type: 'sawtooth', freq: 110, slide: 220, dur: 0.6, vol: 0.22 * vol, filter: 900 });
+    tone(ctx, d, { type: 'square', freq: 55, slide: 110, dur: 0.6, vol: 0.18 * vol, filter: 500 });
+    // 0,6 s : impact de l'onde
+    noise(ctx, d, { dur: 0.9, vol: 0.45 * vol, filter: 500, slideFilter: 60, delay: 0.6 });
+    tone(ctx, d, { type: 'sine', freq: 55, dur: 1.0, vol: 0.5 * vol, delay: 0.6 });
+    // motif tricolore
+    tone(ctx, d, { type: 'square', freq: 220, dur: 0.18, vol: 0.2 * vol, delay: 0.6, filter: 2400 }); // bleu
+    tone(ctx, d, { type: 'square', freq: 277, dur: 0.18, vol: 0.2 * vol, delay: 0.72, filter: 2400 }); // rouge
+    tone(ctx, d, { type: 'square', freq: 554, dur: 0.32, vol: 0.22 * vol, delay: 0.84, filter: 3200 }); // cyan
+    // envolée aiguë
+    tone(ctx, d, { type: 'sine', freq: 1108, slide: 1660, dur: 0.35, vol: 0.12 * vol, delay: 0.6 });
+  }, { pos });
+});
+
 const SUMMONER_RECIPES: Record<SummonerId, Recipe> = {
   flash: (am, pos) => am.sfx((ctx, d) => { tone(ctx, d, { type: 'square', freq: 1200, slide: 300, dur: 0.12, vol: 0.3 }); noise(ctx, d, { dur: 0.15, vol: 0.2, filter: 5000, slideFilter: 800 }); }, { pos }),
   ignite: (am, pos) => am.sfx((ctx, d) => { noise(ctx, d, { dur: 0.5, vol: 0.3, filter: 1800, slideFilter: 300 }); tone(ctx, d, { type: 'sawtooth', freq: 180, slide: 90, dur: 0.5, vol: 0.25, filter: 900 }); }, { pos }),
@@ -200,7 +226,8 @@ export function playEvent(a: AudioManager, e: GameEvent): void {
       break;
 
     case 'abilityCast': {
-      const recipe = fxRecipes.get(`${e.championId}_${e.slot}`) ?? fxRecipes.get(`${e.championId}_${e.slot.toLowerCase()}`);
+      const key = `${e.championId}_${e.slot}`;
+      const recipe = customRecipes.get(key) ?? fxRecipes.get(key) ?? fxRecipes.get(`${e.championId}_${e.slot.toLowerCase()}`);
       const pos = a.entityPos(e.source) ?? e.targetPos;
       if (recipe) recipe(a, pos, 1);
       else a.sfx((ctx, d) => tone(ctx, d, { type: 'square', freq: 440, slide: 660, dur: 0.15, vol: 0.2 }), { pos });
@@ -223,7 +250,10 @@ export function playEvent(a: AudioManager, e: GameEvent): void {
       break;
 
     case 'areaEffect':
-      a.sfx((ctx, d) => { tone(ctx, d, { type: 'sawtooth', freq: 220, slide: 440, dur: Math.min(0.6, e.duration), vol: 0.15, filter: 1500 }); }, { pos: e.pos });
+      // les fxKey avec recette dédiée gèrent déjà leur impact (ex. ult de Mélenchon)
+      if (!customFxKeys.has(e.fxKey)) {
+        a.sfx((ctx, d) => { tone(ctx, d, { type: 'sawtooth', freq: 220, slide: 440, dur: Math.min(0.6, e.duration), vol: 0.15, filter: 1500 }); }, { pos: e.pos });
+      }
       break;
 
     case 'buffApplied':
