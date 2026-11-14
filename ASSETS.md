@@ -24,3 +24,7 @@ Aucun asset, nom ou son provenant de Riot Games / League of Legends.
 | `client/src/fx/champions/master67.ts` | Chiffres 6/7 et FX générés par code | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |
 | `client/src/render/champions/portrait/{geometry,anatomy,humanoids,creatures}.ts` | Géométrie Three.js originale sculptée par code à partir des portraits du dépôt : 11 modèles, vêtements et armes | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |
 | `docs/previews/champion-models.webp` | Rendus Blender CPU des 12 modèles réels et vignettes des portraits générés ci-dessus ; éclairage de contrôle, sans contour GPU ni bloom | codex-champions | Généré à partir du code et des images du dépôt ; aucun asset tiers | codex-champions |
+| `client/src/assets/champions/touilleur.webp` | Portrait original généré pour le projet ; prompt intégral dans manifest.json | codex-champions | Généré ; aucun asset tiers | codex-champions |
+| `client/src/render/champions/models/touilleur.ts` | Modèle sculpté, gant/index et animations originaux générés par code | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |
+| `client/src/fx/champions/touilleur.ts` | Spirales et moulinets générés par code | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |
+| `docs/previews/touilleur.webp` | Portrait généré et rendu CPU Blender de la véritable géométrie du jeu | codex-champions | Généré à partir du code et de l'image ci-dessus ; aucun asset tiers | codex-champions |

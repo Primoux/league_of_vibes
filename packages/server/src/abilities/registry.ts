@@ -12,4 +12,5 @@ import { nyx } from './champions/nyx.ts';
 import { solenne } from './champions/solenne.ts';
 import { melenchon } from './champions/melenchon.ts';
 import { master67 } from './champions/master67.ts';
-export const CHAMPION_ABILITIES: Record<string, Record<AbilitySlot, AbilityHandler>> = { grondak, ilyra, tharox, kaelen, vrenna, zephyr, sable, corvin, nyx, solenne, melenchon, master67 };
+import { touilleur } from './champions/touilleur.ts';
+export const CHAMPION_ABILITIES: Record<string, Record<AbilitySlot, AbilityHandler>> = { grondak, ilyra, tharox, kaelen, vrenna, zephyr, sable, corvin, nyx, solenne, melenchon, master67, touilleur };
