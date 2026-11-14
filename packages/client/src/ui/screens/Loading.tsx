@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { useCountdown } from '../components.tsx';
 import { ChampionPortrait, ClassEmblem, SummonerIcon } from '../icons/Icons.tsx';
 import { CLASS_LABEL } from '../logic/format.ts';
+import { RiftBackground } from '../stage/RiftBackground.tsx';
 import { useSelect } from '../useStore.ts';
 
 const TIPS = [
@@ -40,7 +41,7 @@ export function Loading() {
 
   return (
     <div class="lov-screen lov-loading">
-      <div class="lov-aurora dim" />
+      <RiftBackground tint={'#b072ff'} intensity={0.8} />
       {(['blue', 'red'] as const).map((team) => (
         <div class={`lov-load-row ${team}`} key={team}>
           {cards
