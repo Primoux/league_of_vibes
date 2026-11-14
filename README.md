@@ -33,6 +33,8 @@ Pour la version de production : `npm run build && npm start`, puis <http://local
 
 ### Champions
 
+Le roster compte 13 champions, chacun avec son portrait et son modèle dédié.
+
 | Champion | Titre | Classe | Voies |
 |---|---|---|---|
 | Corvin | l'Archer des Corbeaux | Tireur | bot |
@@ -47,6 +49,7 @@ Pour la version de production : `npm run build && npm start`, puis <http://local
 | Zephyr | l'Arcaniste Instable | Mage | mid |
 | 67 Master | le Grand Maître du Six-Sept | Mage | mid, bot |
 | Mélenchon | le Tribun indigné | Mage | mid, bot |
+| Le Touilleur | le Virtuose du Moulinet | Mage | mid, jungle |
 
 Mélenchon est une caricature satirique. Le détail des sorts de chaque champion est affiché en jeu, dans le draft et au
 survol des sorts.
@@ -71,6 +74,26 @@ survol des sorts.
 | Y | Verrouiller la caméra |
 | Alt + clic | Ping |
 | Échap | Fermer, paramètres |
+
+## Le Touilleur, le Virtuose du Moulinet
+
+Mage de mêlée en manteau turquoise, moustache cuivrée et gant ivoire. Son index levé décrit un moulinet
+continu en repos, course, attaques, sorts et rappel. Le doigt a un poste à temps plein.
+
+| Touche | Sort | Effet |
+|---|---|---|
+| P | Ça monte à la tête | Trois impacts de sorts espacés sur des champions donnent dégâts bonus et vitesse |
+| Q | Coup de doigt | Projectile sur le premier ennemi, dégâts et ralentissement |
+| W | Tourbillon de poche | Zone retardée de dégâts et ralentissement |
+| E | Pas de côté | Téléportation courte et bouclier |
+| R | La grande touille | Passe derrière un champion, dégâts et étourdissement jusqu'à 2 s pendant une canalisation burlesque |
+
+L'ultime respecte les murs, les limites de carte et les collisions : il ne touche pas si aucune arrivée
+derrière la cible n'est possible. Ténacité et Purification fonctionnent ; contrôle dur/silence du lanceur,
+ordre d'arrêt/déplacement, mort, stase ou rupture de proximité terminent le canal et son stun.
+
+Portrait, modèle et moulinet : `?modellab&champ=touilleur`. Sorts réellement simulés :
+`?fxlab&champ=touilleur&close=1`. [Aperçu du portrait et du modèle](docs/previews/touilleur.webp).
 
 ## Développement
 
@@ -106,7 +129,7 @@ Elles s'ouvrent sur le client seul (`npm run dev:client`), sans serveur.
 | `?maplab` | Carte seule |
 | `?uilab=home`, `?uilab=draft`, `?uilab=game` | Écrans et HUD avec des données factices |
 
-Les identifiants de champion sont les noms en minuscules (`nyx`, `grondak`…), plus `master67` et `melenchon`.
+Les identifiants de champion sont les noms en minuscules (`nyx`, `grondak`…), plus `master67`, `melenchon` et `touilleur`.
 
 ### Test de charge
 

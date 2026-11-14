@@ -1,10 +1,13 @@
 # Modèles de champions — vérification visuelle
 
-Les douze portraits existants servent de référence. Les volumes sont générés par le code du jeu, sans
+Les treize portraits existants servent de référence. Les volumes sont générés par le code du jeu, sans
 texture ni modèle tiers. Les onze modèles du pipeline commun conservent leur rig, leurs clips et leurs
 effets animés. Mélenchon conserve son rig particulier, son index accusateur et son aura républicaine.
 
 ![Portraits et modèles, rendu CPU hors WebGL](previews/champion-models.webp)
+
+La planche couvre les douze premiers champions. [Le Touilleur et son portrait](previews/touilleur.webp)
+complètent le roster : index levé animé indépendamment du poignet, moustache et manteau turquoise.
 
 ## Correspondances
 
@@ -22,6 +25,7 @@ effets animés. Mélenchon conserve son rig particulier, son index accusateur et
 | Solenne | Cheveux dorés, robe ivoire, armure dorée, auréole rayonnante et sceptre solaire |
 | Mélenchon | Front dégagé, cheveux gris, lunettes rectangulaires, nez marqué, costume et cravate rouge |
 | 67 Master | Boucles, sourire/barbe, hoodie violet/cyan, bijoux, doigts articulés avec les avant-bras, paumes ouvertes |
+| Le Touilleur | Mèches et moustache cuivrées, col relevé, lavallière ivoire, manteau turquoise/laiton, index levé et spirale menthe |
 
 ## Atelier interactif
 
@@ -32,7 +36,7 @@ npm run dev:client
 # http://localhost:5173/?modellab&champ=master67
 ```
 
-- Sélectionner chacun des douze champions et comparer le portrait au modèle.
+- Sélectionner chacun des treize champions et comparer le portrait au modèle.
 - Tourner/zoomer, passer en vue de jeu et vérifier les silhouettes et les armes.
 - Essayer course, attaque, Q/W/E/R, mort puis retour. Les gestes du 67 restent présents en course/incantation.
 - Pour les FX et les règles simulées, utiliser `?fxlab` ; l'atelier n'envoie pas de commandes au serveur.

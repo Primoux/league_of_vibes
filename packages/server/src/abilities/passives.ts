@@ -7,6 +7,7 @@ import { enemiesInRadius, isUnit } from './primitives.ts';
 import type { DamageContext, Entity, World } from '../world.ts';
 import { installMelenchonPassive } from './champions/melenchon.ts';
 import { installMaster67Passive } from './champions/master67.ts';
+import { installTouilleurPassive } from './champions/touilleur.ts';
 import { updateGranite } from './champions/grondak.ts';
 interface PassiveState { attacks: number; momentum: number; lastPos: { x: number; y: number } }
 interface Bleed { source: number; stacks: number; expires: number; nextTick: number }
@@ -38,6 +39,7 @@ export function initPassives(world: World): void {
   initialized.add(world);
   installMelenchonPassive(world);
   installMaster67Passive(world);
+  installTouilleurPassive(world);
   const beforeHp = new WeakMap<DamageContext, number>();
   world.hooks.beforeDamage.push((ctx) => { beforeHp.set(ctx, ctx.target.hp); });
   registerDamageModifier(world, (context) => {
