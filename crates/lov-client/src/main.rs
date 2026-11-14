@@ -1,11 +1,97 @@
 //! Client natif de League of Vibes.
 //!
-//! Portage de `packages/client/src` (rendu, FX, interface, audio, entrées, réseau). Il se connecte
-//! au même protocole JSON v2 que le client web, donc au serveur Node tant que `lov-server` n'est pas porté.
+//! Portage de `packages/client/src` (rendu, FX, interface, audio, entrées, réseau). Il parle le même
+//! protocole JSON v2 que le client web, donc au serveur Node tant que `lov-server` n'est pas porté.
 //!
-//! Squelette : le client de référence reste `npm run dev:client` jusqu'à la bascule.
+//! PROTOTYPE de validation : carte, entités en formes simples, déplacement au clic droit, compteur de FPS.
+//! Lancement : `SKIP_DRAFT=1 DEV_LOBBY=1 npm run dev:server`, puis `cargo run -p lov-client --release`.
+//! `LOV_URL` change l'adresse du serveur (défaut `ws://localhost:3000/ws`).
+//! `LOV_SCREENSHOT=chemin.png` enregistre une capture 4 s après l'entrée en jeu, pour vérifier le rendu
+//! sans regarder la fenêtre (CI, IA).
+
+use bevy::dev_tools::fps_overlay::FpsOverlayPlugin;
+use bevy::prelude::*;
+use bevy::render::view::screenshot::{Screenshot, save_to_disk};
+
+mod input;
+mod net;
+mod render;
 
 fn main() {
-    eprintln!("lov-client : pas encore porté. Lance le client web : npm run dev:client");
-    std::process::exit(1);
+    App::new()
+        .add_plugins((
+            DefaultPlugins.set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "League of Vibes".into(),
+                    resolution: (1600, 900).into(),
+                    ..default()
+                }),
+                ..default()
+            }),
+            FpsOverlayPlugin::default(),
+            net::NetPlugin,
+            render::map::MapPlugin,
+            render::entities::EntitiesPlugin,
+            render::camera::CameraPlugin,
+            input::InputPlugin,
+        ))
+        .insert_resource(ClearColor(Color::srgb(0.03, 0.04, 0.06)))
+        .add_systems(Startup, spawn_status)
+        .add_systems(Update, (update_status, screenshot_once))
+        .run();
+}
+
+#[derive(Component)]
+struct StatusText;
+
+fn spawn_status(mut commands: Commands) {
+    commands.spawn((
+        StatusText,
+        Text::new(""),
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(10.0),
+            bottom: Val::Px(10.0),
+            ..default()
+        },
+    ));
+}
+
+fn update_status(
+    state: Res<net::GameState>,
+    rig: Res<render::camera::CameraRig>,
+    mut text: Single<&mut Text, With<StatusText>>,
+) {
+    // La police par défaut de Bevy n'a que l'ASCII : pas d'accents ici tant que l'area ui-core
+    // n'a pas apporté une police du jeu.
+    text.0 = format!(
+        "{} | {} unites | {} snapshots | vue {}\n\
+         Clic droit : bouger | Espace : centrer | Y : fixer la vue | Molette : zoom\n\
+         F11 : plein ecran | V : vsync | Esc : rendre la souris | Ctrl+Q : quitter",
+        state.status,
+        state.entities.len(),
+        state.snapshots,
+        if rig.locked { "fixe" } else { "libre" },
+    );
+}
+
+fn screenshot_once(
+    mut commands: Commands,
+    state: Res<net::GameState>,
+    time: Res<Time>,
+    mut in_game_for: Local<f32>,
+    mut done: Local<bool>,
+) {
+    if *done || state.my_entity.is_none() {
+        return;
+    }
+    *in_game_for += time.delta_secs();
+    if *in_game_for >= 4.0 {
+        *done = true;
+        if let Ok(path) = std::env::var("LOV_SCREENSHOT") {
+            commands
+                .spawn(Screenshot::primary_window())
+                .observe(save_to_disk(path));
+        }
+    }
 }
