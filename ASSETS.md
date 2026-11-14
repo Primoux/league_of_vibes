@@ -22,3 +22,5 @@ Aucun asset, nom ou son provenant de Riot Games / League of Legends.
 | `client/src/assets/champions/master67.webp` | Image originale générée pour le projet ; prompt dans manifest.json | codex-champions | Généré ; aucun asset tiers | codex-champions |
 | `client/src/render/champions/models/master67.ts` | Modèle, doigts et gestes générés par code | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |
 | `client/src/fx/champions/master67.ts` | Chiffres 6/7 et FX générés par code | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |
+| `client/src/render/champions/portrait/{geometry,anatomy,humanoids,creatures}.ts` | Géométrie Three.js originale sculptée par code à partir des portraits du dépôt : 11 modèles, vêtements et armes | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |
+| `docs/previews/champion-models.webp` | Rendus Blender CPU des 12 modèles réels et vignettes des portraits générés ci-dessus ; éclairage de contrôle, sans contour GPU ni bloom | codex-champions | Généré à partir du code et des images du dépôt ; aucun asset tiers | codex-champions |
