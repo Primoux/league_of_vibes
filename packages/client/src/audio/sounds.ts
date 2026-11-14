@@ -3,9 +3,12 @@
  * Chaque `fxKey` des 40 sorts a une recette procédurale (dérivée du champion et du slot),
  * les sorts d'invocateur ont leur propre table, et tout événement a un fallback par type.
  */
-import { CHAMPION_LIST, SUMMONERS, type GameEvent, type SummonerId } from '@lov/shared';
+import { CHAMPION_LIST, SUMMONERS, type GameEvent, type SummonerId, type Team } from '@lov/shared';
 import { store } from '../state.ts';
 import type { AudioManager, SfxFn } from './AudioManager.ts';
+import { KillStreaks, stingLevel } from './killStreaks.ts';
+import { MusicBus } from './music/instruments.ts';
+import { firstBloodSting, killSting, type StingSide } from './music/stings.ts';
 import { noise, tone } from './synth.ts';
 
 // ---------------------------------------------------------------- recettes par fxKey
@@ -53,37 +56,56 @@ const SUMMONER_RECIPES: Record<SummonerId, Recipe> = {
 };
 
 // ---------------------------------------------------------------- annonces vocales
-// mistral-ui dérive premier sang / multi-kills / séries de l'événement `death` (pas d'`announcement`
-// serveur pour ceux-là) : l'audio fait de même ici. Les `announcement` génériques passent par params.text.
+// Les éliminations n'ont plus de voix (jingles ci-dessous). Les `announcement` génériques passent par params.text.
 const ANNOUNCEMENTS: Record<string, (p?: Record<string, string | number>) => string> = {
   colosse_invoque: () => 'Le Colosse du Rift charge !',
 };
 
-/** Suivi des kills par tueur (fenêtre 10 s) pour les annonces de multi-kills. */
-const killTimes = new Map<number, number[]>();
-let firstBloodSpoken = false;
+/**
+ * Éliminations : uniquement champion tué par un champion ennemi (jamais les sbires, monstres ou tours).
+ * Plus de voix : un jingle synthétisé qui gagne en ampleur avec le multi-kill et la série (killStreaks.ts).
+ */
+const streaks = new KillStreaks();
+/** Équipe de chaque champion vu (les ids restent connus même quand l'unité passe dans le brouillard). */
+const champTeams = new Map<number, Team>();
+let stingBus: MusicBus | null = null;
+
 export function resetKillAnnouncements(): void {
-  killTimes.clear();
-  firstBloodSpoken = false;
+  streaks.reset();
+  champTeams.clear();
 }
 
-function announceKill(a: AudioManager, killerId: number | undefined): void {
-  if (killerId === undefined) return;
-  const now = performance.now() / 1000;
-  const arr = (killTimes.get(killerId) ?? []).filter((t) => now - t < 10);
-  arr.push(now);
-  killTimes.set(killerId, arr);
-  const voice = a.getVolume('voice');
-  if (!firstBloodSpoken) {
-    firstBloodSpoken = true;
-    speak('Premier sang !', voice);
+function refreshChampions(): void {
+  for (const e of store.state.snapshot?.entities ?? []) if (e.kind === 'champion' && e.team !== 'neutral') champTeams.set(e.id, e.team);
+}
+
+function getStingBus(a: AudioManager): MusicBus | null {
+  if (!stingBus)
+    a.sfx((ctx, dest) => {
+      stingBus = new MusicBus(ctx, dest);
+      stingBus.master.gain.value = 1;
+    }, { channel: 'voice' });
+  return stingBus;
+}
+
+function onDeath(a: AudioManager, victimId: number, killerId: number | undefined): void {
+  refreshChampions();
+  const victimTeam = champTeams.get(victimId);
+  if (!victimTeam) return; // pas un champion : aucune annonce
+  const killerTeam = killerId !== undefined ? champTeams.get(killerId) : undefined;
+  if (killerId === undefined || !killerTeam || killerTeam === victimTeam) {
+    streaks.onChampionDeath(victimId); // exécuté par une tour / un sbire / un monstre
     return;
   }
-  const n = arr.length;
-  if (n === 2) speak('Double élimination !', voice);
-  else if (n === 3) speak('Triple élimination !', voice);
-  else if (n === 4) speak('Quadruple élimination !', voice);
-  else if (n >= 5) speak('Pentakill !', voice);
+  const info = streaks.onChampionKill(victimId, killerId, performance.now() / 1000);
+  const me = store.state.snapshot?.self?.entityId ?? store.state.game?.entityId;
+  const myTeam = store.state.game?.team;
+  const side: StingSide = killerId === me ? 'self' : killerTeam === myTeam ? 'ally' : 'enemy';
+  const bus = getStingBus(a);
+  if (!bus) return;
+  const t = bus.ctx.currentTime + 0.05;
+  if (info.firstBlood) firstBloodSting(bus, t, side);
+  else killSting(bus, t, stingLevel(info), side);
 }
 
 function speak(text: string, voiceVol: number): void {
@@ -130,7 +152,7 @@ export function playEvent(a: AudioManager, e: GameEvent): void {
         noise(ctx, d, { dur: 0.5, vol: 0.3, filter: 800, slideFilter: 120 });
         tone(ctx, d, { type: 'sawtooth', freq: 160, slide: 50, dur: 0.5, vol: 0.25, filter: 600 });
       }, { pos: a.entityPos(e.target) });
-      announceKill(a, e.killer);
+      onDeath(a, e.target, e.killer);
       break;
 
     case 'respawn':
