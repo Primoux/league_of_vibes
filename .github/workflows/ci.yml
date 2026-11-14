@@ -48,6 +48,7 @@ jobs:
       - name: Périmètre de la PR
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
           BASE_REF: ${{ github.base_ref }}
         run: node scripts/check-areas.mjs
       - name: Label de l'area

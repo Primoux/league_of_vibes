@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Intensity, themeFor } from '../src/audio/music.ts';
 import { MusicBus } from '../src/audio/music/instruments.ts';
-import { defeat, PHRASES, phraseInBounds, THEMES, victory } from '../src/audio/music/themes.ts';
+import { defeat, gameBar, PHRASES, phraseInBounds, THEMES, victory } from '../src/audio/music/themes.ts';
 
 /** Faux AudioContext : chaque nœud accepte connect/start/stop et des AudioParam inertes. */
 function fakeCtx(): AudioContext {
@@ -68,5 +68,24 @@ describe('musique', () => {
     victory(bus, 0);
     defeat(bus, 0);
     expect((ctx as unknown as { created: number }).created).toBeGreaterThan(1000);
+  });
+
+  it('varie le thème de partie d’une boucle à l’autre, en restant clairsemé', () => {
+    const loops = new Set<string>();
+    let bars = 0;
+    let withMotif = 0;
+    for (let loop = 0; loop < 12; loop++) {
+      const plan = Array.from({ length: 8 }, (_, bar) => gameBar(loop, bar));
+      loops.add(JSON.stringify(plan));
+      for (const b of plan) {
+        bars++;
+        if (b.motif.length) withMotif++;
+        for (const [at, , len] of b.motif) expect(at >= 0 && at < 16 && len > 0).toBe(true);
+      }
+      expect(JSON.stringify(plan)).toBe(JSON.stringify(Array.from({ length: 8 }, (_, bar) => gameBar(loop, bar))));
+    }
+    expect(loops.size).toBe(12);
+    expect(withMotif / bars).toBeLessThan(0.45);
+    expect(withMotif).toBeGreaterThan(0);
   });
 });

@@ -3,10 +3,16 @@ Titre : commit conventionnel, où le scope est l'AREA de .github/areas.json.
   feat(fx-core): halo de soin persistant
   fix(ui-hud): barre de mana tronquée en 1280×720
   contract: ajoute PlayerStats.visionScore au protocole   ← PR de contrat, seule, rien d'autre dedans
-La CI refuse une PR qui sort de son area. Un mainteneur relit et merge : ne merge pas toi-même.
+Une fonctionnalité qui traverse vraiment plusieurs areas les déclare : feat(input,ui-hud): …
+ou la ligne « Areas: » ci-dessous.
+La CI refuse une PR qui sort de ses areas. Un mainteneur relit et merge : ne merge pas toi-même.
 -->
 
 Closes #<numéro de l'issue>
+
+<!-- À remplir seulement si la PR traverse plusieurs areas (sinon le scope du titre suffit) :
+Areas: input, ui-hud
+-->
 
 ## Résumé
 -
