@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FeedTracker, trimFeed, type UnitRef } from '../src/ui/logic/feed.ts';
 import { buffName, formatClock, formatCooldown, formatGoldShort, formatKdaRatio, formatRanks, formatStat, isDebuff } from '../src/ui/logic/format.ts';
 import { canRankUp, hastedCooldown, sortScoreRows, type ScoreRow } from '../src/ui/logic/game.ts';
-import { canBuy, filterItems, quoteItem } from '../src/ui/logic/shop.ts';
+import { canBuy, filterItems, quoteItem, sortItems, upgradesFor } from '../src/ui/logic/shop.ts';
 
 describe('format', () => {
   it('formate le chrono', () => {
@@ -68,6 +68,28 @@ describe('boutique', () => {
     const basics = filterItems(list, '', 'basic');
     expect(basics.every((i) => i.category === 'basic')).toBe(true);
     for (let i = 1; i < basics.length; i++) expect(basics[i]!.cost).toBeGreaterThanOrEqual(basics[i - 1]!.cost);
+  });
+  it('recherche aussi par libellé de statistique', () => {
+    const list = Object.values(ITEMS);
+    const armor = filterItems(list, 'armure', 'all');
+    expect(armor.length).toBeGreaterThan(0);
+    expect(armor.some((i) => (i.stats.armor ?? 0) > 0)).toBe(true);
+  });
+  it('trie par prix (après déduction) et par nom', () => {
+    const list = Object.values(fakeItems);
+    expect(sortItems(list, 'priceAsc').map((i) => i.id)).toEqual(['b', 'a', 'mid', 'top']);
+    expect(sortItems(list, 'priceDesc').map((i) => i.id)).toEqual(['top', 'mid', 'a', 'b']);
+    expect(sortItems(list, 'name').map((i) => i.id)).toEqual(['a', 'b', 'mid', 'top']);
+    // avec « mid » possédé, top coûte 1900 et a 400 : le tri suit le prix réellement payé
+    const price = (i: ItemDef) => quoteItem(i.id, ['mid'], fakeItems).price;
+    expect(sortItems([fakeItems.top!, fakeItems.a!], 'priceDesc', price).map((i) => i.id)).toEqual(['top', 'a']);
+    expect(price(fakeItems.top!)).toBe(1900);
+  });
+  it('propose les améliorations de l’inventaire, de la moins chère à la plus chère', () => {
+    const list = Object.values(fakeItems);
+    expect(upgradesFor([], list, fakeItems)).toEqual([]);
+    expect(upgradesFor(['a'], list, fakeItems).map((i) => i.id)).toEqual(['mid', 'top']);
+    expect(upgradesFor(['top', 'mid'], list, fakeItems).map((i) => i.id)).toEqual([]); // top unique déjà possédé, mid ne se construit pas depuis top
   });
 });
 
