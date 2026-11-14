@@ -17,7 +17,6 @@
     "crates/lov-shared/src/constants.rs",
     "crates/lov-shared/src/map.rs",
     "crates/lov-shared/src/math.rs",
-    "crates/lov-shared/src/data/mod.rs",
     "crates/lov-sim/src/systems/mod.rs"
   ],
   "always": [
@@ -41,7 +40,8 @@
         "crates/lov-shared/src/data/champions/*.rs",
         "crates/lov-sim/src/abilities/champions/*.rs",
         "crates/lov-client/src/render/champions/models/*.rs",
-        "crates/lov-client/src/fx/champions/*.rs"
+        "crates/lov-client/src/fx/champions/*.rs",
+        "crates/lov-shared/src/data/mod.rs"
       ]
     },
     "net": {
@@ -78,7 +78,8 @@
         "packages/shared/src/data/summoners.ts",
         "crates/lov-sim/src/abilities/*.rs",
         "crates/lov-shared/src/data/buffs.rs",
-        "crates/lov-shared/src/data/summoners.rs"
+        "crates/lov-shared/src/data/summoners.rs",
+        "crates/lov-shared/src/data/mod.rs"
       ]
     },
     "items": {
@@ -87,7 +88,8 @@
         "packages/server/src/items/**",
         "packages/shared/src/data/items.ts",
         "crates/lov-sim/src/items/**",
-        "crates/lov-shared/src/data/items.rs"
+        "crates/lov-shared/src/data/items.rs",
+        "crates/lov-shared/src/data/mod.rs"
       ]
     },
     "systems": {
@@ -98,7 +100,8 @@
         "packages/shared/src/data/minions.ts",
         "crates/lov-sim/src/systems/*.rs",
         "crates/lov-shared/src/data/structures.rs",
-        "crates/lov-shared/src/data/minions.rs"
+        "crates/lov-shared/src/data/minions.rs",
+        "crates/lov-shared/src/data/mod.rs"
       ]
     },
     "world-ai": {
@@ -107,7 +110,8 @@
         "packages/server/src/world-ai/**",
         "packages/shared/src/data/monsters.ts",
         "crates/lov-sim/src/world_ai/**",
-        "crates/lov-shared/src/data/monsters.rs"
+        "crates/lov-shared/src/data/monsters.rs",
+        "crates/lov-shared/src/data/mod.rs"
       ]
     },
     "render": {

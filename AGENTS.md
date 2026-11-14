@@ -68,7 +68,7 @@ Même logique pour les objets, les monstres de jungle, les écrans d'UI : préf�
 ```
 packages/shared/src/protocol.ts   types.ts   schema.ts   constants.ts   map.ts
 packages/server/src/systems/index.ts
-crates/lov-shared/   Cargo.toml, src/lib.rs, protocol.rs, types.rs, schema.rs, constants.rs, map.rs, math.rs, data/mod.rs
+crates/lov-shared/   Cargo.toml, src/lib.rs, protocol.rs, types.rs, schema.rs, constants.rs, map.rs, math.rs
 crates/lov-sim/src/systems/mod.rs
 ```
 
@@ -145,6 +145,8 @@ crates/lov-client   rendu, FX, interface, audio, entrées (Bevy)
   La tranche verticale d'un champion existe à l'identique :
   `lov-shared/src/data/champions/<nom>.rs`, `lov-sim/src/abilities/champions/<nom>.rs`,
   `lov-client/src/render/champions/models/<nom>.rs`, `lov-client/src/fx/champions/<nom>.rs`.
+- Les données (`lov-shared/src/data/<domaine>.rs`) se portent dans la PR de l'area qui possède leur
+  comportement ; chaque PR ajoute sa ligne `pub mod …;` au registre `data/mod.rs`, partagé comme un `index.ts`.
 - **Porter un système serveur, c'est porter ses tests** : les fichiers de `packages/server/test/` qui le
   couvrent arrivent dans la même PR, sans être affaiblis. Un bug connu du TS que le test révèle se dit dans la PR.
 - `lov-sim` ne lit ni l'horloge ni un aléatoire non semé : le temps et le générateur sont injectés.
