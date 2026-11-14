@@ -237,6 +237,7 @@ on se sérialise.
 | CI `areas` rouge : « Area inconnue » | le scope de ton titre n'est pas dans `.github/areas.json`. Corrige le titre de la PR (pas besoin de repousser). |
 | CI `areas` rouge : « hors de l'area » | ta PR touche des fichiers d'un autre domaine. Découpe-la, ou change d'area si tu t'es trompé. |
 | CI `areas` rouge : « fichiers de contrat » | sors-les dans une PR `contract:` séparée (§7). |
+| Un test dit « fichier qu'aucune area ne couvre » | tu as créé un fichier dans un chemin que `areas.json` ne décrit pas. Rattache-le à l'area qui possède son comportement — sinon personne ne pourra plus le modifier. `node scripts/check-areas.mjs --audit` liste les cas. |
 | « ça marche chez moi » | vérifie `node -v` contre `.nvmrc`. C'est la cause numéro un. |
 | Des tests échouent sans que tu aies touché à ça | certains tests dépendent de l'horloge murale et lâchent sur une machine chargée. Relance-les seuls : `npx vitest run packages/server/test/wards.test.ts`. S'ils passent seuls, ce n'est pas toi — voir l'issue de suivi. |
 | Conflit dans un fichier que tu ne connais pas | garde la version de `main`, réapplique ton ajout par-dessus. En cas de doute, demande à qui l'a écrit plutôt que de trancher. |

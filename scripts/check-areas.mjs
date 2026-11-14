@@ -4,6 +4,7 @@
 //   usage : node scripts/check-areas.mjs [--title "feat(fx-core): ..."] [--base origin/main]
 //           node scripts/check-areas.mjs --title "..." --files "a.ts,b.ts"   (pour les tests)
 //           node scripts/check-areas.mjs --labels --title "..." --body "..."  (labels à poser sur la PR)
+//           node scripts/check-areas.mjs --audit                               (fichiers couverts par aucune area)
 //
 // Règles (voir AGENTS.md §2) :
 //   1. Le titre suit le commit conventionnel : type(area): résumé — ou « contract: ... ».
@@ -36,6 +37,33 @@ function matches(pattern, file) {
   return new RegExp(`^${rx}$`).test(file);
 }
 const matchesAny = (patterns, file) => patterns.some((p) => matches(p, file));
+
+/**
+ * Mode --audit : liste les fichiers suivis par git que AUCUNE area ne couvre.
+ * Un tel fichier est intouchable — toute PR qui le modifie est refusée, quelle que soit l'area
+ * annoncée. C'est donc une erreur de configuration, pas un choix.
+ */
+function audit() {
+  const every = [...cfg.contracts, ...cfg.always, ...cfg.tests, ...Object.values(cfg.areas).flatMap((a) => a.paths)];
+  const tracked = execFileSync('git', ['ls-files'], { encoding: 'utf8' })
+    .split('\n')
+    .filter((f) => f && !f.startsWith('docs/'));
+  return tracked.filter((f) => !every.some((p) => matches(p, f)));
+}
+
+if (process.argv.includes('--audit')) {
+  const orphans = audit();
+  if (orphans.length) {
+    console.error(
+      `${orphans.length} fichier(s) qu'aucune area ne couvre — donc impossibles à modifier par une PR :\n    ` +
+        orphans.join('\n    ') +
+        "\n  Rattache chacun à l'area qui possède son comportement dans .github/areas.json.",
+    );
+    process.exit(1);
+  }
+  console.log('✓ Tous les fichiers suivis sont couverts par une area.');
+  process.exit(0);
+}
 
 const fail = (msg) => {
   console.error(`\u001b[31m✗ ${msg}\u001b[0m`);

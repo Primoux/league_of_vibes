@@ -180,3 +180,27 @@ describe('check-areas : labels posés sur la PR', () => {
     expect(labels('feat(cuisine): soupe')).toEqual([]);
   });
 });
+
+describe('check-areas : couverture du dépôt', () => {
+  it('aucun fichier suivi n’échappe à toutes les areas', () => {
+    // Un fichier que personne ne couvre est intouchable : la CI refuse toute PR qui le modifie,
+    // quelle que soit l'area annoncée. Ce test a attrapé 13 fichiers — dont toutes les données
+    // de jeu partagées (structures, sbires, monstres, objets), ce qui rendait tout travail
+    // d'équilibrage impossible.
+    const r = run(['--audit']);
+    expect(r.out).toBe('✓ Tous les fichiers suivis sont couverts par une area.\n');
+    expect(r.ok).toBe(true);
+  });
+
+  it('les données de jeu partagées appartiennent à l’area qui possède leur comportement', () => {
+    const cases: [string, string][] = [
+      ['packages/shared/src/data/structures.ts', 'feat(systems): plaques de tour'],
+      ['packages/shared/src/data/minions.ts', 'fix(systems): dégâts des sbires'],
+      ['packages/shared/src/data/monsters.ts', 'fix(world-ai): camps de jungle'],
+      ['packages/shared/src/data/items.ts', 'feat(items): nouvel objet'],
+      ['packages/shared/src/data/buffs.ts', 'feat(abilities): nouveau CC'],
+      ['packages/shared/src/data/summoners.ts', 'fix(abilities): sort d’invocateur'],
+    ];
+    for (const [file, title] of cases) expect(check(title, [file]).ok, `${title} → ${file}`).toBe(true);
+  });
+});
