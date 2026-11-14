@@ -6,6 +6,7 @@
 //! PROTOTYPE de validation : carte, entités en formes simples, déplacement au clic droit, compteur de FPS.
 //! Lancement : `SKIP_DRAFT=1 DEV_LOBBY=1 npm run dev:server`, puis `cargo run -p lov-client --release`.
 //! `LOV_URL` change l'adresse du serveur (défaut `ws://localhost:3000/ws`).
+//! `LOV_STRESS=<n>` lance une scène de charge de n unités sans serveur (mesure de FPS).
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture 4 s après l'entrée en jeu, pour vérifier le rendu
 //! sans regarder la fenêtre (CI, IA).
 
@@ -18,27 +19,33 @@ mod net;
 mod render;
 
 fn main() {
-    App::new()
-        .add_plugins((
-            DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: "League of Vibes".into(),
-                    resolution: (1600, 900).into(),
-                    ..default()
-                }),
+    let stress = render::stress::units_from_env();
+    let mut app = App::new();
+    app.add_plugins((
+        DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "League of Vibes".into(),
+                resolution: (1600, 900).into(),
                 ..default()
             }),
-            FpsOverlayPlugin::default(),
-            net::NetPlugin,
-            render::map::MapPlugin,
-            render::entities::EntitiesPlugin,
-            render::camera::CameraPlugin,
-            input::InputPlugin,
-        ))
-        .insert_resource(ClearColor(Color::srgb(0.03, 0.04, 0.06)))
-        .add_systems(Startup, spawn_status)
-        .add_systems(Update, (update_status, screenshot_once))
-        .run();
+            ..default()
+        }),
+        FpsOverlayPlugin::default(),
+        render::perf::PerfPlugin,
+        render::map::MapPlugin,
+        render::entities::EntitiesPlugin,
+        render::camera::CameraPlugin,
+        input::InputPlugin,
+    ))
+    .insert_resource(ClearColor(Color::srgb(0.03, 0.04, 0.06)))
+    .add_systems(Startup, spawn_status)
+    .add_systems(Update, (update_status, screenshot_once));
+    // `LOV_STRESS=<n>` : scène de charge hors ligne, sans connexion au serveur.
+    match stress {
+        Some(units) => app.add_plugins((net::OfflinePlugin, render::stress::StressPlugin(units))),
+        None => app.add_plugins(net::NetPlugin),
+    };
+    app.run();
 }
 
 #[derive(Component)]
