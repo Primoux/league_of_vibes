@@ -12,7 +12,7 @@ function setup() {
 }
 it('donne une plaque franchie par des dégâts positifs arrondis à zéro', () => {
   const { world, tower, attacker } = setup();
-  tower.hp = 4000.05;
+  tower.hp = (tower.stats.maxHp / 5) * 4 + 0.05; // juste au-dessus du seuil de la 4e plaque
   applyDamage(world, { source: attacker, target: tower, amount: 0.1, type: 'true' });
   expect(structureState(tower).plates).toBe(4);
   expect(world.events.pending.filter(e => e.type === 'structureDestroyed' && e.plate)).toHaveLength(1);

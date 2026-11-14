@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TIMERS, scaled } from '@lov/shared';
 import { World, createChampion } from '../src/world.ts';
 import { structuresSystem, isStructureAttackable, structureState } from '../src/systems/structures.ts';
+import { STRUCTURES } from '../../shared/src/data/structures.ts';
 import { applyDamage, stats } from '../src/world-ai/runtime.ts';
 function setup() {
   const world = new World([structuresSystem]); world.init();
@@ -16,23 +17,26 @@ describe('structures', () => {
   });
   it('bloque les dégâts hors ordre et fortifie les tours externes', () => {
     const { world, champion, tower } = setup();
-    hit(world, champion, tower, 100); expect(tower.hp).toBe(4950);
+    const hp0 = tower.hp;
+    hit(world, champion, tower, 100); expect(tower.hp).toBe(hp0 - 50); // fortification -50 % avant 3:00
     const inner = [...world.query('tower')].find(e => e.team === 'blue' && e.subtype === 'inner' && structureState(e).lane === 'mid')!;
     hit(world, champion, inner, 10000); expect(inner.hp).toBe(inner.stats.maxHp);
     world.time = scaled(180); hit(world, champion, tower, 10000); expect(isStructureAttackable(world, inner)).toBe(true);
   });
   it('ne donne une plaque qu’au seuil, y compris plusieurs sur un même coup', () => {
     const { world, champion, tower } = setup(); world.time = scaled(180);
+    const seuil = tower.stats.maxHp / 5;
     hit(world, champion, tower, 1); expect(structureState(tower).plates).toBe(5);
-    hit(world, champion, tower, 999); expect(structureState(tower).plates).toBe(4);
-    hit(world, champion, tower, 2000); expect(structureState(tower).plates).toBe(2);
+    hit(world, champion, tower, seuil + 1); expect(structureState(tower).plates).toBe(4);
+    hit(world, champion, tower, 2 * seuil); expect(structureState(tower).plates).toBe(2);
     expect(world.events.pending.filter(e => e.type === 'structureDestroyed' && e.plate)).toHaveLength(3);
     world.time = scaled(TIMERS.towerPlatesUntil); world.step(); expect(structureState(tower).plates).toBe(0);
   });
   it('ajoute puis retire la résistance anti-backdoor', () => {
-    const { world, tower } = setup(); world.step(); expect(tower.stats.armor).toBe(240);
+    const { world, tower } = setup(); world.step();
+    expect(tower.stats.armor).toBe(STRUCTURES.towers.outer.armor + STRUCTURES.backdoorResistance);
     world.spawn({ kind: 'minion', team: 'red', pos: { ...tower.pos }, radius: 30, hp: 500, mana: 0, stats: stats(500, 10) });
-    world.step(); expect(tower.stats.armor).toBe(40);
+    world.step(); expect(tower.stats.armor).toBe(STRUCTURES.towers.outer.armor);
   });
   it('privilégie un sbire, puis le champion qui agresse un allié', () => {
     const { world, champion, tower } = setup();
