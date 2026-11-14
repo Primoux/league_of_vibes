@@ -105,7 +105,25 @@ Avant de pousser, vérifie que tu es dans les clous :
 node scripts/check-areas.mjs --title "feat(ui-hud): barre de mana"
 ```
 
-La CI refait exactement ce test. Si ta tâche déborde sur deux areas, c'est **deux issues et deux PR**.
+La CI refait exactement ce test.
+
+Si ta tâche déborde sur deux areas, demande-toi d'abord si ce sont **deux issues et deux PR** : c'est presque
+toujours la bonne réponse, et c'est ce qui permet aux relectures d'avancer en parallèle.
+
+Mais certaines fonctionnalités traversent vraiment le code — un réglage qui demande un champ dans le store,
+un bouton dans le HUD et une touche dans l'input. Dans ce cas tu **déclares** les areas concernées, dans le
+titre ou dans le corps de la PR :
+
+```
+feat(input,ui-hud): mode plein écran
+```
+```
+Areas: input, ui-hud, client-net
+```
+
+Au-delà de trois areas la CI t'avertit sans bloquer : c'est le signe d'une PR trop large, mais c'est toi qui
+juges si les morceaux tiendraient debout séparément. Déclarer une area, c'est prendre le verrou dessus :
+n'en déclare pas « au cas où ».
 
 ### Le cas idéal : un champion de bout en bout
 
