@@ -43,6 +43,155 @@ CHAMPION_LIST.forEach((c, ci) => {
   });
 });
 
+// ---------------------------------------------------------------- recettes dédiées (Ults d'abord)
+// On enregistre ici les sons sur mesure des ults, par fxKey ; ils priment sur la recette
+// procédurale du champion. `customFxKeys` permet aussi de réserver l'événement areaEffect.
+const customRecipes = new Map<string, Recipe>();
+const customFxKeys = new Set<string>();
+
+// Mélenchon — R « La République, c'est moi ! » : déclaration solennelle (0,6 s) puis onde
+// tricolore (bleu #203452 / rouge #ef3340 / cyan #5de2ff, la palette du champion).
+customFxKeys.add('melenchon_r');
+customRecipes.set('melenchon_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    // 0 -> 0,6 s : montée grave de la déclaration
+    tone(ctx, d, { type: 'sawtooth', freq: 110, slide: 220, dur: 0.6, vol: 0.22 * vol, filter: 900 });
+    tone(ctx, d, { type: 'square', freq: 55, slide: 110, dur: 0.6, vol: 0.18 * vol, filter: 500 });
+    // 0,6 s : impact de l'onde
+    noise(ctx, d, { dur: 0.9, vol: 0.45 * vol, filter: 500, slideFilter: 60, delay: 0.6 });
+    tone(ctx, d, { type: 'sine', freq: 55, dur: 1.0, vol: 0.5 * vol, delay: 0.6 });
+    // motif tricolore
+    tone(ctx, d, { type: 'square', freq: 220, dur: 0.18, vol: 0.2 * vol, delay: 0.6, filter: 2400 }); // bleu
+    tone(ctx, d, { type: 'square', freq: 277, dur: 0.18, vol: 0.2 * vol, delay: 0.72, filter: 2400 }); // rouge
+    tone(ctx, d, { type: 'square', freq: 554, dur: 0.32, vol: 0.22 * vol, delay: 0.84, filter: 3200 }); // cyan
+    // envolée aiguë
+    tone(ctx, d, { type: 'sine', freq: 1108, slide: 1660, dur: 0.35, vol: 0.12 * vol, delay: 0.6 });
+  }, { pos });
+});
+
+// --- Tous les autres ults (R) : une recette dédiée par champion, inspirée de son thème et sa palette ---
+
+// Grondak — R « Effondrement » : grondement de terre (0,75 s) puis choc sismique + débris.
+customFxKeys.add('grondak_r');
+customRecipes.set('grondak_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    noise(ctx, d, { dur: 0.75, vol: 0.2 * vol, filter: 220, slideFilter: 90 }); // grondement montant
+    noise(ctx, d, { dur: 1.1, vol: 0.5 * vol, filter: 700, slideFilter: 70, delay: 0.75 }); // choc
+    tone(ctx, d, { type: 'sine', freq: 48, slide: 30, dur: 1.2, vol: 0.5 * vol, delay: 0.75 }); // sub sismique
+    for (let i = 0; i < 5; i++) noise(ctx, d, { dur: 0.08, vol: 0.15 * vol, filter: 2000 + i * 500, delay: 0.75 + i * 0.09 }); // débris
+  }, { pos });
+});
+
+// Tharox — R « Ruée sauvage » : galop qui s'accélère (1 s) puis barrissement de charge.
+customFxKeys.add('tharox_r');
+customRecipes.set('tharox_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    for (let i = 0; i < 6; i++) {
+      const t = i * (0.16 - i * 0.018); // tempo accéléré
+      tone(ctx, d, { type: 'square', freq: 90, slide: 60, dur: 0.07, vol: 0.25 * vol, delay: t, filter: 400 });
+    }
+    noise(ctx, d, { dur: 0.7, vol: 0.4 * vol, filter: 1200, slideFilter: 300, type: 'bandpass', delay: 1 }); // barrissement
+    tone(ctx, d, { type: 'sawtooth', freq: 180, slide: 90, dur: 0.5, vol: 0.25 * vol, delay: 1, filter: 800 });
+  }, { pos });
+});
+
+// Kaelen — R « Jugement solaire » : accord céleste majeur + flash blanc + frappe métallique lourde.
+customFxKeys.add('kaelen_r');
+customRecipes.set('kaelen_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    const chord = [523, 659, 784, 1047]; // do majeur
+    chord.forEach((f, i) => tone(ctx, d, { type: 'triangle', freq: f, dur: 0.5, vol: 0.16 * vol, delay: i * 0.07, filter: 4000 }));
+    tone(ctx, d, { type: 'sine', freq: 2093, slide: 3136, dur: 0.25, vol: 0.12 * vol, delay: 0.4 }); // flash blanc
+    noise(ctx, d, { dur: 0.3, vol: 0.4 * vol, filter: 3000, slideFilter: 400, delay: 0.4 }); // lame qui tranche
+    tone(ctx, d, { type: 'square', freq: 130, slide: 65, dur: 0.5, vol: 0.3 * vol, delay: 0.4, filter: 600 }); // impact au sol
+  }, { pos });
+});
+
+// Vrenna — R « Lance céleste » : envol (whoosh montant) puis impact doré.
+customFxKeys.add('vrenna_r');
+customRecipes.set('vrenna_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    noise(ctx, d, { dur: 0.45, vol: 0.3 * vol, filter: 600, slideFilter: 4000, type: 'bandpass' }); // envol
+    tone(ctx, d, { type: 'sawtooth', freq: 300, slide: 900, dur: 0.4, vol: 0.2 * vol, filter: 1500 }); // montée de la lance
+    noise(ctx, d, { dur: 0.5, vol: 0.45 * vol, filter: 2500, slideFilter: 200, delay: 0.45 }); // impact
+    tone(ctx, d, { type: 'square', freq: 784, slide: 392, dur: 0.4, vol: 0.22 * vol, delay: 0.45, filter: 3000 }); // retentissement doré
+  }, { pos });
+});
+
+// Ilyra — R « Blizzard » : vent glacé 4 s + cristaux de glace qui tintent + ronronnement de givre.
+customFxKeys.add('ilyra_r');
+customRecipes.set('ilyra_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    noise(ctx, d, { dur: 4, vol: 0.22 * vol, filter: 3500, type: 'highpass' }); // vent
+    tone(ctx, d, { type: 'sine', freq: 110, dur: 4, vol: 0.12 * vol, filter: 300 }); // hum de givre
+    for (let i = 0; i < 8; i++) {
+      tone(ctx, d, { type: 'sine', freq: 1800 + Math.random() * 1800, dur: 0.12, vol: 0.07 * vol, delay: 0.2 + i * 0.48 }); // cristaux
+    }
+  }, { pos });
+});
+
+// Zephyr — R « Barrage arcanique » : charge arcanique montante puis décharge de rayon (x3 espacées).
+customFxKeys.add('zephyr_r');
+customRecipes.set('zephyr_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    tone(ctx, d, { type: 'sawtooth', freq: 220, slide: 880, dur: 0.5, vol: 0.2 * vol, filter: 1800 }); // charge
+    for (let i = 0; i < 3; i++) {
+      const t = 0.5 + i * 0.35;
+      tone(ctx, d, { type: 'square', freq: 1200, slide: 300, dur: 0.25, vol: 0.25 * vol, delay: t, filter: 5000 }); // rayon
+      noise(ctx, d, { dur: 0.2, vol: 0.2 * vol, filter: 6000, slideFilter: 1000, delay: t });
+    }
+  }, { pos });
+});
+
+// Sable — R « Balle du jugement » : visée (1 s, sifflement montant) puis détonation globale.
+customFxKeys.add('sable_r');
+customRecipes.set('sable_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    tone(ctx, d, { type: 'sine', freq: 600, slide: 1800, dur: 1, vol: 0.15 * vol }); // visée
+    noise(ctx, d, { dur: 0.15, vol: 0.5 * vol, filter: 4000, slideFilter: 500, delay: 1 }); // détonation
+    tone(ctx, d, { type: 'sine', freq: 1200, slide: 200, dur: 0.8, vol: 0.3 * vol, delay: 1 }); // onde de choc
+    tone(ctx, d, { type: 'square', freq: 90, slide: 45, dur: 0.6, vol: 0.3 * vol, delay: 1, filter: 500 });
+  }, { pos });
+});
+
+// Corvin — R « Nuée » : nuée de corbeaux 3 s (battements d'ailes + croassements) sur fond sinistre.
+customFxKeys.add('corvin_r');
+customRecipes.set('corvin_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    tone(ctx, d, { type: 'sawtooth', freq: 140, slide: 90, dur: 3, vol: 0.1 * vol, filter: 500 }); // fond sinistre
+    for (let i = 0; i < 10; i++) {
+      noise(ctx, d, { dur: 0.05, vol: 0.12 * vol, filter: 1800, type: 'bandpass', delay: i * 0.3 }); // battements
+    }
+    for (let i = 0; i < 4; i++) {
+      tone(ctx, d, { type: 'sawtooth', freq: 700, slide: 350, dur: 0.18, vol: 0.15 * vol, delay: 0.3 + i * 0.7, filter: 1200 }); // croassement
+    }
+  }, { pos });
+});
+
+// Nyx — R « Mort certaine » : marque obsessionnelle pulsée (3 s) puis détonation sombre différée.
+customFxKeys.add('nyx_r');
+customRecipes.set('nyx_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    for (let i = 0; i < 6; i++) {
+      tone(ctx, d, { type: 'sine', freq: 220, dur: 0.25, vol: 0.18 * vol, delay: i * 0.5 }); // pulsation de la marque
+    }
+    tone(ctx, d, { type: 'sawtooth', freq: 880, slide: 220, dur: 0.4, vol: 0.25 * vol, delay: 3, filter: 2000 }); // cri de la marque
+    noise(ctx, d, { dur: 0.8, vol: 0.5 * vol, filter: 900, slideFilter: 80, delay: 3 }); // explosion
+    tone(ctx, d, { type: 'sine', freq: 65, slide: 40, dur: 1, vol: 0.45 * vol, delay: 3 });
+  }, { pos });
+});
+
+// Solenne — R « Aube » : arpège chaud montant (0,5 s) puis colonne de lumière douce.
+customFxKeys.add('solenne_r');
+customRecipes.set('solenne_r', (am, pos, vol = 1) => {
+  am.sfx((ctx, d) => {
+    const arp = [392, 523, 659, 784, 1047]; // sol majeur céleste
+    arp.forEach((f, i) => tone(ctx, d, { type: 'triangle', freq: f, dur: 0.6, vol: 0.15 * vol, delay: i * 0.1, filter: 3500 }));
+    noise(ctx, d, { dur: 1.2, vol: 0.18 * vol, filter: 5000, type: 'highpass', delay: 0.5 }); // colonne de lumière
+    tone(ctx, d, { type: 'sine', freq: 1568, slide: 2093, dur: 0.8, vol: 0.12 * vol, delay: 0.5 });
+  }, { pos });
+});
+
 const SUMMONER_RECIPES: Record<SummonerId, Recipe> = {
   flash: (am, pos) => am.sfx((ctx, d) => { tone(ctx, d, { type: 'square', freq: 1200, slide: 300, dur: 0.12, vol: 0.3 }); noise(ctx, d, { dur: 0.15, vol: 0.2, filter: 5000, slideFilter: 800 }); }, { pos }),
   ignite: (am, pos) => am.sfx((ctx, d) => { noise(ctx, d, { dur: 0.5, vol: 0.3, filter: 1800, slideFilter: 300 }); tone(ctx, d, { type: 'sawtooth', freq: 180, slide: 90, dur: 0.5, vol: 0.25, filter: 900 }); }, { pos }),
@@ -200,7 +349,8 @@ export function playEvent(a: AudioManager, e: GameEvent): void {
       break;
 
     case 'abilityCast': {
-      const recipe = fxRecipes.get(`${e.championId}_${e.slot}`) ?? fxRecipes.get(`${e.championId}_${e.slot.toLowerCase()}`);
+      const key = `${e.championId}_${e.slot}`;
+      const recipe = customRecipes.get(key) ?? fxRecipes.get(key) ?? fxRecipes.get(`${e.championId}_${e.slot.toLowerCase()}`);
       const pos = a.entityPos(e.source) ?? e.targetPos;
       if (recipe) recipe(a, pos, 1);
       else a.sfx((ctx, d) => tone(ctx, d, { type: 'square', freq: 440, slide: 660, dur: 0.15, vol: 0.2 }), { pos });
@@ -223,7 +373,10 @@ export function playEvent(a: AudioManager, e: GameEvent): void {
       break;
 
     case 'areaEffect':
-      a.sfx((ctx, d) => { tone(ctx, d, { type: 'sawtooth', freq: 220, slide: 440, dur: Math.min(0.6, e.duration), vol: 0.15, filter: 1500 }); }, { pos: e.pos });
+      // les fxKey avec recette dédiée gèrent déjà leur impact (ex. ult de Mélenchon)
+      if (!customFxKeys.has(e.fxKey)) {
+        a.sfx((ctx, d) => { tone(ctx, d, { type: 'sawtooth', freq: 220, slide: 440, dur: Math.min(0.6, e.duration), vol: 0.15, filter: 1500 }); }, { pos: e.pos });
+      }
       break;
 
     case 'buffApplied':
