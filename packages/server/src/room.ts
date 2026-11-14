@@ -33,6 +33,7 @@ import {
   type SummonerId,
   type Team,
 } from '@lov/shared';
+import { LoopPerf } from './net/perf.ts';
 import { ClientView, ScoreTracker, SnapshotFrame } from './net/snapshot.ts';
 import { createSystems } from './systems/index.ts';
 import { World, createChampion, type System } from './world.ts';
@@ -96,10 +97,15 @@ export class Room {
   private score: ScoreTracker | null = null;
   private gameStart: Omit<GameStart, 'you' | 'team' | 'entityId'> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
-  private loop: ReturnType<typeof setInterval> | null = null;
+  private loop: ReturnType<typeof setTimeout> | null = null;
   private clock: Clock;
   private random: () => number;
-  private snapAcc = 0;
+  private ticksSinceSnapshot = 0;
+  /** Snapshot tous les N ticks : TICK_RATE / N doit tomber juste pour que les envois soient réguliers. */
+  private ticksPerSnapshot = Math.max(1, Math.round(TICK_RATE / SNAPSHOT_RATE));
+  /** Instant (horloge de la salle, ms) du tick 0 de la boucle ; null en mode manuel. */
+  private loopEpoch: number | null = null;
+  private perf: LoopPerf | null = null;
   private timings: DraftTimings;
 
   constructor(
@@ -437,7 +443,9 @@ export class Room {
       p.view.reset();
       this.sendGameStart(p);
     }
-    this.snapAcc = 0;
+    this.ticksSinceSnapshot = 0;
+    this.loopEpoch = null;
+    if (process.env.LOV_PERF === '1') this.perf = new LoopPerf(this.code);
     if (!this.opts.manual) this.startLoop();
   }
 
@@ -447,34 +455,40 @@ export class Room {
     this.send(p.conn, { t: 'gameStart', start: { ...this.gameStart, you: p.id, team: p.team, entityId: ent.id, serverTime: this.now() } });
   }
 
+  /**
+   * Boucle à échéances fixes : le tick n est dû à `loopEpoch + n * stepMs` (pas de dérive, contrairement à
+   * setInterval). En cas de retard on rattrape au plus 4 ticks puis on recale l'horloge (pas de spirale).
+   */
   private startLoop(): void {
-    let last = this.now();
-    let acc = 0;
     const stepMs = 1000 / TICK_RATE;
-    this.loop = setInterval(() => {
-      const now = this.now();
-      acc += now - last;
-      last = now;
-      // Rattrape le retard sans spirale (max 4 ticks par réveil).
-      let n = 0;
-      while (acc >= stepMs && n < 4 && this.phase === 'game') {
-        acc -= stepMs;
+    let epoch = this.now();
+    this.loopEpoch = epoch;
+    let n = 0;
+    const run = (): void => {
+      this.loop = null;
+      if (this.phase !== 'game') return;
+      let caught = 0;
+      while (this.now() >= epoch + (n + 1) * stepMs && caught < 4 && this.phase === 'game') {
         n++;
+        caught++;
         this.tickGame();
       }
-      if (acc > stepMs * 4) acc = 0;
-    }, stepMs / 2);
+      if (this.now() >= epoch + (n + 1) * stepMs) this.loopEpoch = epoch = this.now() - n * stepMs; // trop en retard : recalage
+      if (this.phase !== 'game') return;
+      this.loop = setTimeout(run, Math.max(0, epoch + (n + 1) * stepMs - this.now()));
+    };
+    this.loop = setTimeout(run, stepMs);
   }
 
-  /** Un tick de simulation + envoi des snapshots au rythme SNAPSHOT_RATE. */
+  /** Un tick de simulation ; snapshots tous les `ticksPerSnapshot` ticks (cadence régulière). */
   tickGame(): void {
     const world = this.world;
     if (!world || this.phase !== 'game') return;
+    const t0 = this.perf ? performance.now() : 0;
     world.step(TICK_DT);
-    this.snapAcc += TICK_DT;
-    if (this.snapAcc >= 1 / SNAPSHOT_RATE - 1e-6 || world.winner) {
-      this.snapAcc -= 1 / SNAPSHOT_RATE;
-      if (this.snapAcc > 1 / SNAPSHOT_RATE) this.snapAcc = 0;
+    this.perf?.tick(performance.now() - t0);
+    if (++this.ticksSinceSnapshot >= this.ticksPerSnapshot || world.winner) {
+      this.ticksSinceSnapshot = 0;
       this.sendSnapshots();
     }
     if (world.winner) this.endGame(world.winner);
@@ -482,11 +496,20 @@ export class Room {
 
   sendSnapshots(): void {
     const world = this.world!;
-    const frame = new SnapshotFrame(world, world.events.drain(), this.score!.score());
+    const t0 = this.perf ? performance.now() : 0;
+    // Horodatage = instant prévu du tick (positions et temps cohérents malgré la gigue des timers).
+    const serverTime = this.loopEpoch !== null ? Math.round(this.loopEpoch + (world.tick * 1000) / TICK_RATE) : this.now();
+    const frame = new SnapshotFrame(world, world.events.drain(), this.score!.score(), serverTime);
+    let bytes = 0;
+    let clients = 0;
     for (const p of this.players.values()) {
       if (!p.conn) continue;
-      p.conn.send(encode({ t: 'snapshot', snap: p.view.build(frame, p.id, p.team) }));
+      const raw = encode({ t: 'snapshot', snap: p.view.build(frame, p.id, p.team) });
+      bytes += raw.length;
+      clients++;
+      p.conn.send(raw);
     }
+    this.perf?.snapshot(performance.now() - t0, bytes, clients);
   }
 
   endGame(winner: Team): void {
@@ -536,10 +559,12 @@ export class Room {
   }
 
   stop(): void {
-    if (this.loop) clearInterval(this.loop);
+    if (this.loop) clearTimeout(this.loop);
     if (this.timer) clearInterval(this.timer);
     this.loop = null;
     this.timer = null;
+    this.perf?.dispose();
+    this.perf = null;
     if (this.phase === 'game') this.phase = 'end';
   }
 
