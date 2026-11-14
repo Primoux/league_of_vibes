@@ -39,6 +39,20 @@ y compris pendant la course et les sorts. Sept impacts de sorts espacés déclen
 Démo sans serveur : `?uilab=draft` pour les portraits et `?fxlab&champ=master67&close=1`
 pour le modèle et ses sorts (Q/W/E/R dans le panneau). Le labo FX utilise la vraie simulation du serveur.
 
+## Modèles 3D inspirés des portraits
+
+Les douze champions reprennent désormais les silhouettes, coiffures, costumes et armes de leurs portraits :
+visages sculptés, étoffes plissées, capuches ouvertes, métal distinct du tissu, cristaux et ornements.
+Les animations existantes restent utilisées, y compris les gestes du 67 Master.
+
+Pour les comparer : `npm run dev:client`, puis `http://localhost:5173/?modellab`.
+Choix du champion, portrait de référence, rotation/zoom, vue de jeu, course, attaque, Q/W/E/R et mort/retour.
+Un lien comme `?modellab&champ=master67` sélectionne directement un champion.
+Ce labo montre les animations ; `?fxlab` reste le banc de test des sorts avec simulation.
+
+[Aperçu comparatif des douze modèles](docs/previews/champion-models.webp) — rendu CPU de la géométrie réelle,
+sans les contours GPU ni le bloom du jeu. [Détails de vérification](docs/champion-models.md).
+
 ## Mélenchon, le Tribun indigné
 
 Une caricature satirique de mage, disponible dans le draft. Le micro n'a pas de bouton d'arrêt ; ses sorts ont bien des cooldowns.
