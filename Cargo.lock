@@ -3716,6 +3716,14 @@ name = "lov-server"
 version = "0.0.0"
 
 [[package]]
+name = "lov-shared"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "lov-sim"
 version = "0.0.0"
 

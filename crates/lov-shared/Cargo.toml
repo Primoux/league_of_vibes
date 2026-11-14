@@ -1,0 +1,13 @@
+[package]
+name = "lov-shared"
+description = "Contrats partagés de League of Vibes : protocole v2, types, constantes, carte. Port fidèle de packages/shared."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
