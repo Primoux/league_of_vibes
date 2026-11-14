@@ -184,8 +184,9 @@ if (vertical) {
   const names = new Set();
   for (const f of files) {
     if (!matchesAny(area.paths, f)) continue;
-    const name = f.split('/').pop().replace(/\.ts$/, '');
-    if (name !== 'index' && !name.startsWith('_')) names.add(name);
+    const name = f.split('/').pop().replace(/\.(ts|rs)$/, '');
+    // `index.ts` et `mod.rs` sont les registres partagés (une ligne ajoutée par champion).
+    if (name !== 'index' && name !== 'mod' && !name.startsWith('_')) names.add(name);
   }
   if (names.size > 1) {
     fail(

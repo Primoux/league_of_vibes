@@ -29,5 +29,13 @@ fi
 npm install
 npm run typecheck
 npm test
+
+# Workspace Rust (migration en cours). rustup lit rust-toolchain.toml et installe la bonne version.
+if command -v cargo >/dev/null; then
+  cargo test --workspace
+else
+  echo "⚠ Rust n'est pas installé : le workspace crates/ ne sera pas testé sur cette machine."
+  echo "  Installe rustup (https://rustup.rs), puis relance ce script."
+fi
 echo
 echo "Prêt. Prends une issue libre : gh issue list --label 'bonne première tâche'"

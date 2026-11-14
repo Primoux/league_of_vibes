@@ -1,0 +1,9 @@
+[package]
+name = "lov-sim"
+description = "Simulation autoritaire de League of Vibes : monde, systèmes, combat, sorts. Aucune E/S."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

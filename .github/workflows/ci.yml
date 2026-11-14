@@ -31,6 +31,18 @@ jobs:
         if: always()
         run: cat server.log || true
 
+  rust:
+    # Workspace Rust (`crates/`), en migration à côté des paquets TypeScript.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain épinglé (rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+
   areas:
     # Une PR = une area = une issue. Les fichiers de contrat partagés passent par une PR « contract: » seule.
     if: github.event_name == 'pull_request'
@@ -91,7 +103,7 @@ jobs:
       - name: Taille de la PR
         run: |
           lines=$(git diff --numstat "origin/${{ github.base_ref }}...HEAD" -- . \
-            ':(exclude)package-lock.json' ':(exclude)*.webp' ':(exclude)*.png' \
+            ':(exclude)package-lock.json' ':(exclude)Cargo.lock' ':(exclude)*.webp' ':(exclude)*.png' \
             | awk '{a+=$1; d+=$2} END {print a+d+0}')
           echo "Lignes modifiées (hors lock et binaires) : $lines"
           if [ "$lines" -gt 800 ]; then

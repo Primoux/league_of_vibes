@@ -68,6 +68,8 @@ Même logique pour les objets, les monstres de jungle, les écrans d'UI : préf�
 ```
 packages/shared/src/protocol.ts   types.ts   schema.ts   constants.ts   map.ts
 packages/server/src/systems/index.ts
+crates/lov-shared/   Cargo.toml, src/lib.rs, protocol.rs, types.rs, schema.rs, constants.rs, map.rs, math.rs, data/mod.rs
+crates/lov-sim/src/systems/mod.rs
 ```
 
 Ces fichiers sont lus par tout le monde : un changement y bloque tous les autres. Donc :
@@ -116,7 +118,38 @@ gh pr create --fill                                           # remplis le templ
   casse à cause de toi, c'est ton code ou le contrat qui doit changer — dis-le dans la PR.
 - Côté client, ajoute une page de démo quand c'est utile (`?fxlab`, `?uilab`…) pour tester sans serveur.
 - Performances : pas d'allocation inutile par tick ou par frame, réutilise les objets.
-- Pas de nouvelle dépendance npm sans la justifier dans la PR. Pas de framework concurrent (pas de React, pas de Babylon…).
+- Pas de nouvelle dépendance npm ou crate sans la justifier dans la PR. Pas de framework concurrent
+  (pas de React, pas de Babylon…) : côté Rust, le moteur est Bevy et le serveur tokio + axum, rien d'autre.
+- Rust : `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`
+  verts avant chaque push qui touche `crates/`. Pas de `unsafe` (refusé par le workspace), pas de
+  `#[allow(...)]` sans commentaire qui le justifie, pas d'`unwrap()` sur une donnée venue du réseau.
+
+## 5 bis. Migration vers Rust (en cours)
+
+Le jeu devient une **application native** : client et serveur sont réécrits en Rust dans `crates/`,
+à côté de `packages/` jusqu'à la bascule. Le navigateur vole des raccourcis, laisse sortir la souris,
+plafonne le framerate, et ne se distribue pas comme un jeu.
+
+```
+crates/lov-shared   protocole, types, constantes, carte, données      ← contrats (PR « contract: »)
+crates/lov-sim      simulation : monde, systèmes, combat, sorts        ← sans E/S, déterministe
+crates/lov-server   WebSocket, salles, draft, snapshots (tokio + axum)
+crates/lov-client   rendu, FX, interface, audio, entrées (Bevy)
+```
+
+- **Le protocole JSON v2 ne bouge pas pendant la migration.** Le client Rust joue contre le serveur Node,
+  le client web contre le serveur Rust : chaque moitié se valide contre l'autre, le jeu reste jouable.
+- **Le TypeScript est gelé** : corrections de bugs seulement. Une règle de jeu à changer se change dans
+  le portage Rust du système concerné.
+- **Les areas gardent leurs noms** et couvrent en plus les chemins Rust équivalents (`.github/areas.json`).
+  La tranche verticale d'un champion existe à l'identique :
+  `lov-shared/src/data/champions/<nom>.rs`, `lov-sim/src/abilities/champions/<nom>.rs`,
+  `lov-client/src/render/champions/models/<nom>.rs`, `lov-client/src/fx/champions/<nom>.rs`.
+- **Porter un système serveur, c'est porter ses tests** : les fichiers de `packages/server/test/` qui le
+  couvrent arrivent dans la même PR, sans être affaiblis. Un bug connu du TS que le test révèle se dit dans la PR.
+- `lov-sim` ne lit ni l'horloge ni un aléatoire non semé : le temps et le générateur sont injectés.
+  `entity.data.<domaine>` devient une table typée par domaine ; on n'ajoute toujours pas de champ à `Entity`
+  sans PR `contract:`.
 
 ## 6. Contenu et propriété intellectuelle
 

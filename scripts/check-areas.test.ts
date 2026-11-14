@@ -105,6 +105,45 @@ describe('check-areas : tranche verticale champion', () => {
     expect(r.ok).toBe(false);
     expect(r.out).toContain('zephyr');
   });
+
+  // Migration Rust : la même tranche existe dans `crates/`, avec `mod.rs` comme registre partagé.
+  const nyxRust = [
+    'crates/lov-shared/src/data/champions/nyx.rs',
+    'crates/lov-sim/src/abilities/champions/nyx.rs',
+    'crates/lov-client/src/render/champions/models/nyx.rs',
+    'crates/lov-client/src/fx/champions/nyx.rs',
+    'crates/lov-shared/src/data/champions/mod.rs',
+  ];
+
+  it('accepte un champion Rust de bout en bout, registre mod.rs compris', () => {
+    const r = check('feat(champion): Nyx en Rust', nyxRust);
+    expect(r.ok).toBe(true);
+    expect(r.out).toContain('nyx');
+  });
+
+  it('refuse deux champions Rust dans la même PR', () => {
+    const r = check('feat(champion): Nyx et Zephyr', [...nyxRust, 'crates/lov-client/src/fx/champions/zephyr.rs']);
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain('zephyr');
+  });
+});
+
+describe('check-areas : contrats Rust', () => {
+  it('refuse le protocole Rust dans une PR normale', () => {
+    const r = check('feat(net): salles', ['crates/lov-server/src/room.rs', 'crates/lov-shared/src/protocol.rs']);
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain('protocol.rs');
+  });
+
+  it('accepte une PR de contrat qui crée lov-shared et met à jour Cargo.lock', () => {
+    const r = check('contract: protocole v2 en Rust', [
+      'crates/lov-shared/Cargo.toml',
+      'crates/lov-shared/src/lib.rs',
+      'crates/lov-shared/src/protocol.rs',
+      'Cargo.lock',
+    ]);
+    expect(r.ok).toBe(true);
+  });
 });
 
 describe('check-areas : fonctionnalité qui traverse plusieurs areas', () => {

@@ -1,0 +1,4 @@
+# Même compilateur sur toutes les machines et en CI. rustup l'installe tout seul à la première commande cargo.
+[toolchain]
+channel = "1.100.0"
+components = ["rustfmt", "clippy"]

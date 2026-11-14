@@ -16,6 +16,10 @@ larves, Colosse du Rift (≈ héraut), Léviathan (≈ baron), sorts d'invocateu
 
 ## 2. Architecture
 
+> **Migration en cours vers une application native en Rust** (client Bevy, serveur tokio + axum, dans `crates/`).
+> Ce qui suit décrit l'implémentation TypeScript de référence, que le portage reproduit système par système
+> en gardant le protocole JSON v2 à l'identique. Organisation et règles : `AGENTS.md §5 bis`.
+
 ```
 packages/
   shared/   types, protocole, schémas, données (champions, objets, sorts, carte, constantes) — source de vérité
