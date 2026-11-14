@@ -35,9 +35,26 @@ export function material(color: number, opts: { emissive?: number; intensity?: n
       emissive: opts.emissive ?? 0,
       emissiveIntensity: opts.intensity ?? 1,
     });
+    if (!opts.emissive) addRim(m as THREE.MeshStandardMaterial);
     matCache.set(key, m);
   }
   return m;
+}
+
+/**
+ * Liseré de lumière (rim) : les bords tournés à l'opposé de la caméra s'éclaircissent légèrement, ce qui
+ * détache les silhouettes du sol en vue plongeante (quelques instructions par pixel, aucun passage en plus).
+ */
+function addRim(m: THREE.MeshStandardMaterial): void {
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+      float rimF = 1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0);
+      totalEmissiveRadiance += diffuseColor.rgb * vec3(0.95, 0.97, 1.1) * rimF * rimF * rimF * 0.6;`,
+    );
+  };
+  m.customProgramCacheKey = () => 'rim';
 }
 
 export function glow(color: number, intensity = 1.6): THREE.Material {

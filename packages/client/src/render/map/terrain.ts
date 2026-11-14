@@ -1,16 +1,42 @@
 /**
- * Sol de la carte : géométrie avec relief + texture peinte dans un canvas. Propriétaire : claude-client.
+ * Sol de la carte : géométrie avec relief + matériaux procéduraux. Propriétaire : claude-client
+ * (refonte graphique claude-fx).
+ *
+ * Un canvas basse résolution ne porte plus des couleurs mais des **masques** (voies, sable/lit de rivière,
+ * dallage des bases, occlusion) ; le shader compose herbe, terre, cailloux, sable humide, pavés et caustiques
+ * à partir d'une texture de bruit échantillonnée en coordonnées monde. Résultat : détail net à tout zoom
+ * (l'ancienne texture couleur faisait ~6 unités de jeu par pixel) et bords de chemins organiques.
  */
 import * as THREE from 'three';
 import { BRUSHES, FOUNTAINS, LANE_HALF_WIDTH, LANE_PATHS, MAP_SIZE, PITS, RIVER_HALF_WIDTH, WALLS, type Polygon } from '@lov/shared';
 import { S } from '../coords.ts';
 import { terrainHeight } from './geometry.ts';
-import { rng } from './rng.ts';
 import { applyFog } from '../FogOfWar.ts';
+import { decorTime, noiseTexture } from './noise.ts';
 
-const TEX = 2048;
+const TEX = 1024;
 /** Le sol déborde de la carte pour remplir la vue aux bords. */
 export const GROUND_MARGIN = 2000;
+
+/** Couleurs sRGB (converties en linéaire par THREE.Color). */
+const PALETTE = {
+  grass: 0x5a8c3e,
+  grassDark: 0x356a31,
+  grassDry: 0x9aa64a,
+  dirt: 0xb4935f,
+  dirtDark: 0x8a6c47,
+  pebble: 0xd8ccb0,
+  sand: 0xcdb98a,
+  sandWet: 0x6d6a52,
+  stoneA: 0x9d9584,
+  stoneB: 0xb8ae97,
+  mortar: 0x5a5244,
+  caustic: 0xbff4ff,
+  teamBlue: 0x3d8bff,
+  teamRed: 0xff4a3d,
+};
+
+const lin = (hex: number) => new THREE.Color(hex);
 
 export function buildTerrain(quality: 'low' | 'high'): THREE.Mesh {
   const size = MAP_SIZE + GROUND_MARGIN * 2;
@@ -23,29 +49,47 @@ export function buildTerrain(quality: 'low' | 'high'): THREE.Mesh {
     pos.setY(i, terrainHeight(gx, gy) * S);
   }
   geo.computeVertexNormals();
-  // UV : la texture couvre exactement la carte (0..MAP_SIZE), le bord déborde en ClampToEdge
+  // UV : les masques couvrent exactement la carte (0..MAP_SIZE), le bord déborde en ClampToEdge
   const uv = geo.attributes.uv as THREE.BufferAttribute;
   for (let i = 0; i < uv.count; i++) {
     const gx = pos.getX(i) / S + MAP_SIZE / 2;
     const gy = -pos.getZ(i) / S + MAP_SIZE / 2;
     uv.setXY(i, gx / MAP_SIZE, gy / MAP_SIZE);
   }
-  const tex = new THREE.CanvasTexture(paintGround());
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  const detail = new THREE.CanvasTexture(paintDetail());
-  detail.wrapS = detail.wrapT = THREE.RepeatWrapping;
-  detail.repeat.set(60, 60);
-  const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, metalness: 0 });
-  // bruit de détail multiplicatif (grain de l'herbe/terre) à haute fréquence
-  mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uDetail = { value: detail };
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D uDetail;')
-      .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= 0.82 + 0.36 * texture2D(uDetail, vMapUv * 60.0).r;');
+  const splat = paintMasks();
+  // `map` n'est pas une couleur : il active simplement vMapUv dans le shader standard (masques en linéaire)
+  const mat = new THREE.MeshStandardMaterial({ map: splat, roughness: 0.93, metalness: 0 });
+  const u = {
+    uNoise: { value: noiseTexture() },
+    uTime: decorTime,
+    uFountB: { value: new THREE.Vector2(FOUNTAINS.blue.x * S, -FOUNTAINS.blue.y * S) },
+    uFountR: { value: new THREE.Vector2(FOUNTAINS.red.x * S, -FOUNTAINS.red.y * S) },
+    uGrass: { value: lin(PALETTE.grass) },
+    uGrassDark: { value: lin(PALETTE.grassDark) },
+    uGrassDry: { value: lin(PALETTE.grassDry) },
+    uDirt: { value: lin(PALETTE.dirt) },
+    uDirtDark: { value: lin(PALETTE.dirtDark) },
+    uPebble: { value: lin(PALETTE.pebble) },
+    uSand: { value: lin(PALETTE.sand) },
+    uSandWet: { value: lin(PALETTE.sandWet) },
+    uStoneA: { value: lin(PALETTE.stoneA) },
+    uStoneB: { value: lin(PALETTE.stoneB) },
+    uMortar: { value: lin(PALETTE.mortar) },
+    uCaustic: { value: lin(PALETTE.caustic) },
+    uTeamB: { value: lin(PALETTE.teamBlue) },
+    uTeamR: { value: lin(PALETTE.teamRed) },
   };
-  mat.customProgramCacheKey = () => 'terrain';
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vTerrW;\nvarying float vTerrNy;')
+      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvTerrW = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvTerrNy = objectNormal.y;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>\n${TERRAIN_DECL}`)
+      .replace('#include <map_fragment>', TERRAIN_MAP)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += terrGlow;');
+  };
+  mat.customProgramCacheKey = () => 'terrain2';
   applyFog(mat);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set((MAP_SIZE / 2) * S, 0, (-MAP_SIZE / 2) * S);
@@ -53,6 +97,98 @@ export function buildTerrain(quality: 'low' | 'high'): THREE.Mesh {
   mesh.name = 'terrain';
   return mesh;
 }
+
+const TERRAIN_DECL = /* glsl */ `
+uniform sampler2D uNoise;
+uniform float uTime;
+uniform vec2 uFountB, uFountR;
+uniform vec3 uGrass, uGrassDark, uGrassDry, uDirt, uDirtDark, uPebble, uSand, uSandWet;
+uniform vec3 uStoneA, uStoneB, uMortar, uCaustic, uTeamB, uTeamR;
+varying vec3 vTerrW;
+varying float vTerrNy;
+float terrHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+`;
+
+/**
+ * Composition des matériaux (remplace map_fragment). Masques : r = voie, g = sable/rivière, b = dallage,
+ * a = occlusion (pied des murs, sol des brousses). Unités monde : 1 = 100 unités de jeu.
+ */
+const TERRAIN_MAP = /* glsl */ `
+vec4 sp = texture2D(map, vMapUv);
+vec2 wp = vTerrW.xz;
+float nL = texture2D(uNoise, wp * 0.011).r;
+float nL2 = texture2D(uNoise, wp * 0.0041 + 0.37).r;
+float nM = texture2D(uNoise, wp * 0.045).g;
+float nH = texture2D(uNoise, wp * 0.31).b;
+float nC = texture2D(uNoise, wp * 0.23).a;
+vec3 terrGlow = vec3(0.0);
+
+// herbe : deux tons + zones plus sèches, grain fin
+float tone = nL * 0.6 + nL2 * 0.4;
+vec3 col = mix(uGrassDark, uGrass, smoothstep(0.28, 0.72, tone));
+col = mix(col, uGrassDry, smoothstep(0.55, 0.85, nM) * smoothstep(0.45, 0.8, nL2) * 0.5);
+col *= 0.84 + 0.3 * nH;
+
+// terre des voies : bords bruités, ornières sombres, cailloux
+float laneV = sp.r + (nM - 0.5) * 0.34 + (nH - 0.5) * 0.12;
+float laneM = smoothstep(0.43, 0.55, laneV);
+vec3 dirt = mix(uDirtDark, uDirt, smoothstep(0.2, 0.85, nL + (nH - 0.5) * 0.4));
+dirt *= 1.0 - (1.0 - smoothstep(0.5, 0.72, laneV)) * 0.22;
+float pebble = (1.0 - smoothstep(0.07, 0.15, nC)) * step(0.52, texture2D(uNoise, wp * 0.06 + 0.5).b);
+dirt = mix(dirt, uPebble * (0.75 + 0.4 * nH), pebble * 0.85);
+col = mix(col, dirt, laneM);
+// liseré d'herbe foncée au bord du chemin (herbe piétinée)
+col *= 1.0 - (smoothstep(0.3, 0.43, laneV) - laneM) * 0.18;
+
+// sable des berges et lit de la rivière (humide sous l'eau), plus de sable dans les pentes
+float slope = 1.0 - clamp(vTerrNy, 0.0, 1.0);
+float sandM = smoothstep(0.38, 0.6, sp.g + (nM - 0.5) * 0.3 + slope * 1.5);
+float wet = 1.0 - smoothstep(-0.2, -0.06, vTerrW.y);
+vec3 sand = mix(uSand, uSandWet, wet) * (0.86 + 0.26 * nH);
+col = mix(col, sand, sandM);
+
+// dallage circulaire des bases (calculé : joints nets à tout zoom)
+if (sp.b > 0.02) {
+  vec2 fb = wp - uFountB;
+  vec2 fr = wp - uFountR;
+  bool blue = dot(fb, fb) < dot(fr, fr);
+  vec2 d = blue ? fb : fr;
+  float r = length(d);
+  float ringW = 1.9;
+  float ri = floor(r / ringW);
+  float fri = fract(r / ringW);
+  float circ = 6.2831853 * max(ri + 0.5, 0.5) * ringW;
+  float nst = max(5.0, floor(circ / 2.3));
+  float seg = (atan(d.y, d.x) / 6.2831853 + 0.5) * nst + ri * 0.5;
+  float fs = fract(seg);
+  float cell = terrHash(vec2(ri, floor(seg)) + (blue ? 0.0 : 17.0));
+  float edge = min(min(fri, 1.0 - fri) * ringW, min(fs, 1.0 - fs) * circ / nst);
+  float joint = 1.0 - smoothstep(0.022, 0.055, edge + (nH - 0.5) * 0.03);
+  vec3 stone = mix(uStoneA, uStoneB, cell) * (0.8 + 0.32 * nH) * (0.92 + 0.16 * terrHash(vec2(floor(seg), ri) + 3.1));
+  // pierres légèrement bombées : bords plus sombres, mousse dans certains joints
+  stone *= 0.8 + 0.2 * smoothstep(0.03, 0.35, edge);
+  stone = mix(stone, mix(uMortar, uGrassDark * 0.8, step(0.6, nM) * 0.7), joint);
+  // incrustations lumineuses aux couleurs de l'équipe
+  vec3 team = blue ? uTeamB : uTeamR;
+  float inlay = (1.0 - smoothstep(0.05, 0.13, abs(r - 6.5))) + (1.0 - smoothstep(0.06, 0.16, abs(r - 22.6)));
+  stone = mix(stone, team * 0.6, inlay * 0.8);
+  float pm = smoothstep(0.45, 0.6, sp.b + (nH - 0.5) * 0.1);
+  terrGlow = team * inlay * pm * 0.55;
+  col = mix(col, stone, pm);
+}
+
+// occlusion : pied des murs, sol des brousses
+col *= 1.0 - sp.a * 0.6;
+
+// caustiques animées sur le lit de la rivière
+if (wet > 0.0) {
+  float c1 = texture2D(uNoise, wp * 0.33 + vec2(uTime * 0.045, uTime * 0.03)).a;
+  float c2 = texture2D(uNoise, wp * 0.27 - vec2(uTime * 0.035, -uTime * 0.025)).a;
+  float ca = smoothstep(0.42, 0.8, c1) * smoothstep(0.42, 0.8, c2);
+  col += uCaustic * ca * wet * 0.45;
+}
+diffuseColor.rgb *= col;
+`;
 
 const K = TEX / MAP_SIZE;
 const cx = (x: number) => x * K;
@@ -64,157 +200,89 @@ function pathPoly(ctx: CanvasRenderingContext2D, p: Polygon): void {
   ctx.closePath();
 }
 
-function paintGround(): HTMLCanvasElement {
+/** Un masque en niveaux de gris : `draw` peint en blanc sur fond noir. */
+function mask(draw: (ctx: CanvasRenderingContext2D) => void): Uint8ClampedArray {
   const c = document.createElement('canvas');
   c.width = c.height = TEX;
-  const ctx = c.getContext('2d')!;
-  const r = rng(1337);
-
-  // herbe de base + taches de variation
-  ctx.fillStyle = '#41703a';
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
+  ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, TEX, TEX);
-  const greens = ['#4a7d3f', '#386433', '#4f8444', '#3b6a36', '#567f3e', '#466f3a'];
-  for (let i = 0; i < 2600; i++) {
-    ctx.globalAlpha = 0.08 + r() * 0.12;
-    ctx.fillStyle = greens[Math.floor(r() * greens.length)]!;
-    ctx.beginPath();
-    ctx.arc(r() * TEX, r() * TEX, 6 + r() * 38, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // petites fleurs / touffes claires
-  for (let i = 0; i < 2500; i++) {
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = r() < 0.15 ? '#e8d77a' : '#6f9a52';
-    ctx.fillRect(r() * TEX, r() * TEX, 1.5, 1.5);
-  }
-  ctx.globalAlpha = 1;
+  ctx.fillStyle = ctx.strokeStyle = '#fff';
+  draw(ctx);
+  return ctx.getImageData(0, 0, TEX, TEX).data;
+}
 
-  // lit de la rivière (sable humide sous l'eau, berges)
-  ctx.save();
-  ctx.lineCap = 'butt';
-  const river = (w: number, color: string) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = w * K * 2;
-    ctx.beginPath();
-    ctx.moveTo(cx(1350), cy(10650));
-    ctx.lineTo(cx(10650), cy(1350));
-    ctx.stroke();
-  };
-  river(RIVER_HALF_WIDTH + 160, '#5f6e45');
-  river(RIVER_HALF_WIDTH + 40, '#7c7652');
-  river(RIVER_HALF_WIDTH - 120, '#3f5a50');
-  ctx.restore();
-
-  // voies : bord sombre, terre, centre plus clair, cailloux
-  const stroke = (w: number, color: string, alpha = 1) => {
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = w * K * 2;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
+/**
+ * Masques RGBA (r voie, g sable, b dallage, a occlusion). Les masques sont flous : le seuil 0,5 du shader
+ * tombe sur le bord réel, et le bruit qui le décale donne des contours organiques.
+ */
+function paintMasks(): THREE.DataTexture {
+  const lane = mask((ctx) => {
+    ctx.filter = 'blur(5px)';
+    ctx.lineJoin = ctx.lineCap = 'round';
+    ctx.lineWidth = LANE_HALF_WIDTH * K * 2;
     for (const p of Object.values(LANE_PATHS)) {
       ctx.beginPath();
       p.forEach((q, i) => (i ? ctx.lineTo(cx(q.x), cy(q.y)) : ctx.moveTo(cx(q.x), cy(q.y))));
       ctx.stroke();
     }
-    ctx.globalAlpha = 1;
-  };
-  stroke(LANE_HALF_WIDTH + 70, '#5e5a3c', 0.7);
-  stroke(LANE_HALF_WIDTH, '#9a8460');
-  stroke(LANE_HALF_WIDTH * 0.6, '#a99270', 0.8);
-  stroke(LANE_HALF_WIDTH * 0.25, '#b39d7a', 0.5);
-  for (const p of Object.values(LANE_PATHS)) {
-    for (let i = 0; i < p.length - 1; i++) {
-      const a = p[i]!;
-      const b = p[i + 1]!;
-      const n = Math.hypot(b.x - a.x, b.y - a.y) / 25;
-      for (let k = 0; k < n; k++) {
-        const t = k / n;
-        const ox = (r() - 0.5) * LANE_HALF_WIDTH * 1.8;
-        const oy = (r() - 0.5) * LANE_HALF_WIDTH * 1.8;
-        ctx.fillStyle = r() < 0.5 ? '#7d6a4c' : '#c2ad88';
-        ctx.globalAlpha = 0.55;
-        ctx.fillRect(cx(a.x + (b.x - a.x) * t + ox), cy(a.y + (b.y - a.y) * t + oy), 2, 2);
-      }
-    }
-  }
-  ctx.globalAlpha = 1;
-
-  // bases : dallage circulaire autour de la fontaine, liseré d'équipe
-  for (const team of ['blue', 'red'] as const) {
-    const f = FOUNTAINS[team];
-    const tint = team === 'blue' ? '#4c78c8' : '#c84c4c';
-    ctx.fillStyle = '#7d7768';
+  });
+  const sand = mask((ctx) => {
+    ctx.filter = 'blur(7px)';
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = (RIVER_HALF_WIDTH + 90) * K * 2;
     ctx.beginPath();
-    ctx.arc(cx(f.x), cy(f.y), 2300 * K, 0, Math.PI * 2);
-    ctx.fill();
-    for (let ring = 2300; ring > 200; ring -= 260) {
-      ctx.strokeStyle = 'rgba(40,36,30,0.35)';
-      ctx.lineWidth = 2;
+    ctx.moveTo(cx(1350), cy(10650));
+    ctx.lineTo(cx(10650), cy(1350));
+    ctx.stroke();
+    for (const pit of Object.values(PITS)) {
       ctx.beginPath();
-      ctx.arc(cx(f.x), cy(f.y), ring * K, 0, Math.PI * 2);
-      ctx.stroke();
-      const n = Math.floor(ring / 120);
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2 + ring;
-        ctx.beginPath();
-        ctx.moveTo(cx(f.x + Math.cos(a) * ring), cy(f.y + Math.sin(a) * ring));
-        ctx.lineTo(cx(f.x + Math.cos(a) * (ring - 260)), cy(f.y + Math.sin(a) * (ring - 260)));
-        ctx.stroke();
-      }
+      ctx.arc(cx(pit.pos.x), cy(pit.pos.y), pit.radius * 0.9 * K, 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.strokeStyle = tint;
-    ctx.globalAlpha = 0.8;
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.arc(cx(f.x), cy(f.y), 2300 * K, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx(f.x), cy(f.y), 650 * K, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
+  });
+  const paving = mask((ctx) => {
+    ctx.filter = 'blur(2px)';
+    for (const team of ['blue', 'red'] as const) {
+      const f = FOUNTAINS[team];
+      ctx.beginPath();
+      ctx.arc(cx(f.x), cy(f.y), 2330 * K, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+  const occl = mask((ctx) => {
+    ctx.filter = 'blur(6px)';
+    ctx.globalAlpha = 0.75;
+    for (const w of WALLS) {
+      pathPoly(ctx, w);
+      ctx.fill();
+    }
+    ctx.filter = 'blur(3px)';
+    ctx.globalAlpha = 0.4;
+    for (const b of BRUSHES) {
+      pathPoly(ctx, b);
+      ctx.fill();
+    }
+  });
+  const data = new Uint8Array(TEX * TEX * 4);
+  // le canvas a l'origine en haut : on retourne les lignes pour une DataTexture (origine en bas, flipY inopérant)
+  for (let y = 0; y < TEX; y++) {
+    const src = (TEX - 1 - y) * TEX * 4;
+    const dst = y * TEX * 4;
+    for (let x = 0; x < TEX * 4; x += 4) {
+      data[dst + x] = lane[src + x]!;
+      data[dst + x + 1] = sand[src + x]!;
+      data[dst + x + 2] = paving[src + x]!;
+      data[dst + x + 3] = occl[src + x]!;
+    }
   }
-
-  // fosses : terre battue + anneau de pierres
-  for (const pit of Object.values(PITS)) {
-    const g = ctx.createRadialGradient(cx(pit.pos.x), cy(pit.pos.y), 0, cx(pit.pos.x), cy(pit.pos.y), pit.radius * K);
-    g.addColorStop(0, '#6a6247');
-    g.addColorStop(0.85, '#5a5a40');
-    g.addColorStop(1, 'rgba(90,90,64,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(cx(pit.pos.x), cy(pit.pos.y), pit.radius * K, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // ombre au pied des murs, sol sombre sous les brousses
-  ctx.fillStyle = 'rgba(20,30,15,0.55)';
-  ctx.filter = 'blur(6px)';
-  for (const w of WALLS) {
-    pathPoly(ctx, w);
-    ctx.fill();
-  }
-  ctx.filter = 'none';
-  ctx.fillStyle = '#2f5a2c';
-  for (const b of BRUSHES) {
-    pathPoly(ctx, b);
-    ctx.fill();
-  }
-  return c;
-}
-
-/** Texture de grain répétée (bruit). */
-function paintDetail(): HTMLCanvasElement {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const ctx = c.getContext('2d')!;
-  const img = ctx.createImageData(128, 128);
-  const r = rng(7);
-  for (let i = 0; i < 128 * 128; i++) {
-    const v = 110 + r() * 145;
-    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
-    img.data[i * 4 + 3] = 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  return c;
+  const tex = new THREE.DataTexture(data, TEX, TEX, THREE.RGBAFormat);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
 }
