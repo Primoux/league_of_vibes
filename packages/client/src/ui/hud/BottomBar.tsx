@@ -54,7 +54,7 @@ export function BottomBar() {
           </div>
           <Bars ent={ent} champ={champ} self={self} />
         </div>
-        <Inventory items={items} gold={self.gold} canShop={self.canShop} ward={self.wardCharges} />
+        <Inventory items={items} gold={self.gold} canShop={self.canShop} ward={self.wardCharges} charges={self.itemCharges} cooldowns={self.itemCooldowns} />
       </div>
     </div>
   );
@@ -194,7 +194,7 @@ function GoldFloats() {
   );
 }
 
-function Inventory({ items, gold, canShop, ward }: { items: (string | null)[]; gold: number; canShop: boolean; ward?: SelfState['wardCharges'] }) {
+function Inventory({ items, gold, canShop, ward, charges, cooldowns }: { items: (string | null)[]; gold: number; canShop: boolean; ward?: SelfState['wardCharges']; charges?: (number | null)[]; cooldowns?: (number | null)[] }) {
   const bought = useMini(juice, (s) => ({ seq: s.boughtSeq, item: s.boughtItem }));
   const newSlot = bought.item ? items.indexOf(bought.item) : -1;
   const trinket = items[6] ?? items.find((i) => i && ITEMS[i]?.category === 'trinket') ?? null;
@@ -207,6 +207,9 @@ function Inventory({ items, gold, canShop, ward }: { items: (string | null)[]; g
           const id = items[i] ?? null;
           const def = id ? ITEMS[id] : undefined;
           const active = !!def?.active;
+          const ch = charges?.[i] ?? null;
+          const cd = cooldowns?.[i] ?? 0;
+          const cdTotal = def?.active?.cooldown ?? 0;
           return (
             <div
               class={`slot ${id ? 'full' : ''} ${active ? 'active' : ''}`}
@@ -215,6 +218,9 @@ function Inventory({ items, gold, canShop, ward }: { items: (string | null)[]; g
               {...(def ? tip(() => <ItemCard item={def} />) : {})}
             >
               <ItemIcon itemId={id} size="100%" />
+              {cd > 0 && <div class="cd-sweep" style={{ '--f': cooldownFraction(cd, Math.max(cdTotal, cd)) } as Record<string, number>} />}
+              {cd > 0 && <span class="cd-num">{formatCooldown(cd)}</span>}
+              {ch !== null && ch > 1 && <b class="charges">{ch}</b>}
               {i === newSlot && <i class="lov-newitem" key={bought.seq} />}
               <kbd>{ITEM_KEYS[i]}</kbd>
             </div>

@@ -63,7 +63,14 @@
 - **Plus aucune voix sur les éliminations** : jingles originaux synthétisés (`audio/music/stings.ts`) qui montent en puissance avec le multi-kill et la série (cloches → cuivres → basse/nappe → chœur/roulement → cymbales et cascade), plus aigus à chaque cran ; majeur pour ton équipe, mineur et plus discret pour l'ennemi, plus fort et scintillant pour ton propre kill ; jingle dédié au premier sang. Canal « Annonces » (son volume s'applique).
 - Vérifié : tests (`test/kill-audio.test.ts`, dont « tuer des sbires ne déclenche rien ») et rendu hors ligne (énergie 50 → 135 → 883 → 1386 → 1900 du kill simple au penta, aucune saturation).
 
+## Catalogue de 101 objets (session 5)
+- **Boutique** : filtres par statistique combinables (Attaque, Vit. d'attaque, Critique, Létalité, Vol de vie, Puissance, Pén. magique, Mana, Accélération, PV, Armure, Rés. magique, Vitesse), onglets vides masqués (plus d'« Épiques »), en-têtes de catégorie dans « Tous », « Conseillés » et la recherche, 20 conseils par classe.
+- **Icônes** : 22 nouveaux glyphes (amulette, ceinture, gants, gantelet, casque, faux, épines, soleil, serpent, arbalète, cyclone, masque, infini, fiole, montagne, lune, fantôme, goutte, crocs, crâne, lance, boussole) + variation déterministe par objet (teinte, inclinaison, anneaux, gemme de couleur sur les légendaires). Logique dans `ui/icons/glyphs.ts`, testée : 43 glyphes distincts, combinaisons quasi toutes uniques sur les 101 objets.
+- **HUD** : compteur de charges et cadran de recharge sur les objets de l'inventaire, dès que le serveur remplit les nouveaux champs.
+- Correctif : le texte sous les gros boutons (« Acheter »…) passait sous le reflet animé.
+
 ## Bloqué / Besoins (des autres agents)
+- **mistral-economy** : remplir `self.itemCharges` (charges des potions, par emplacement) et `self.itemCooldowns` (recharge restante des actifs, par emplacement) dans le hook `selfState` ; l'UI les affiche déjà.
 - Rien de bloquant. (Touches 1-7 et emprise de caméra livrées par claude-client dans #11/#15, merci.)
 - **mistral-economy** : exporte `setVolume(channel, v)` depuis `audio/AudioManager.ts` (canaux `master`, `sfx`, `voice`, `music`, `ui`, valeurs 0..1) : l'UI l'appelle automatiquement au démarrage et à chaque changement. Pour les objets : un champ `icon` parlant (`sword`, `tome`, `boots`, `hourglass`, `shield`…) suffit pour l'icône générée. Inventaire attendu : `champ.items` de longueur 7, index 6 = trinket.
 - **Annonces** : l'UI dérive elle-même premier sang, multi-kills, séries, arrêt de série, équipe anéantie, tours, inhibiteurs et objectifs à partir de `death`/`structureDestroyed`/`objectiveTaken`. **Ne pas** émettre d'`announcement` pour ceux-là (doublons). Clés `announcement` reconnues : `welcome`, `minionsSoon`, `minionsSpawn`, `dragonSpawn`, `elderSpawn`, `grubsSpawn`, `heraldSpawn`, `leviathanSpawn`, `inhibitorRespawn`, `dragonSoul`, ou toute clé avec `params.text`.
