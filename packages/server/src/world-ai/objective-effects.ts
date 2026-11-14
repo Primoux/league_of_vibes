@@ -25,9 +25,9 @@ export function installObjectiveEffects(world: World, state: ObjectiveState): vo
     const source = world.get(event.source);
     if (event.slot === 'R' && source && source.team !== 'neutral' && state.teams[source.team].soul === 'cloud') addBuff(world, source, 'soul_cloud_speed', { duration: 6, params: { moveSpeedPercent: 0.5 } });
   });
-  world.events.on('damage', event => {
-    const source = world.get(event.source); const target = world.get(event.target);
-    if (event.amount <= 0 || !source?.champ || source.dead || source.team === 'neutral' || !target || target.dead || target.team === source.team || target.kind !== 'champion' || event.ability?.startsWith('soul_')) return;
+  world.hooks.afterDamage.push((ctx, dealt) => {
+    const source = ctx.credit ?? ctx.source; const target = ctx.target;
+    if (dealt <= 0 || !source?.champ || source.dead || source.team === 'neutral' || !target || target.dead || target.team === source.team || target.kind !== 'champion' || ctx.ability?.startsWith('soul_')) return;
     const soul = state.teams[source.team].soul; const active = runtime(source);
     if (soul === 'ocean') { active.oceanUntil = world.time + 3; return; }
     if (world.time < active.nextBurst) return;
@@ -35,11 +35,11 @@ export function installObjectiveEffects(world: World, state: ObjectiveState): vo
       active.nextBurst = world.time + 3;
       const amount = 80 + source.stats.ad * 0.2 + source.stats.ap * 0.12;
       world.events.emit({ type: 'areaEffect', source: source.id, fxKey: 'soul_infernal', pos: { ...target.pos }, radius: 250, duration: 0.4 });
-      for (const victim of world.query('champion')) if (!victim.dead && victim.team !== source.team && dist2(victim.pos, target.pos) <= 250 ** 2) applyDamage(world, { source, target: victim, amount, type: 'magic', ability: 'soul_infernal' });
+      for (const victim of world.query('champion')) if (!victim.dead && victim.hp > 0 && victim.team !== source.team && dist2(victim.pos, target.pos) <= 250 ** 2) applyDamage(world, { source, target: victim, amount, type: 'magic', ability: 'soul_infernal' });
     } else if (soul === 'hextech') {
       active.nextBurst = world.time + 8;
       let chained = 0;
-      for (const victim of world.query('champion')) if (!victim.dead && victim.team !== source.team && dist2(victim.pos, target.pos) <= 500 ** 2) {
+      for (const victim of world.query('champion')) if (!victim.dead && victim.hp > 0 && victim.team !== source.team && dist2(victim.pos, target.pos) <= 500 ** 2) {
         addBuff(world, victim, 'soul_hextech_slow', { duration: 2, source, params: { slow: 0.4 } });
         applyDamage(world, { source, target: victim, amount: 80, type: 'true', ability: 'soul_hextech' });
         if (++chained === 4) break;

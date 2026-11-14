@@ -99,9 +99,9 @@ export const structuresSystem: System = {
         const state = structureState(ctx.attacker); state.ramp = Math.min(3, state.ramp + 1);
       }
     });
-    world.events.on('damage', event => {
-      const source = world.get(event.source); const target = world.get(event.target);
-      if (!source || !target || event.amount <= 0) return;
+    world.hooks.afterDamage.push((ctx, dealt) => {
+      const source = ctx.credit ?? ctx.source; const target = ctx.target;
+      if (!source || dealt <= 0) return;
       if (source.kind === 'champion' && target.kind === 'champion' && source.team !== target.team) {
         for (const tower of world.query('tower')) if (!tower.dead && tower.team === target.team && inRange(tower, source, STRUCTURES.range)) tower.data.towerAggressor = { id: source.id, until: world.time + 3 };
       }
