@@ -2,6 +2,7 @@ import { CHAMPION_LIST } from '@lov/shared';
 import { useEffect, useState } from 'preact/hooks';
 import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
+import { championArtworkUrl } from '../icons/ChampionArtwork.tsx';
 import { ChampionPortrait, ClassEmblem, RoleIcon } from '../icons/Icons.tsx';
 import { CLASS_LABEL, ROLE_LABEL } from '../logic/format.ts';
 import { ChampionStage } from '../stage/ChampionStage.tsx';
@@ -135,6 +136,7 @@ export function Home() {
 
       <section class="lov-home2-right" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
         <div class="lov-showcase">
+          {championArtworkUrl(champ.id) && <img class="lov-stage-art home" src={championArtworkUrl(champ.id)} alt="" key={`a-${champ.id}`} />}
           <ChampionStage championId={champ.id} pulse={pulse} class="lov-showcase-stage" spin={0.3} />
           <div class="lov-showcase-plate" key={champ.id}>
             <span class="cls">

@@ -446,3 +446,11 @@
 .lov-end > .lov-end-burst { position: absolute; }
 .lov-load-card .art .lov-portrait { background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.06), transparent 70%); }
 .lov-load-card { border-radius: 12px; }
+
+/* illustration peinte en fond d'ambiance derrière la scène 3D */
+.lov-stage-art { position: absolute; right: 0; top: 50%; height: 115%; aspect-ratio: 1; transform: translateY(-50%); object-fit: cover; opacity: 0.32; filter: saturate(1.15) blur(1.5px);
+  -webkit-mask: radial-gradient(closest-side, #000 45%, transparent 100%); mask: radial-gradient(closest-side, #000 45%, transparent 100%); pointer-events: none; animation: lov-art-in 1.2s var(--ease) both; }
+.lov-stage-art.home { right: 8%; height: 100%; opacity: 0.28; }
+@keyframes lov-art-in { from { opacity: 0; transform: translateY(-50%) scale(1.08); } }
+.lov-gal-tile .name { z-index: 1; font-family: var(--font); font-weight: 800; font-size: 0.6em; text-shadow: 0 1px 3px #000; }
+.lov-gal-tile .lock, .lov-gal-tile .hover-tag { z-index: 2; }

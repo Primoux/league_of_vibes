@@ -2,6 +2,7 @@ import { CHAMPION_LIST, CHAMPIONS, DRAFT_TURN_SECONDS, SUMMONER_IDS, SUMMONERS, 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { net } from '../../net/client.ts';
 import { AbilityCard, SummonerCard, TimerRing, tip, useCountdown } from '../components.tsx';
+import { championArtworkUrl } from '../icons/ChampionArtwork.tsx';
 import { AbilityIcon, ChampionPortrait, ClassEmblem, Glyph, RoleIcon, SummonerIcon } from '../icons/Icons.tsx';
 import { CLASS_LABEL, ROLE_LABEL } from '../logic/format.ts';
 import { ChampionStage } from '../stage/ChampionStage.tsx';
@@ -75,6 +76,7 @@ export function Draft() {
         <section class="lov-draft2-stage">
           {champ ? (
             <>
+              {championArtworkUrl(champ.id) && <img class="lov-stage-art" src={championArtworkUrl(champ.id)} alt="" key={`a-${champ.id}`} />}
               <ChampionStage championId={champ.id} pulse={pulse} class="stage" spin={0.25} />
               <ChampionInfo champ={champ} key={champ.id} />
               <div class="lov-draft2-name" key={`n-${champ.id}`}>
