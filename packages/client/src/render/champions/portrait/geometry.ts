@@ -9,21 +9,21 @@ export type Ring = [y: number, depth: number, width: number, x?: number];
 export function loft(rings: Ring[], segments = 12, caps = true): THREE.BufferGeometry {
   const vertices: number[] = [], indices: number[] = [];
   for (const [y, depth, width, x = 0] of rings) {
-    for (let i = 0; i <= segments; i++) {
+    for (let i = 0; i < segments; i++) {
       const a = i / segments * Math.PI * 2;
       vertices.push(x + Math.cos(a) * depth, y, Math.sin(a) * width);
     }
   }
   for (let j = 0; j < rings.length - 1; j++) for (let i = 0; i < segments; i++) {
-    const a = j * (segments + 1) + i, b = a + segments + 1;
-    indices.push(a, b, a + 1, b, b + 1, a + 1);
+    const a = j * segments + i, b = a + segments, next = j * segments + (i + 1) % segments;
+    indices.push(a, b, next, b, next + segments, next);
   }
   for (const top of caps ? [false, true] : []) {
     const row = top ? rings.length - 1 : 0, ring = rings[row]!;
     const center = vertices.length / 3; vertices.push(ring[3] ?? 0, ring[0], 0);
     for (let i = 0; i < segments; i++) {
-      const a = row * (segments + 1) + i;
-      indices.push(center, top ? a + 1 : a, top ? a : a + 1);
+      const a = row * segments + i, next = row * segments + (i + 1) % segments;
+      indices.push(center, top ? next : a, top ? a : next);
     }
   }
   const g = new THREE.BufferGeometry();
@@ -42,7 +42,15 @@ export function strand(points: Point[], radii: number[], sides = 6, steps = 10):
       position.setXYZ(index, center.x + (position.getX(index) - center.x) * radius, center.y + (position.getY(index) - center.y) * radius, center.z + (position.getZ(index) - center.z) * radius);
     }
   }
-  g.computeVertexNormals(); return g;
+  g.computeVertexNormals();
+  // TubeGeometry duplique la couture UV ; nos tubes sans texture doivent rester lisses à cet endroit.
+  const normal = g.getAttribute('normal'), average = new THREE.Vector3();
+  for (let i = 0; i <= steps; i++) {
+    const a = i * (sides + 1), b = a + sides;
+    average.set(normal.getX(a) + normal.getX(b), normal.getY(a) + normal.getY(b), normal.getZ(a) + normal.getZ(b)).normalize();
+    normal.setXYZ(a, average.x, average.y, average.z); normal.setXYZ(b, average.x, average.y, average.z);
+  }
+  return g;
 }
 
 /** Polygone sculpté dans le plan yz, face vers +x. */
