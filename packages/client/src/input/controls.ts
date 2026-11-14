@@ -3,8 +3,9 @@
  *
  * - Clic droit : sur un ennemi = attaque, sur le sol = déplacement (+ marqueur). Maintenu = suit le curseur.
  * - A puis clic gauche : attaque-déplacement (quick-cast : immédiat).
- * - Q W E R : cast normal (indicateur, clic gauche pour confirmer, clic droit/Échap pour annuler) ou
- *   quick-cast selon les paramètres ; Maj+touche inverse le mode. Ctrl+QWER : monter le sort.
+ * - Q W E R : cast normal (touche maintenue = indicateur, relâcher la touche ou clic gauche pour lancer,
+ *   clic droit/Échap pour annuler) ou quick-cast selon les paramètres ; Maj+touche inverse le mode.
+ *   Ctrl+QWER : monter le sort.
  * - D / F : sorts d'invocateur. 1 2 3 5 6 7 : objets actifs. 4 : balise. B : rappel. S : stop.
  * - Espace (maintenu) : centrer la caméra. Y : verrouiller/déverrouiller. Flèches : déplacer la caméra.
  * - P : boutique. Tab (maintenu) : scores. C : stats. Échap : annuler / fermer / paramètres.
@@ -31,6 +32,8 @@ export function installControls(renderer: GameRenderer): void {
   let mouseX = 0;
   let mouseY = 0;
   let rightHeld = false;
+  /** Touche physique (e.code) qui a ouvert l'indicateur de sort en cours : la relâcher lance le sort. */
+  let castHeldCode: string | null = null;
   let lastFollowSend = 0;
   const lastFollowPos: Vec2 = { x: 0, y: 0 };
 
@@ -48,6 +51,7 @@ export function installControls(renderer: GameRenderer): void {
   };
 
   const setTargeting = (t: Targeting) => {
+    if (!t) castHeldCode = null;
     if (store.state.targeting !== t) store.set({ targeting: t });
     updateCursor();
   };
@@ -93,6 +97,7 @@ export function installControls(renderer: GameRenderer): void {
   addEventListener('blur', () => {
     renderer.cam.clearMouse();
     rightHeld = false;
+    castHeldCode = null;
     renderer.cam.centerHeld = false;
     if (store.state.scoreboardOpen) store.set({ scoreboardOpen: false });
   });
@@ -185,7 +190,7 @@ export function installControls(renderer: GameRenderer): void {
   }
 
   /** QWER / DF : cast normal ou rapide. */
-  function castKey(t: NonNullable<Targeting>, invertQuick: boolean): void {
+  function castKey(t: NonNullable<Targeting>, invertQuick: boolean, code: string): void {
     const st = self();
     const targeting = t.kind === 'ability' ? abilityTargeting(t.slot) : t.kind === 'summoner' ? summonerTargeting(t.slot) : null;
     if (st && t.kind === 'ability' && st.abilityLevels[t.slot] === 0) return;
@@ -196,6 +201,7 @@ export function installControls(renderer: GameRenderer): void {
       return;
     }
     setTargeting(t);
+    castHeldCode = code;
   }
 
   addEventListener('keydown', (e) => {
@@ -235,12 +241,12 @@ export function installControls(renderer: GameRenderer): void {
     if (key === 'Q' || key === 'W' || key === 'E' || key === 'R') {
       e.preventDefault();
       if (e.ctrlKey) net.send({ t: 'levelAbility', slot: key });
-      else castKey({ kind: 'ability', slot: key }, e.shiftKey);
+      else castKey({ kind: 'ability', slot: key }, e.shiftKey, code);
       return;
     }
     if (key === 'D' || key === 'F') {
       e.preventDefault();
-      castKey({ kind: 'summoner', slot: key }, e.shiftKey);
+      castKey({ kind: 'summoner', slot: key }, e.shiftKey, code);
       return;
     }
     switch (key) {
@@ -275,6 +281,16 @@ export function installControls(renderer: GameRenderer): void {
   });
 
   addEventListener('keyup', (e) => {
+    // cast au relâchement : la touche qui a ouvert l'indicateur lance le sort (si toujours actif)
+    if (castHeldCode !== null && e.code === castHeldCode) {
+      castHeldCode = null;
+      const t = store.state.targeting;
+      if (t && inGame() && (t.kind === 'ability' || t.kind === 'summoner')) {
+        refreshPointer();
+        confirmTargeting(t, hasCursor ? { x: cursor.x, y: cursor.y } : null);
+      }
+      return;
+    }
     if (e.key === 'Tab') {
       if (store.state.scoreboardOpen) store.set({ scoreboardOpen: false });
       return;
