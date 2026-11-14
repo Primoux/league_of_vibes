@@ -80,3 +80,11 @@
 ### `net` (`net/client.ts`)
 - `fxBus` reçoit les `GameEvent` **synchronisés avec le rendu interpolé** (~100 ms après réception). L'UI peut lire `store.snapshot.events` immédiatement.
 - `snapshots` (SnapshotBuffer), `clock`, `renderTime()`, `net.inject(msg)` / `net.setLoopback(fn)` pour démos hors ligne.
+
+### Jouabilité navigateur (branches `feat/client-playability` + `feat/ui-playability`)
+- **Cast au relâchement** : en cast normal, maintenir QWER/DF affiche l'indicateur, relâcher lance (clic gauche fonctionne toujours, clic droit/Échap annulent).
+- **Mode jeu** (`input/gameMode.ts`) : plein écran de la page (la barre d'onglets ne réapparaît plus au bord de l'écran) + Keyboard Lock (Chromium : Ctrl+W/Ctrl+Q capturés). F11 intercepté. Auto au premier clic en partie (`settings.autoFullscreen`).
+- **Gardes navigateur** en partie : F1/F3/F5/F6/F7/F10, Ctrl+…, Alt+←/→, Alt relâché, boutons Précédent/Suivant, clic molette, Ctrl+molette, menu contextuel, sélection, glisser ; `beforeunload` (`settings.confirmLeave`) ; verrou d'historique (popstate).
+- **Alt+QWER** (en plus de Ctrl) pour monter un sort ; lettres via `keyLetter` (disposition clavier, Option macOS).
+- **Clic molette maintenu** = glisser la caméra ; **² / `** maintenu = ne cibler que les champions ; option **attaque-déplacement au clic gauche**.
+- Contrats : `Settings.{autoFullscreen, confirmLeave, leftClickAttackMove}`, `ClientState.{fullscreen, keyboardLocked}`, `DEFAULT_GAME_SETTINGS` exporté (ajouts uniquement).
