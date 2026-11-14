@@ -21,6 +21,7 @@ import { tharoxModel } from './models/tharox.ts';
 import { vrennaModel } from './models/vrenna.ts';
 import { zephyrModel } from './models/zephyr.ts';
 import { master67Model } from './models/master67.ts';
+import { touilleurModel } from './models/touilleur.ts';
 import { portraitModel } from './portrait/index.ts';
 
 export { ProceduralChampionView, setRespawnHook } from './ChampionView.ts';
@@ -37,6 +38,7 @@ const MODELS: Record<string, ChampionModelDef> = {
   nyx: nyxModel,
   solenne: solenneModel,
   master67: master67Model,
+  touilleur: touilleurModel,
 };
 
 /** Contrat commun aux modèles articulés et aux caricatures originales. */

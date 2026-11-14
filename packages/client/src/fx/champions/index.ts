@@ -4,6 +4,7 @@
  */
 import './grondak.ts';
 import './master67.ts';
+import './touilleur.ts';
 import './ilyra.ts';
 import './tharox.ts';
 import './kaelen.ts';
