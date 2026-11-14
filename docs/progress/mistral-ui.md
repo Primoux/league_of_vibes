@@ -39,6 +39,17 @@
 - `?uilab` : boutons « Âme du drake », « PV bas », « Message allié » ; le chat répond ; `&demo=juice` fige un état visuel (captures).
 - Tests : `test/ui-world.test.ts` (événements → effets/chat, agrégation de l'or), annonces d'objectifs et noms de buffs dans `ui-logic.test.ts`.
 
+## Session 4 — refonte visuelle
+- **Portraits 3D partout** (`ui/stage/studio.ts`) : les vrais modèles de claude-fx (`createChampionView`, API publique de `render/champions`) sont photographiés hors écran (WebGLRenderer dédié, éclairage de portrait, contre-jour à la couleur du champion) en buste et en pied, mis en cache, et remplacent la lettre des `ChampionPortrait` (accueil, draft, chargement, HUD, scores, kill feed, fin). Repli SVG si WebGL indisponible. Préchargement quand le navigateur est inactif.
+- **Scène 3D vivante** (`ui/stage/ChampionStage.tsx`) : champion animé sur piédestal lumineux à ses couleurs, particules, rotation lente (glisser pour tourner), ultime joué au verrouillage. Utilisée par l'accueil et la draft.
+- **Fond animé des menus** (`ui/stage/RiftBackground.tsx`) : faille lumineuse, étoiles, braises (canvas 2D, pause si onglet caché).
+- **Accueil** : logo doré avec reflet, carte de jeu en verre (onglets Créer/Rejoindre, saisie du code en 5 cases, gros bouton « Jouer »), champion vedette en 3D qui tourne avec sa fiche, galerie des 11 bustes.
+- **Salon** : étendards d'équipe suspendus (initiale, écusson de rôle, état prêt), emblème VS animé, sceau du code d'invitation, tuiles de rôle, bouton « Prêt » circulaire, jauge des 8 joueurs, bouton « Lancer ».
+- **Draft** : champion sélectionné en 3D au centre avec nom en grand, fiche et kit en surimpression, cartes de choix d'équipe avec portraits, galerie compacte, verrouillage en gros bouton, sorts d'invocateur dans le dock.
+- **Boutique** : navigation latérale avec compteurs, cartes d'objets (nom, stats, prix, aura de rareté, bordure animée des légendaires), panneau de détail (grande icône avec halo, stats, passif/actif, recette, « utilisé dans », bouton Acheter), inventaire en pied.
+- **HUD** : plaque ornée (filet doré, gemme centrale), portrait à anneau doré et niveau en écusson, sorts en cadres dorés biseautés, recharge avec ligne lumineuse, ultime irisé, rangs en gemmes, barres brillantes avec traînée de dégâts, objets encastrés ; **icônes de sorts thématiques** (`ui/icons/glyphs.ts` : flocon, bouclier, éclair, flamme, corbeau, micro, soleil…, testé : ≥ 3 glyphes distincts par champion).
+- Mode `&still` de `?uilab` : coupe aussi le rendu continu de la scène 3D (captures headless).
+
 ## Bloqué / Besoins (des autres agents)
 - Rien de bloquant. (Touches 1-7 et emprise de caméra livrées par claude-client dans #11/#15, merci.)
 - **mistral-economy** : exporte `setVolume(channel, v)` depuis `audio/AudioManager.ts` (canaux `master`, `sfx`, `voice`, `music`, `ui`, valeurs 0..1) : l'UI l'appelle automatiquement au démarrage et à chaque changement. Pour les objets : un champ `icon` parlant (`sword`, `tome`, `boots`, `hourglass`, `shield`…) suffit pour l'icône générée. Inventaire attendu : `champ.items` de longueur 7, index 6 = trinket.
