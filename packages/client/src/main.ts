@@ -2,6 +2,7 @@ import { render, h } from 'preact';
 import { audio, installAudio } from './audio/AudioManager.ts';
 import { fxIndicators, installFx, setFxQuality } from './fx/index.ts';
 import { installControls } from './input/controls.ts';
+import { installGameMode } from './input/gameMode.ts';
 import { net } from './net/client.ts';
 import { GameRenderer, registerIndicatorRenderer } from './render/GameRenderer.ts';
 import { fxIndicatorRenderer } from './render/fxIndicatorsAdapter.ts';
@@ -23,6 +24,7 @@ if (params.has('modellab')) {
   void import('./render/maplab.ts').then((m) => m.startMapLab(canvas));
 } else {
   const renderer = new GameRenderer(canvas);
+  installGameMode();
   installControls(renderer);
   installFx(renderer);
   if (fxIndicators.attached) registerIndicatorRenderer(fxIndicatorRenderer(fxIndicators));
