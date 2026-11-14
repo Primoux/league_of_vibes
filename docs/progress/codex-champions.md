@@ -1,6 +1,27 @@
 # Progress — codex-champions
 
-Date : 2026-11-14. Branche de travail actuelle : `feat/portrait-champion-models` (extension demandée par l'utilisateur).
+Date : 2026-11-14. Branche de travail actuelle : `feat/touilleur` (extension demandée par l'utilisateur).
+
+## Extension : Le Touilleur
+
+- Nouveau mage de mêlée jouable `touilleur`, treizième champion : trois impacts de sorts espacés déclenchent dégâts/vitesse, Q projectile/slow, W zone retardée/slow, E blink/bouclier, R ciblé avec passage derrière et stun de 2 s de base pendant une canalisation burlesque.
+- Départ de la branche des modèles ; PR #32 fusionnée pendant le travail. Synchronisation avec `main` à `b07e8f9` (UI et audio récents conservés). Aucun conflit, YOUR_PLAN.md de main inchangé.
+- R : préparation interruptible de 0,25 s, uniquement sur champion ennemi visible/ciblable et en portée. Arrivée respectant la navigation et les rayons, dans le dos uniquement ; aucun impact si l'arrivée est bloquée. Le lanceur fait face à la cible puis canalise sur place. Ténacité réduit le stun et le canal ensemble ; Purification arrête immédiatement les deux. Contrôle dur/silence du lanceur, ordre de déplacement/attaque/stop/rappel, mort, stase, suppression d'entité ou rupture de proximité annulent le canal et son propre stun. Les contrôles d'une autre source sont conservés. Aucun tick de dégâts différé ne survit à l'annulation.
+- Modèle sculpté d'après le nouveau portrait : manteau turquoise/laiton, col relevé, lavallière ivoire, cheveux/moustache cuivrés, gant et index levé. L'index appartient à l'os prop, compensé indépendamment du bras ; horloge continue entre les animations, sans allocation par frame. Repos/course/AA/QWER/rappel conservent le moulinet ; mort/CC restent traités normalement. 7 300 triangles visibles hors contours, 5 meshes au maximum, budget avec contours <16 000 triangles.
+- Portrait original généré avec l'outil intégré, WebP 512 × 512 de 42 930 octets ; prompt intégral dans le manifest. Modèle, portrait et FX déclarés dans ASSETS.md. Rendu CPU de contrôle inspecté ; comparaison dans `docs/previews/touilleur.webp`. Pas de contrôle WebGL interactif ni de FPS revendiqué.
+- FX : spirale projectile, télégraphie/tourbillon, trace d'esquive et moulinet derrière le haut du manteau de la cible avec les étoiles du stun commun. La durée et la suppression suivent le vrai buff serveur, avec destruction idempotente des géométries/matières. L'animation du canal suit aussi le buff pour s'arrêter en cas de purification/interruption.
+- Disponible au draft, chargement/HUD/scores, `?modellab&champ=touilleur` et `?fxlab&champ=touilleur&close=1`. Les registres existants distribuent automatiquement les données et le portrait ; aucune nouvelle dépendance npm.
+- Validation : **644 tests / 63 fichiers**, typage et build verts. Trente tests serveur spécifiques, cinq tests client (doigt vertical et trajet circulaire dans les états vivants, budget, mort/retour, annulation d'animation et de FX, ressources). Les garde-fous communs couvrent maintenant 156 duels déterministes et les coûts/CD des 52 sorts, ainsi que les 13 modèles/portraits. Le test shared exige 13 identifiants uniques.
+- Réseau réel : huit clients WebSocket, draft déterministe de huit champions distincts, Touilleur confirmé dans gameStart, puis 15 s de commandes simultanées. **29,8 snapshots/s sur chacun des huit clients, aucune erreur**, sortie 0 (cadence cible actuelle : 30 Hz). JSON décompressé 35,3–35,7 Ko/s/client ; ne certifie pas le débit compressé. Harness temporaire dérivé de scripts/bots.ts, sans modification du bot livré.
+- Publication dans une nouvelle PR via `scripts/open-pr.sh`, revue/fusion laissées à Fable.
+
+### Contrats modifiés pour Le Touilleur
+
+- Commit `contract:` : ajouts d'une entrée de modèle et d'un import de FX aux registres client. Extension client explicitement demandée dans la tâche.
+- Commit `contract:` : fabrique dédiée `TouilleurView`, qui étend la vue procédurale et synchronise seulement son animation de canal avec `touilleur_r_channel`. Les autres vues conservent leur comportement.
+- Aucun nouveau message/champ de protocole : événements de dash, sorts et buffs existants ; stun générique à fxKey dédiée, pour les CC/étoiles/animations/Purification communs. Moteur de ciblage : ajout de Touilleur à la liste des R réservés aux champions.
+
+## Historique : modèles inspirés des portraits
 
 ## Extension : modèles inspirés des portraits
 

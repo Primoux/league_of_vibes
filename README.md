@@ -3,7 +3,7 @@
 MOBA 4v4 jouable dans le navigateur, aux mécaniques inspirées de League of Legends
 (phase de pick, 3 voies, jungle, sbires, tours, inhibiteurs, nexus, drakes, larves, Colosse du Rift, Léviathan,
 sorts d'invocateur, objets, brouillard de guerre). 10 champions originaux et une caricature jouable de Mélenchon,
-rendu 3D Three.js, serveur autoritaire Node. Le 67 Master complète maintenant le roster de 12 champions.
+rendu 3D Three.js, serveur autoritaire Node. Avec le 67 Master et le Touilleur, le roster compte 13 champions.
 
 Projet fan non affilié à Riot Games. Aucun asset ni nom de Riot n'est utilisé.
 
@@ -21,8 +21,8 @@ Production : `npm run build && npm start` puis http://localhost:3000.
 
 ## Portraits et 67 Master
 
-Chaque champion a son illustration de sélection : les douze portraits sont également repris au chargement,
-dans le HUD et le tableau des scores. Images locales WebP de 512 × 512, environ 650 Ko pour le roster complet ;
+Chaque champion a son illustration de sélection : les treize portraits sont également repris au chargement,
+dans le HUD et le tableau des scores. Images locales WebP de 512 × 512, environ 700 Ko pour le roster complet ;
 le portrait SVG de secours reste disponible si une image ne charge pas. Prompts et provenance dans
 `packages/client/src/assets/champions/manifest.json`.
 
@@ -41,7 +41,7 @@ pour le modèle et ses sorts (Q/W/E/R dans le panneau). Le labo FX utilise la vr
 
 ## Modèles 3D inspirés des portraits
 
-Les douze champions reprennent désormais les silhouettes, coiffures, costumes et armes de leurs portraits :
+Les treize champions reprennent désormais les silhouettes, coiffures, costumes et armes de leurs portraits :
 visages sculptés, étoffes plissées, capuches ouvertes, métal distinct du tissu, cristaux et ornements.
 Les animations existantes restent utilisées, y compris les gestes du 67 Master.
 
@@ -52,6 +52,26 @@ Ce labo montre les animations ; `?fxlab` reste le banc de test des sorts avec si
 
 [Aperçu comparatif des douze modèles](docs/previews/champion-models.webp) — rendu CPU de la géométrie réelle,
 sans les contours GPU ni le bloom du jeu. [Détails de vérification](docs/champion-models.md).
+
+## Le Touilleur, le Virtuose du Moulinet
+
+Mage de mêlée en manteau turquoise, moustache cuivrée et gant ivoire. Son index levé décrit un moulinet
+continu en repos, course, attaques, sorts et rappel. Le doigt a un poste à temps plein.
+
+| Touche | Sort | Effet |
+|---|---|---|
+| P | Ça monte à la tête | Trois impacts de sorts espacés sur des champions donnent dégâts bonus et vitesse |
+| Q | Coup de doigt | Projectile sur le premier ennemi, dégâts et ralentissement |
+| W | Tourbillon de poche | Zone retardée de dégâts et ralentissement |
+| E | Pas de côté | Téléportation courte et bouclier |
+| R | La grande touille | Passe derrière un champion, dégâts et étourdissement jusqu'à 2 s pendant une canalisation burlesque |
+
+L'ultime respecte les murs, les limites de carte et les collisions : il ne touche pas si aucune arrivée
+derrière la cible n'est possible. Ténacité et Purification fonctionnent ; contrôle dur/silence du lanceur,
+ordre d'arrêt/déplacement, mort, stase ou rupture de proximité terminent le canal et son stun.
+
+Portrait, modèle et moulinet : `?modellab&champ=touilleur`. Sorts réellement simulés :
+`?fxlab&champ=touilleur&close=1`. [Aperçu du portrait et du modèle](docs/previews/touilleur.webp).
 
 ## Mélenchon, le Tribun indigné
 
