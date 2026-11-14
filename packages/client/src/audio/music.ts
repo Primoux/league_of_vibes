@@ -1,8 +1,8 @@
 /**
  * Bande-son originale générée (aucun asset) : moteur de séquence + thèmes composés pour le jeu.
  * - Menu / salon : « La Faille des Vibes » (héroïque).  - Draft : « Le Choix » (tendu).
- * - Partie : « Sous la canopée », dynamique : l'intensité monte avec les combats (tambours, cordes,
- *   cuivres) et redescend au calme.  - Fin : fanfare de victoire / complainte de défaite.
+ * - Partie : « Sous la canopée », ambiance douce et générative (motifs différents à chaque boucle) ;
+ *   les combats ajoutent de légères couches puis tout redescend au calme.  - Fin : fanfare de victoire / complainte de défaite.
  * Propriétaire : mistral-economy (refonte musique : branche feat/music).
  */
 import type { GameEvent } from '@lov/shared';
@@ -128,7 +128,7 @@ class Music {
     this.loop = 0;
     this.nextTime = bus.ctx.currentTime + 0.12;
     bus.setDelay((60 / THEMES[id].bpm) * 0.75);
-    bus.fade(id === 'game' ? 0.8 : 0.95, FADE);
+    bus.fade(id === 'game' ? 0.55 : 0.95, FADE * (id === 'game' ? 3 : 1));
     if (!this.timer) {
       this.lastTick = performance.now();
       this.timer = setInterval(() => this.tick(), TICK_MS);

@@ -372,3 +372,36 @@ export function crash(bus: MusicBus, t: number, vol = 0.06): void {
   n.start(t);
   n.stop(end);
 }
+
+/** Nappe douce (thème de partie) : sinus + triangle légèrement désaccordés, filtre bas, attaque lente. */
+export function softPad(bus: MusicBus, notes: number[], t: number, dur: number, vol = 0.03, bright = 1): void {
+  const out = bus.voice(0.8, 0);
+  const lp = bus.ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.Q.value = 0.5;
+  lp.frequency.setValueAtTime(600 * bright, t);
+  lp.frequency.linearRampToValueAtTime(1100 * bright, t + dur * 0.5);
+  lp.frequency.linearRampToValueAtTime(650 * bright, t + dur);
+  lp.connect(out);
+  const end = env(out.gain, t, vol, Math.min(2.6, dur * 0.4), Math.max(0, dur - 2.6), 3);
+  for (const n of notes) {
+    osc(bus, 'triangle', midi(n), t, end, -5).connect(lp);
+    osc(bus, 'sine', midi(n), t, end, 6).connect(lp);
+  }
+}
+
+/** Kalimba / boîte à musique : sinus et partiel doux, décroissance moyenne, écho léger. */
+export function kalimba(bus: MusicBus, note: number, t: number, vol = 0.03): void {
+  const out = bus.voice(0.55, 0.22);
+  const f = midi(note);
+  for (const [ratio, g, d] of [
+    [1, 1, 1.4],
+    [3, 0.12, 0.35],
+  ] as const) {
+    const gn = bus.ctx.createGain();
+    gn.connect(out);
+    const end = env(gn.gain, t, vol * g, 0.006, 0, d);
+    osc(bus, 'sine', f * ratio, t, end).connect(gn);
+  }
+  out.gain.value = 1;
+}
