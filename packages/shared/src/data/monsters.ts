@@ -1,6 +1,6 @@
 import type { MonsterType } from '../types.ts';
 export interface MonsterDef { hp: number; ad: number; armor: number; range: number; gold: number; xp: number; teamGold?: number }
-// Équilibrage (mesures headless, branche mistral-economy) : les camps étaient ~3x trop longs à清
+// Équilibrage (mesures headless, branche codex-objectives-balance) : les camps étaient ~3x trop longs à clear
 // pour un jungler niveau 3 (gromp ~60 s) et leurs dégâts de base tuaient un jungler 1v1.
 // PV réduits d'environ 35-40 %, dégâts réduits d'environ 25-30 %, armure 20 -> 15.
 const small = { hp: 300, ad: 9, armor: 0, range: 125, gold: 7, xp: 25 };

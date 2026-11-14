@@ -1,7 +1,7 @@
 import type { TowerTier } from '../types.ts';
-// Équilibrage (mesures headless, branche mistral-economy) : une tour externe à 5000 PV + 40 armure
+// Équilibrage (mesures headless, branche codex-objectives-balance) : une tour externe à 5000 PV + 40 armure
 // + backdoor +200 ne mourait pas en 90 s même pour un ADC niveau 6. PV -25 % environ, armure -10,
-// résistance anti-backdoor 200 -> 120 (la fortification à -50 % avant 3:00 reste).
+// résistance anti-backdoor 200 -> 60 (la fortification à -50 % avant 3:00 reste).
 export const STRUCTURES = {
   towers: {
     outer: { hp: 3400, ad: 152, armor: 30, localGold: 250, teamGold: 50 },

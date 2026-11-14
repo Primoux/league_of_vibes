@@ -1,5 +1,5 @@
 /**
- * Tests d'équilibrage (branche mistral-economy, demande utilisateur).
+ * Tests d'équilibrage (branche codex-objectives-balance, demande utilisateur).
  * Mesurés headless contre la vraie simulation ; bornes volontairement larges pour rester
  * robustes en CI, mais resserrées par rapport aux valeurs d'avant équilibrage
  * (tour externe 5000 PV / backdoor +200 ; sbires caster 24 AD ; gromp 2050 PV / 74 AD).
