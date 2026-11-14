@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import type { FxRuntime } from '../core/FxRuntime.ts';
-import { DISTORTION_LAYER, applyDissolve, createDissolveUniforms, createFresnelMaterial, createHeatMaterial, createIceMaterial, createWaterMaterial } from '../shaders/materials.ts';
+import { DISTORTION_LAYER, distortionUsers, applyDissolve, createDissolveUniforms, createFresnelMaterial, createHeatMaterial, createIceMaterial, createWaterMaterial } from '../shaders/materials.ts';
 
 export function createShowcase(rt: FxRuntime, origin: THREE.Vector3): { group: THREE.Group; update(dt: number): void } {
   const group = new THREE.Group();
@@ -43,6 +43,7 @@ export function createShowcase(rt: FxRuntime, origin: THREE.Vector3): { group: T
   const heat = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 2.4), heatMat);
   heat.position.set(4, 1.3, 0);
   heat.layers.set(DISTORTION_LAYER);
+  distortionUsers.count++;
   mats.push(heatMat);
   const firePos = new THREE.Vector3();
 
