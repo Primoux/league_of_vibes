@@ -1,4 +1,5 @@
 import { CHAMPIONS, ITEM_LIST, ITEMS, type ChampionClass, type ItemCategory, type ItemDef, type Stats } from '@lov/shared';
+import { Fragment } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { net } from '../../net/client.ts';
 import { store } from '../../state.ts';
@@ -29,7 +30,7 @@ function recommended(cls: ChampionClass | undefined): ItemDef[] {
   const score = (i: ItemDef) => Object.keys(i.stats).filter((k) => wanted.includes(k as keyof Stats)).length;
   return SHOP_LIST.filter((i) => i.category !== 'trinket' && (score(i) > 0 || i.category === 'consumable' || i.category === 'boots'))
     .sort((a, b) => score(b) - score(a) || b.cost - a.cost)
-    .slice(0, 16)
+    .slice(0, 20)
     .sort((a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category) || a.cost - b.cost);
 }
 
@@ -52,6 +53,30 @@ const TAB_GLYPH: Record<Tab, string> = {
   legendary: 'crown',
   trinket: 'gold',
 };
+
+/** Filtres par statistique (combinables : l'objet doit avoir toutes les stats cochées). */
+const STAT_FILTERS: { id: string; label: string; stats: (keyof Stats)[] }[] = [
+  { id: 'ad', label: 'Attaque', stats: ['ad'] },
+  { id: 'as', label: 'Vit. d’attaque', stats: ['attackSpeed'] },
+  { id: 'crit', label: 'Critique', stats: ['critChance'] },
+  { id: 'leth', label: 'Létalité', stats: ['armorPen'] },
+  { id: 'ls', label: 'Vol de vie', stats: ['lifesteal'] },
+  { id: 'ap', label: 'Puissance', stats: ['ap'] },
+  { id: 'mpen', label: 'Pén. magique', stats: ['magicPen'] },
+  { id: 'mana', label: 'Mana', stats: ['maxMana', 'manaRegen'] },
+  { id: 'haste', label: 'Accélération', stats: ['abilityHaste'] },
+  { id: 'hp', label: 'PV', stats: ['maxHp', 'hpRegen'] },
+  { id: 'armor', label: 'Armure', stats: ['armor'] },
+  { id: 'mr', label: 'Rés. magique', stats: ['mr'] },
+  { id: 'ms', label: 'Vitesse', stats: ['moveSpeed'] },
+];
+
+export function matchesStatFilters(item: ItemDef, active: readonly string[]): boolean {
+  return active.every((id) => {
+    const f = STAT_FILTERS.find((x) => x.id === id);
+    return !f || f.stats.some((k) => (item.stats[k] ?? 0) !== 0);
+  });
+}
 
 const SHORT_STAT: Partial<Record<keyof Stats, string>> = {
   ad: 'AD',
@@ -88,6 +113,7 @@ function ShopPanel() {
   const [sel, setSel] = useState<string | null>(null);
   const [sellSlot, setSellSlot] = useState<number | null>(null);
   const [flash, setFlash] = useState(0);
+  const [statFilter, setStatFilter] = useState<string[]>([]);
   const searchRef = useRef<HTMLInputElement>(null);
   const canShop = d.canShop || d.dead;
 
@@ -97,7 +123,10 @@ function ShopPanel() {
   }, []);
 
   const reco = useMemo(() => recommended(d.cls), [d.cls]);
-  const list = query ? filterItems(SHOP_LIST, query, 'all') : tab === 'reco' ? reco : filterItems(SHOP_LIST, '', tab);
+  const base = query ? filterItems(SHOP_LIST, query, 'all') : tab === 'reco' ? reco : filterItems(SHOP_LIST, '', tab);
+  const list = base.filter((i) => matchesStatFilters(i, statFilter));
+  const grouped = !!query || tab === 'all' || tab === 'reco';
+  const toggleStat = (id: string) => setStatFilter((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
   const selected = (sel ? ITEMS[sel] : undefined) ?? list[0];
 
   const buy = (id: string) => {
@@ -114,6 +143,46 @@ function ShopPanel() {
     }
   };
   const close = () => store.set({ shopOpen: false });
+  const renderCard = (it: ItemDef, i: number) => {
+            const q = quoteItem(it.id, d.items, ITEMS);
+            const v = canBuy(it, d.items, d.gold, canShop, ITEMS);
+            const stats = Object.entries(it.stats).slice(0, 2) as [keyof Stats, number][];
+            const fx = it.active ?? it.passive;
+            return (
+              <button
+                key={it.id}
+                class={`lov-item-card cat-${it.category} ${selected?.id === it.id ? 'sel' : ''} ${v === 'ok' ? 'ok' : 'no'} ${d.items.includes(it.id) ? 'owned' : ''}`}
+                style={{ '--i': Math.min(i, 20) } as Record<string, number>}
+                onClick={() => setSel(it.id)}
+                onDblClick={() => buy(it.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  buy(it.id);
+                }}
+              >
+                <span class="ic">
+                  <ItemIcon itemId={it.id} size={46} />
+                </span>
+                <span class="body">
+                  <b>{it.name}</b>
+                  <span class="chips">
+                    {stats.map(([k, val]) => (
+                      <em key={k}>
+                        {formatStat(k, val, true)} {SHORT_STAT[k] ?? STAT_LABEL[k]}
+                      </em>
+                    ))}
+                    {stats.length === 0 && fx && <em>{fx.name}</em>}
+                  </span>
+                </span>
+                <span class={`price ${q.price < it.cost ? 'disc' : ''}`}>
+                  <span class="coin" />
+                  {q.price}
+                </span>
+                {d.items.includes(it.id) && <span class="owned-tag">Possédé</span>}
+              </button>
+            );
+          };
+
   const count = (t: Tab) => (t === 'reco' ? reco.length : t === 'all' ? SHOP_LIST.length : SHOP_LIST.filter((i) => i.category === t).length);
 
   return (
@@ -153,7 +222,7 @@ function ShopPanel() {
         </header>
 
         <nav class="lov-shop2-nav">
-          {(['reco', 'all', ...CATEGORY_ORDER] as Tab[]).map((t) => (
+          {(['reco', 'all', ...CATEGORY_ORDER] as Tab[]).filter((t) => count(t) > 0).map((t) => (
             <button
               key={t}
               class={!query && tab === t ? 'on' : ''}
@@ -171,46 +240,29 @@ function ShopPanel() {
         </nav>
 
         <section class="lov-shop2-grid">
-          {list.length === 0 && <p class="lov-muted">Aucun objet trouvé.</p>}
-          {list.map((it, i) => {
-            const q = quoteItem(it.id, d.items, ITEMS);
-            const v = canBuy(it, d.items, d.gold, canShop, ITEMS);
-            const stats = Object.entries(it.stats).slice(0, 2) as [keyof Stats, number][];
-            const fx = it.active ?? it.passive;
-            return (
-              <button
-                key={it.id}
-                class={`lov-item-card cat-${it.category} ${selected?.id === it.id ? 'sel' : ''} ${v === 'ok' ? 'ok' : 'no'} ${d.items.includes(it.id) ? 'owned' : ''}`}
-                style={{ '--i': Math.min(i, 20) } as Record<string, number>}
-                onClick={() => setSel(it.id)}
-                onDblClick={() => buy(it.id)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  buy(it.id);
-                }}
-              >
-                <span class="ic">
-                  <ItemIcon itemId={it.id} size={46} />
-                </span>
-                <span class="body">
-                  <b>{it.name}</b>
-                  <span class="chips">
-                    {stats.map(([k, val]) => (
-                      <em key={k}>
-                        {formatStat(k, val, true)} {SHORT_STAT[k] ?? STAT_LABEL[k]}
-                      </em>
-                    ))}
-                    {stats.length === 0 && fx && <em>{fx.name}</em>}
-                  </span>
-                </span>
-                <span class={`price ${q.price < it.cost ? 'disc' : ''}`}>
-                  <span class="coin" />
-                  {q.price}
-                </span>
-                {d.items.includes(it.id) && <span class="owned-tag">Possédé</span>}
+          <div class="lov-stat-filters">
+            {STAT_FILTERS.map((f) => (
+              <button key={f.id} class={`lov-chip ${statFilter.includes(f.id) ? 'on' : ''}`} onClick={() => toggleStat(f.id)}>
+                {f.label}
               </button>
-            );
-          })}
+            ))}
+            {statFilter.length > 0 && (
+              <button class="lov-chip clear" onClick={() => setStatFilter([])}>
+                <Glyph name="close" size={10} /> Effacer
+              </button>
+            )}
+          </div>
+          {list.length === 0 && <p class="lov-muted">Aucun objet ne correspond.</p>}
+          {grouped
+            ? groupByCategory(list).map(([cat, items]) => (
+                <Fragment key={cat}>
+                  <h3 class="lov-shop2-group">
+                    {CATEGORY_LABEL[cat]} <small>{items.length}</small>
+                  </h3>
+                  {items.map((it, i) => renderCard(it, i))}
+                </Fragment>
+              ))
+            : list.map((it, i) => renderCard(it, i))}
         </section>
 
         <aside class="lov-shop2-detail">{selected && <Detail item={selected} inv={d.items} gold={d.gold} canShop={canShop} onBuy={buy} onPick={setSel} />}</aside>
@@ -351,4 +403,14 @@ function RecipeTree({ id, inv, onPick, root }: { id: string; inv: (string | null
       )}
     </div>
   );
+}
+
+function groupByCategory(list: ItemDef[]): [ItemCategory, ItemDef[]][] {
+  const m = new Map<ItemCategory, ItemDef[]>();
+  for (const it of list) {
+    const arr = m.get(it.category) ?? [];
+    arr.push(it);
+    m.set(it.category, arr);
+  }
+  return [...m.entries()].sort((a, b) => CATEGORY_ORDER.indexOf(a[0]) - CATEGORY_ORDER.indexOf(b[0]));
 }

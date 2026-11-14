@@ -454,3 +454,15 @@
 @keyframes lov-art-in { from { opacity: 0; transform: translateY(-50%) scale(1.08); } }
 .lov-gal-tile .name { z-index: 1; font-family: var(--font); font-weight: 800; font-size: 0.6em; text-shadow: 0 1px 3px #000; }
 .lov-gal-tile .lock, .lov-gal-tile .hover-tag { z-index: 2; }
+
+/* boutique : filtres par statistique et en-têtes de catégorie */
+.lov-stat-filters { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 5px; padding-bottom: 4px; margin-bottom: 2px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); position: sticky; top: -14px; z-index: 2; background: linear-gradient(180deg, rgba(14, 16, 32, 0.98) 80%, transparent); padding-top: 4px; }
+.lov-stat-filters .lov-chip { font-size: 0.74em; padding: 4px 10px; }
+.lov-stat-filters .lov-chip.clear { color: #ffc2c2; border-color: rgba(255, 107, 107, 0.4); }
+.lov-shop2-group { grid-column: 1 / -1; margin: 8px 0 0; display: flex; align-items: baseline; gap: 8px; font-size: 0.72em; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
+.lov-shop2-group::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(217, 178, 95, 0.4), transparent); }
+.lov-shop2-group small { font-size: 0.9em; color: var(--muted); letter-spacing: 0.05em; }
+.lov-cta > .lov-cta-label, .lov-cta > small { position: relative; z-index: 1; }
+.lov-inventory .slot .cd-sweep { position: absolute; inset: 0; background: conic-gradient(rgba(4, 5, 12, 0.75) calc(var(--f) * 360deg), rgba(255, 245, 210, 0.9) calc(var(--f) * 360deg) calc(var(--f) * 360deg + 4deg), transparent calc(var(--f) * 360deg + 4deg)); }
+.lov-inventory .slot .cd-num { background: none; text-shadow: 0 0 3px #000, 0 0 2px #000; }
+.lov-inventory .slot .charges { top: auto; bottom: 0.05em; right: 0.2em; font-size: 0.62em; color: #fff; }
