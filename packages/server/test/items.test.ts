@@ -248,6 +248,29 @@ describe('passifs et actifs d’objets', () => {
     expect(e.hp).toBeLessThan(hpBefore); // dégâts réfléchis
   });
 
+  it('vengeance : pas de boucle infinie entre deux porteurs de carapace', () => {
+    const w = makeWorld();
+    const a = addChamp(w, { x: 5000, y: 5000 });
+    a.champ!.gold = 9999;
+    a.dead = true;
+    a.champ!.respawnIn = 9999;
+    cmd(w, a, { t: 'buy', itemId: 'carapace_du_roc' });
+    a.dead = false;
+    const b = createChampion(w, { playerId: 'pr', name: 'R', team: 'red', championId: 'sable', summoners: ['flash', 'ignite'], pos: { x: 5100, y: 5000 } });
+    b.champ!.gold = 9999;
+    b.dead = true;
+    b.champ!.respawnIn = 9999;
+    cmd(w, b, { t: 'buy', itemId: 'carapace_du_roc' });
+    b.dead = false;
+    const hpA = a.hp;
+    const hpB = b.hp;
+    applyDamage(w, { source: a, target: b, amount: 100, type: 'magic' });
+    // un seul niveau de renvoi : b renvoie à a, et ce renvoi ne renvoie pas
+    expect(b.hp).toBeLessThan(hpB);
+    expect(a.hp).toBeLessThan(hpA);
+    expect(a.hp).toBeGreaterThan(hpA - 30); // renvoi borné (~10 % de ~55 dégâts après RM)
+  });
+
   it('lame spectrale : dash vers la position visée, annule le rappel', () => {
     const w = makeWorld();
     const c = addChamp(w, { x: 5000, y: 5000 });

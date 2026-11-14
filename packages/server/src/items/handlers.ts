@@ -95,8 +95,9 @@ export function registerItemHooks(world: World): void {
     if (credit?.champ && ctx.target.team !== credit.team && dealt > 0 && hasPassive(credit, 'grievous')) {
       econ(ctx.target).grievousUntil = w.time + 3;
     }
-    if (hasPassive(ctx.target, 'vengeance') && credit && credit.team !== ctx.target.team && !credit.dead && dealt > 0 && ctx.type !== 'true') {
-      applyDamage(w, { source: ctx.target, target: credit, amount: dealt * 0.1, type: 'magic', silent: true });
+    // Un renvoi est marqué (ability) : on ne renvoie jamais un renvoi (pas de récursion entre deux porteurs).
+    if (hasPassive(ctx.target, 'vengeance') && credit && credit.team !== ctx.target.team && !credit.dead && dealt > 0 && ctx.type !== 'true' && ctx.ability !== 'item_vengeance') {
+      applyDamage(w, { source: ctx.target, target: credit, amount: dealt * 0.1, type: 'magic', silent: true, ability: 'item_vengeance' });
     }
   });
 
