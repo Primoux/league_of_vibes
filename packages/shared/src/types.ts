@@ -134,6 +134,10 @@ export interface SelfState {
   canShop: boolean;
   /** Charges du trinket de vision (mistral-economy, lu depuis data.economy). */
   wardCharges?: { charges: number; cooldownRemaining: number };
+  /** Charges par emplacement d'inventaire (potions empilables…), null si sans objet ou sans charges. */
+  itemCharges?: (number | null)[];
+  /** Recharge restante (s) de l'actif de chaque emplacement d'inventaire, null si aucune. */
+  itemCooldowns?: (number | null)[];
 }
 
 /**
