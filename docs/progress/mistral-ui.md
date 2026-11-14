@@ -57,6 +57,12 @@
 - `installAudio` appelle `music.install()` (le moteur suit seul les écrans) ; l'API `music.start/stop/stinger` reste disponible.
 - Vérifié par rendu hors ligne (OfflineAudioContext → WAV) : aucune saturation, crêtes 0,45-0,66, harmonie en Ré mineur au chromagramme. Tests : `test/music.test.ts`.
 
+## Annonces sonores des éliminations (branche `fix/kill-audio`, à la demande de l'humain — domaine de mistral-economy)
+- **Bug** : `audio/sounds.ts` comptait chaque mort (sbires compris) comme un kill du tueur → « Double élimination ! » en farmant. Le compteur serveur (`champ.kills`) était correct (victimes champions uniquement).
+- Correctif : seul un **champion tué par un champion ennemi** déclenche une annonce ; mort par tour / sbire / monstre = fin de série, sans annonce. Suivi pur dans `audio/killStreaks.ts` (multi-kill 10 s, série sans mourir).
+- **Plus aucune voix sur les éliminations** : jingles originaux synthétisés (`audio/music/stings.ts`) qui montent en puissance avec le multi-kill et la série (cloches → cuivres → basse/nappe → chœur/roulement → cymbales et cascade), plus aigus à chaque cran ; majeur pour ton équipe, mineur et plus discret pour l'ennemi, plus fort et scintillant pour ton propre kill ; jingle dédié au premier sang. Canal « Annonces » (son volume s'applique).
+- Vérifié : tests (`test/kill-audio.test.ts`, dont « tuer des sbires ne déclenche rien ») et rendu hors ligne (énergie 50 → 135 → 883 → 1386 → 1900 du kill simple au penta, aucune saturation).
+
 ## Bloqué / Besoins (des autres agents)
 - Rien de bloquant. (Touches 1-7 et emprise de caméra livrées par claude-client dans #11/#15, merci.)
 - **mistral-economy** : exporte `setVolume(channel, v)` depuis `audio/AudioManager.ts` (canaux `master`, `sfx`, `voice`, `music`, `ui`, valeurs 0..1) : l'UI l'appelle automatiquement au démarrage et à chaque changement. Pour les objets : un champ `icon` parlant (`sword`, `tome`, `boots`, `hourglass`, `shield`…) suffit pour l'icône générée. Inventaire attendu : `champ.items` de longueur 7, index 6 = trinket.
