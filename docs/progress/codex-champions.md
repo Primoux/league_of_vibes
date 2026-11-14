@@ -1,6 +1,25 @@
 # Progress — codex-champions
 
-Date : 2026-11-14. Branche de travail actuelle : `feat/champion-67-portraits` (extension demandée par l'utilisateur).
+Date : 2026-11-14. Branche de travail actuelle : `feat/portrait-champion-models` (extension demandée par l'utilisateur).
+
+## Extension : modèles inspirés des portraits
+
+- Demande explicite de retravailler largement les modèles client d'après les images. Départ sur la branche des portraits ; PR #22 désormais fusionnée. Synchronisation avec `main` à `f20bade`, incluant les travaux FX/UI récents ; aucun conflit et YOUR_PLAN.md de main conservé.
+- Douze modèles retravaillés : visages, cheveux/tresses/boucles, capuches ouvertes, capes épaisses, robes plissées, mains/doigts, armures, plumes, défenses, failles de roche et armes sculptées d'après les portraits. Géométrie originale générée par code, sans dépendance ni asset tiers.
+- Onze modèles utilisent la nouvelle construction `portrait/` autour des rigs/clips/extras existants. Mélenchon garde son rig et ses gestes, avec visage/costume/cravate/mèches affinés et pièces fixes fusionnées par articulation/matière : 27 meshes visibles au repos contre 66 auparavant ; 10 148 triangles visibles.
+- Le 67 Master conserve ses paumes vers le haut et leur alternance en repos/course/sorts/rappel. Son modèle reste à 3 meshes avec contour, moins de 16 000 triangles. Les budgets existants ne sont pas relâchés.
+- Atelier sans serveur `?modellab`, choix des douze champions, portrait de référence, rotation/zoom, vues portrait/jeu, course/attaque/QWER/mort-retour. Le labo FX existant conserve les vrais sorts simulés.
+- Validation complète : **561 tests / 58 fichiers**, typage et build verts. Nouveaux garde-fous pour géométrie/index/poids, déformations pendant QWER, budgets incluant contours, normales sculptées sous transformation, matières, invisibilité de Nyx et libération des géométries/matières fusionnées.
+- Rendus PBR CPU des douze véritables vues skinnées inspectés et affinés (yeux, ouvertures des capuches, mèches, plis et ornements). Planche `docs/previews/champion-models.webp`, export et script Blender reproductibles documentés dans `docs/champion-models.md`. Cette planche exclut contour GPU/bloom ; pas de contrôle WebGL interactif ni de FPS revendiqué dans cet environnement.
+- Publication dans une nouvelle PR via `scripts/open-pr.sh` ; revue et fusion laissées à Fable. Les portraits d'origine et le gameplay ne sont pas modifiés.
+
+### Contrats modifiés pour les modèles
+
+- Commits `contract:` : options additives `smooth`, `sculptedSurfaces()` et `metal()` du builder ; lot de métal facultatif, fusion skinnée existante conservée. Normales sculptées transformées correctement ; modèles sans option conservés à facettes.
+- Branchement de la nouvelle géométrie dans la fabrique commune et ajout de `?modellab` dans main. Contrats de vue, rigs, clips, port d'arme et effets existants conservés. Aucun contrat réseau ajouté.
+- Extension de l'invisibilité du client à toutes les matières des lots opaques/émissifs, pour que les nouvelles dagues métalliques de Nyx deviennent translucides avec elle. Test de régression dédié.
+
+## Historique : portraits de sélection et 67 Master
 
 ## Extension : portraits de sélection et 67 Master
 
