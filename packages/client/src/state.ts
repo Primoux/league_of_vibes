@@ -26,6 +26,12 @@ export interface Settings {
   edgePan: boolean;
   /** Vitesse de défilement caméra (unités de jeu / s). */
   cameraSpeed: number;
+  /** Passe en mode jeu (plein écran + verrouillage clavier) au premier clic en partie. */
+  autoFullscreen: boolean;
+  /** Demande confirmation avant de quitter/recharger la page pendant une partie. */
+  confirmLeave: boolean;
+  /** Clic gauche au sol (sans sort en cours) = attaque-déplacement. */
+  leftClickAttackMove: boolean;
 }
 
 export interface ClientState {
@@ -73,13 +79,25 @@ export interface ClientState {
   settingsOpen: boolean;
 
   settings: Settings;
+  /** Mode jeu (input/gameMode.ts) : page en plein écran, et touches système (Ctrl+W, Ctrl+Q…) capturées. */
+  fullscreen: boolean;
+  keyboardLocked: boolean;
   /** Latence aller-retour estimée (ms), si disponible. */
   rtt: number | null;
 }
 
 type Listener = (s: ClientState) => void;
 
-const DEFAULT_SETTINGS: Settings = { quickCast: false, quality: 'high', edgePan: true, cameraSpeed: 3000 };
+export const DEFAULT_GAME_SETTINGS: Readonly<Settings> = {
+  quickCast: false,
+  quality: 'high',
+  edgePan: true,
+  cameraSpeed: 3000,
+  autoFullscreen: true,
+  confirmLeave: true,
+  leftClickAttackMove: false,
+};
+const DEFAULT_SETTINGS = DEFAULT_GAME_SETTINGS;
 
 class Store {
   state: ClientState = {
@@ -106,6 +124,8 @@ class Store {
     statsOpen: false,
     settingsOpen: false,
     settings: loadSettings(),
+    fullscreen: false,
+    keyboardLocked: false,
     rtt: null,
   };
   private listeners = new Set<Listener>();
