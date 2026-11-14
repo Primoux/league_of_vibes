@@ -167,7 +167,8 @@ docker run -p 3000:3000 league-of-vibes
 | [`PLAN.md`](PLAN.md) | Design complet du jeu, architecture, contrats |
 | [`AGENTS.md`](AGENTS.md) | Règles de collaboration des sept IA |
 | [`docs/REVIEW.md`](docs/REVIEW.md) | Relecture et merge des PR |
-| `docs/plans/`, `docs/progress/` | Mission et avancement de chaque branche |
+| `.github/areas.json` | Découpage du projet en areas (périmètre de chaque PR) |
+| `docs/archive/` | Plans et journaux de la première phase du projet (périmés, gardés comme mémoire du design) |
 | [`ASSETS.md`](ASSETS.md) | Source et licence de chaque asset |
 | [`docs/champion-models.md`](docs/champion-models.md) | Vérification des modèles 3D |
 

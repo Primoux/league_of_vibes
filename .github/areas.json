@@ -1,0 +1,117 @@
+{
+  "_comment": "Source de vérité du découpage de League of Vibes. Le scope du titre de PR (commit conventionnel) désigne l'area. Vérifié par scripts/check-areas.mjs en CI.",
+
+  "contracts": [
+    "packages/shared/src/protocol.ts",
+    "packages/shared/src/types.ts",
+    "packages/shared/src/schema.ts",
+    "packages/shared/src/constants.ts",
+    "packages/shared/src/map.ts",
+    "packages/server/src/systems/index.ts"
+  ],
+
+  "always": [
+    "docs/**/*.md"
+  ],
+
+  "tests": [
+    "packages/*/test/**"
+  ],
+
+  "areas": {
+    "champion": {
+      "desc": "Tranche verticale : UN champion de bout en bout (données, sorts serveur, modèle 3D, FX, sons).",
+      "vertical": "champion",
+      "paths": [
+        "packages/shared/src/data/champions/*.ts",
+        "packages/server/src/abilities/champions/*.ts",
+        "packages/client/src/render/champions/models/*.ts",
+        "packages/client/src/fx/champions/*.ts",
+        "packages/client/src/assets/champions/**"
+      ]
+    },
+
+    "net": {
+      "desc": "Serveur : WebSocket, salles, draft, boucle de simulation, snapshots.",
+      "paths": ["packages/server/src/net/**", "packages/server/src/room.ts", "packages/server/src/world.ts", "packages/server/src/index.ts"]
+    },
+    "nav": {
+      "desc": "Serveur : pathfinding et navigation sur la carte.",
+      "paths": ["packages/server/src/nav/**"]
+    },
+    "combat": {
+      "desc": "Serveur : dégâts, résistances, soins, boucliers, mort.",
+      "paths": ["packages/server/src/combat/**"]
+    },
+    "abilities": {
+      "desc": "Serveur : moteur de sorts, buffs, CC, XP (hors kits de champions).",
+      "paths": ["packages/server/src/abilities/*.ts"]
+    },
+    "items": {
+      "desc": "Serveur : objets, or, boutique, effets passifs et actifs.",
+      "paths": ["packages/server/src/items/**"]
+    },
+    "systems": {
+      "desc": "Serveur : systèmes de jeu (vision, régénération, respawn, minions, tours, nexus…).",
+      "paths": ["packages/server/src/systems/*.ts"]
+    },
+    "world-ai": {
+      "desc": "Serveur : IA du monde PvE (jungle, drakes, Léviathan, Colosse, larves).",
+      "paths": ["packages/server/src/world-ai/**"]
+    },
+
+    "render": {
+      "desc": "Client : moteur 3D, caméra, vues, modèles génériques.",
+      "paths": ["packages/client/src/render/*.ts", "packages/client/src/render/views/**", "packages/client/src/render/models/**", "packages/client/src/main.ts"]
+    },
+    "render-map": {
+      "desc": "Client : rendu de la carte, terrain, décor.",
+      "paths": ["packages/client/src/render/map/**"]
+    },
+    "render-champions": {
+      "desc": "Client : socle des champions — animations, portraits, assemblage des modèles.",
+      "paths": ["packages/client/src/render/champions/*.ts", "packages/client/src/render/champions/anim/**", "packages/client/src/render/champions/portrait/**"]
+    },
+    "fx-core": {
+      "desc": "Client : socle FX — particules, post-traitement, shaders, FxBus.",
+      "paths": ["packages/client/src/fx/*.ts", "packages/client/src/fx/core/**", "packages/client/src/fx/particles/**", "packages/client/src/fx/post/**", "packages/client/src/fx/shaders/**"]
+    },
+    "fx-effects": {
+      "desc": "Client : effets de jeu — télégraphes, effets du monde, statuts.",
+      "paths": ["packages/client/src/fx/effects/**", "packages/client/src/fx/telegraph/**", "packages/client/src/fx/world/**", "packages/client/src/fx/lab/**"]
+    },
+    "audio": {
+      "desc": "Client : musique, sons, mixage.",
+      "paths": ["packages/client/src/audio/**"]
+    },
+    "ui-screens": {
+      "desc": "UI : accueil, salon, draft, fin de partie, boutique.",
+      "paths": ["packages/client/src/ui/screens/**", "packages/client/src/ui/stage/**"]
+    },
+    "ui-hud": {
+      "desc": "UI : HUD en jeu — barres, sorts, minimap, panneaux.",
+      "paths": ["packages/client/src/ui/hud/**"]
+    },
+    "ui-core": {
+      "desc": "UI : socle Preact, icônes, logique partagée, styles.",
+      "paths": ["packages/client/src/ui/*.ts", "packages/client/src/ui/*.tsx", "packages/client/src/ui/*.css", "packages/client/src/ui/icons/**", "packages/client/src/ui/logic/**", "packages/client/src/ui/game/**", "packages/client/src/ui/lab/**"]
+    },
+    "input": {
+      "desc": "Client : clavier, souris, mode jeu, raccourcis.",
+      "paths": ["packages/client/src/input/**"]
+    },
+    "client-net": {
+      "desc": "Client : connexion, interpolation, store d'état.",
+      "paths": ["packages/client/src/net/**", "packages/client/src/state.ts"]
+    },
+
+    "infra": {
+      "desc": "Outillage : CI, scripts, configuration, dépendances.",
+      "paths": [".github/**", "scripts/**", "package.json", "package-lock.json", "tsconfig*.json", "vitest.config.ts", "Dockerfile", ".nvmrc", ".gitignore", "packages/*/package.json", "packages/*/tsconfig.json", "packages/*/vite.config.ts", "*.md"]
+    },
+    "docs": {
+      "desc": "Documentation seule.",
+      "paths": ["docs/**", "*.md"]
+    }
+  }
+}
