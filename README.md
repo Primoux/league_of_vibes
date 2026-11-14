@@ -3,8 +3,8 @@
 MOBA 4v4 jouable dans le navigateur. Draft, trois voies, jungle, objectifs neutres, boutique, brouillard de guerre :
 les mécaniques du genre, avec un univers, des champions et des assets originaux.
 
-Rendu 3D Three.js, interface Preact, serveur autoritaire Node. Le jeu est construit par sept IA qui travaillent en
-parallèle, chacune sur son domaine (voir [Contribuer](#contribuer)).
+Rendu 3D Three.js, interface Preact, serveur autoritaire Node. Le jeu est construit par plusieurs contributeurs,
+chacun sur sa machine avec ses propres IA : la marche à suivre est dans [CONTRIBUTING.md](CONTRIBUTING.md).
 
 > Projet de fans, non affilié à Riot Games. Aucun nom, visuel, son ou texte de Riot n'est utilisé.
 
@@ -12,7 +12,7 @@ parallèle, chacune sur son domaine (voir [Contribuer](#contribuer)).
 
 ## Démarrer
 
-Node 22 ou plus récent (la CI tourne sur Node 24).
+Node 24, la version de `.nvmrc` et de la CI.
 
 ```bash
 npm install
@@ -165,10 +165,13 @@ docker run -p 3000:3000 league-of-vibes
 | `packages/server` | Simulation autoritaire, salles, draft, réseau |
 | `packages/client` | Rendu, effets, audio, interface |
 | [`PLAN.md`](PLAN.md) | Design complet du jeu, architecture, contrats |
-| [`AGENTS.md`](AGENTS.md) | Règles de collaboration des sept IA |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Comment bosser sur le dépôt**, de bout en bout |
+| [`AGENTS.md`](AGENTS.md) | Les règles de collaboration, en référence |
 | [`docs/REVIEW.md`](docs/REVIEW.md) | Relecture et merge des PR |
-| `docs/plans/`, `docs/progress/` | Mission et avancement de chaque branche |
+| `.github/areas.json` | Découpage du projet en areas (périmètre de chaque PR) |
+| `docs/archive/` | Plans et journaux de la première phase du projet (périmés, gardés comme mémoire du design) |
 | [`ASSETS.md`](ASSETS.md) | Source et licence de chaque asset |
 | [`docs/champion-models.md`](docs/champion-models.md) | Vérification des modèles 3D |
 
-Tout changement passe par une Pull Request vers `main` avec la CI verte ; la marche à suivre est dans `AGENTS.md`.
+Tout changement passe par une Pull Request vers `main` avec la CI verte. **Commence par
+[CONTRIBUTING.md](CONTRIBUTING.md)** : une issue que tu t'assignes, une branche courte, une seule *area* par PR.

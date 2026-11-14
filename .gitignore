@@ -5,3 +5,6 @@ dist/
 .vite/
 coverage/
 .env
+
+# Identité locale de la machine (un clone = un contributeur)
+.agent
