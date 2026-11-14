@@ -35,7 +35,7 @@ registerFx('touilleur_w_telegraph', { area(rt, e) { telegraph(rt, rt.world(e.pos
 registerFx('touilleur_w', { area(rt, e) {
   const at = rt.world(e.pos, .08), fx = spiral(rt, at, rt.scale(e.radius) * 2);
   shockwave(rt, at, rt.scale(e.radius), .55, brass);
-  timed(rt, .65, t => { fx.mesh.rotation.y = t * 13; fx.mesh.scale.multiplyScalar(1); fx.mesh.material.opacity = 1 - t; }, fx.dispose);
+  timed(rt, .65, t => { fx.mesh.rotation.y = t * 13; fx.mesh.material.opacity = 1 - t; }, fx.dispose);
 } });
 registerFx('touilleur_e', { dash(rt, e) { dashTrail(rt, e.source, rt.world(e.from), rt.world(e.to), .15, mint, false); flash(rt, rt.world(e.to, .7), 1, brass); } });
 registerFx('touilleur_r', { dash(rt, e) { dashTrail(rt, e.source, rt.world(e.from), rt.world(e.to), .18, brass, false); } });

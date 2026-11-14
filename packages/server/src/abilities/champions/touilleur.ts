@@ -55,13 +55,14 @@ export const touilleur: Record<'Q' | 'W' | 'E' | 'R', AbilityHandler> = {
     if (!target?.champ || !isEnemy(source, target) || !isVisibleTarget(world, source, target) || !world.allow(world.hooks.isTargetable, target, source)
       || dist(source.pos, target.pos) > ctx.def.range + source.radius + target.radius) return;
     const offset = source.radius + target.radius + param(ctx, 'offset'), dx = Math.cos(target.facing), dy = Math.sin(target.facing);
+    const travel = ctx.def.range + source.radius + target.radius + offset;
     const behind = { x: target.pos.x - dx * offset, y: target.pos.y - dy * offset };
-    const landing = validLanding(source.pos, behind, ctx.def.range + offset, source.radius);
+    const landing = validLanding(source.pos, behind, travel, source.radius);
     const distance2 = dist2(landing, target.pos);
     // Un mur ne doit pas transformer l'ultime en téléportation devant la cible ou dans son collider.
     if ((landing.x - target.pos.x) * dx + (landing.y - target.pos.y) * dy >= -target.radius * .5
       || distance2 > param(ctx, 'breakRange') ** 2 || distance2 < (source.radius + target.radius) ** 2) return;
-    blink(world, source, landing, ctx.def.range + offset, ctx.def.fxKey);
+    blink(world, source, landing, travel, ctx.def.fxKey);
     source.facing = Math.atan2(target.pos.y - source.pos.y, target.pos.x - source.pos.x);
     hit(ctx, target);
     if (target.dead || source.dead) return;
