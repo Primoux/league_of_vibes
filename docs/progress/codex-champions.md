@@ -1,6 +1,21 @@
 # Progress — codex-champions
 
-Date : 2026-11-13. Branche de travail actuelle : `feat/champion-melenchon` (extension demandée par l'utilisateur).
+Date : 2026-11-14. Branche de travail actuelle : `feat/champion-67-portraits` (extension demandée par l'utilisateur).
+
+## Extension : portraits de sélection et 67 Master
+
+- Base initiale : `main` à `c945df9`, puis synchronisation avec `bca314e` (animations et correctifs FX récents préservés) ; les précédentes PR de champions sont fusionnées. Installation, typage et 483 tests verts avant les ajouts.
+- Douze portraits originaux générés avec l'outil de génération d'images intégré, palettes et descriptions tirées des données/modèles existants ; Mélenchon conserve sa ressemblance caricaturale et le 67 Master est un personnage adulte fictif. Prompts et provenance dans `client/src/assets/champions/manifest.json`.
+- WebP 512 × 512, ~650 Ko pour les douze fichiers ; import Vite avec URL hashée compatible sous-chemin, réutilisation dans le cadre SVG commun (draft, chargement, HUD, feed et scores). Portrait procédural existant conservé en dessous et réaffiché en cas d'erreur réseau/image inconnue. Aucun service distant sollicité par le jeu pour les illustrations.
+- Nouveau mage jouable `master67` : Q projectile/slow, W zone retardée/root, E blink/bouclier, R deux ondes retardées (slow puis knockup), passif au septième impact de sort confirmé sur champion, avec verrouillage anti-multi-proc de 0,67 s et expiration des cumuls. Mort avant la seconde onde = seconde onde annulée.
+- Modèle procédural dédié dans le pipeline skinné commun : hoodie violet, cheveux bouclés, sourire, doigts et deux paumes ouvertes qui alternent continuellement en idle, course, attaques, Q/W/E/R et rappel. Mort et CC utilisent les comportements communs. Trois meshes, ~1 100 triangles de géométrie opaque/émissive ; tests de direction des paumes et d'alternance.
+- FX dédiés par événements réels : 6 projectile, 7 qui tombe, trace de téléportation et deux ondes numérotées. Aucun changement de protocole, aucune dépendance npm ajoutée.
+- Branchement hors domaine demandé explicitement par l'utilisateur, isolé dans un commit `contract:` : une illustration optionnelle dans le cadre SVG de `ui/icons/Icons.tsx`, une entrée de modèle et l'import des FX. Pas de remplacement de l'interface ni des autres modèles.
+- Validation : **525 tests / 53 fichiers**, typage et build verts. Les garde-fous couvrent désormais 132 duels déterministes (66 paires × deux niveaux) et les coûts/CD des 48 sorts. Tests des dimensions/format/poids/unicité des douze images, du repli, des gestes, des délais, des cibles, des cumuls et de la mort entre deux ondes. Portraits et géométrie skinnée inspectés localement ; aucun contrôle WebGL interactif revendiqué.
+- Test réseau réel à huit clients, picks distincts et 67 Master confirmé dans gameStart : 15 s de commandes, **20 snapshots/s sur chacun des huit clients, aucune erreur**, sortie 0. JSON décompressé : 44,1–44,5 Ko/s/client ; ce chiffre ne certifie pas le débit compressé. Script temporaire dérivé de scripts/bots.ts, non livré.
+- Publication : l'intégration GitHub refuse les écritures (403). La connexion GitHub CLI a été rétablie par le flux officiel après préparation des commits et de la description de PR ; publication via scripts/open-pr.sh, revue et fusion laissées à Fable.
+
+## Historique : Mélenchon
 
 ## Extension : Mélenchon
 

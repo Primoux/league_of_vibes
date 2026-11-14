@@ -1,11 +1,12 @@
 /**
- * Icônes générées en SVG (aucun asset externe). Propriétaire : mistral-ui.
- * Portraits de champions procéduraux (palette + emblème de classe + motif déterministe),
+ * Icônes générées en SVG et portraits illustrés locaux. Propriétaire : mistral-ui.
+ * Portraits de secours procéduraux (palette + emblème de classe + motif déterministe),
  * icônes de sorts, d'objets, de sorts d'invocateur et de rôles.
  */
 import { CHAMPIONS, ITEMS, type AbilityDef, type ItemDef, type Role, type SummonerId } from '@lov/shared';
 import type { JSX } from 'preact';
 import { hashString } from '../logic/format.ts';
+import { ChampionArtwork } from './ChampionArtwork.tsx';
 
 type SvgProps = { size?: number | string; class?: string; title?: string };
 
@@ -29,8 +30,9 @@ export function ClassEmblem({ cls, size = 16, color = 'currentColor' }: { cls: s
 
 // ------------------------------------------------------------------ portrait de champion
 /**
- * Portrait procédural : fond dégradé de la palette, motif radial déterministe, emblème de classe en filigrane,
- * initiale gravée. `variant="splash"` : format portrait 3:4 pour les cartes de chargement / draft.
+ * Illustration locale avec portrait procédural de secours si l'image manque ou échoue.
+ * Le cadre SVG conserve le recadrage, les états et l'accessibilité de toutes les vues existantes.
+ * `variant="splash"` : format portrait 3:4 pour les cartes de chargement / draft.
  */
 export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls, grayscale }: { id: string; size?: number | string; variant?: 'square' | 'splash' | 'round'; class?: string; grayscale?: boolean }) {
   const c = CHAMPIONS[id];
@@ -108,6 +110,7 @@ export function ChampionPortrait({ id, size = 64, variant = 'square', class: cls
       >
         {letter}
       </text>
+      <ChampionArtwork id={id} width={W} height={H} />
       <rect width={W} height={H} fill={`url(#${uid}-vig)`} />
     </svg>
   );
