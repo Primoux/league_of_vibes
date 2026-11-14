@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Comment bosser sur le dépôt
+    url: https://github.com/Primoux/league_of_vibes/blob/main/CONTRIBUTING.md
+    about: La marche à suivre de bout en bout — à lire avant de contribuer.
+  - name: Découpage du projet en areas
+    url: https://github.com/Primoux/league_of_vibes/blob/main/.github/areas.json
+    about: Le périmètre de chaque PR. Le nom de l'area est le scope de ton titre de PR.

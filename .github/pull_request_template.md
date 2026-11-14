@@ -1,35 +1,32 @@
 <!--
-Titre de la PR : commit conventionnel, ex. « feat(client): interpolation des snapshots ».
-PR ouverte avec scripts/open-pr.sh depuis ta branche d'agent (voir AGENTS.md §3).
-Elle sera relue, acceptée et mergée par Fable uniquement : ne la merge pas toi-même.
+Titre : commit conventionnel, où le scope est l'AREA de .github/areas.json.
+  feat(fx-core): halo de soin persistant
+  fix(ui-hud): barre de mana tronquée en 1280×720
+  contract: ajoute PlayerStats.visionScore au protocole   ← PR de contrat, seule, rien d'autre dedans
+La CI refuse une PR qui sort de son area. Un mainteneur relit et merge : ne merge pas toi-même.
 -->
 
-## Agent / branche
-<!-- ex. claude-client → pr/claude-client -->
+Closes #<numéro de l'issue>
 
 ## Résumé
-<!-- Ce que la PR apporte, en 2-5 puces. -->
 -
 
-## Jalon
-<!-- M1 / M2 / M3 / M4 + éléments de YOUR_PLAN.md couverts. -->
+## Contrat partagé
+<!-- `protocol.ts`, `types.ts`, `schema.ts`, `map.ts`, `constants.ts`, `systems/index.ts`.
+     Uniquement des ajouts, et uniquement dans une PR « contract: » dédiée. « Aucun » sinon. -->
+Aucun
 
-## Contrats modifiés
-<!-- Fichiers partagés hors de ton domaine (protocol.ts, types.ts, schema.ts, map.ts, constants.ts, systems/index.ts…).
-     Uniquement des ajouts, dans des commits `contract:` séparés. Écris « Aucun » sinon. -->
-- Aucun
-
-## Impact sur les autres agents
-<!-- Nouveaux événements EventBus / fxBus, champs du store, API exposées, mocks à remplacer… -->
+## Impact pour les autres
+<!-- Nouveaux événements EventBus / fxBus, champs du store, API exposées, mock à remplacer. -->
 
 ## Comment tester
-<!-- Tests ajoutés, page de démo (?maplab, ?fxlab, ?uilab…), étapes manuelles. -->
+<!-- Tests ajoutés + étapes manuelles. -->
 
 ## Checklist
 - [ ] `npm run typecheck && npm test && npm run build` verts en local
-- [ ] Je n'ai modifié que les fichiers de mon `YOUR_PLAN.md` (+ progress, tests) ou des ajouts `contract:`
-- [ ] `YOUR_PLAN.md` n'est pas modifié par cette PR
-- [ ] Pas de `any` non justifié, pas de `// @ts-ignore`
-- [ ] Pas de nouvelle dépendance npm, ou justifiée dans mon progress
+- [ ] Une seule area, une seule issue
+- [ ] `main` mergé dans ma branche (PR sans conflit)
+- [ ] Pas de `any` non justifié, pas de `// @ts-ignore`, pas de test affaibli ou supprimé
+- [ ] Pas de nouvelle dépendance npm, ou justifiée ci-dessus
 - [ ] Aucun nom / visuel / son / texte de Riot ; assets générés ou CC0, listés dans `ASSETS.md`
-- [ ] `docs/progress/<agent>.md` à jour
+- [ ] Textes du jeu en français
