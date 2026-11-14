@@ -1,57 +1,79 @@
 # League of Vibes
 
-MOBA 4v4 jouable dans le navigateur, aux mécaniques inspirées de League of Legends
-(phase de pick, 3 voies, jungle, sbires, tours, inhibiteurs, nexus, drakes, larves, Colosse du Rift, Léviathan,
-sorts d'invocateur, objets, brouillard de guerre). 10 champions originaux et une caricature jouable de Mélenchon,
-rendu 3D Three.js, serveur autoritaire Node. Avec le 67 Master et le Touilleur, le roster compte 13 champions.
+MOBA 4v4 jouable dans le navigateur. Draft, trois voies, jungle, objectifs neutres, boutique, brouillard de guerre :
+les mécaniques du genre, avec un univers, des champions et des assets originaux.
 
-Projet fan non affilié à Riot Games. Aucun asset ni nom de Riot n'est utilisé.
+Rendu 3D Three.js, interface Preact, serveur autoritaire Node. Le jeu est construit par sept IA qui travaillent en
+parallèle, chacune sur son domaine (voir [Contribuer](#contribuer)).
+
+> Projet de fans, non affilié à Riot Games. Aucun nom, visuel, son ou texte de Riot n'est utilisé.
+
+![Les douze champions](docs/previews/champion-models.webp)
 
 ## Démarrer
 
+Node 22 ou plus récent (la CI tourne sur Node 24).
+
 ```bash
 npm install
-npm run dev          # serveur :3000 + client Vite :5173
+npm run dev     # serveur sur :3000, client Vite sur :5173
 ```
 
-Ouvre http://localhost:5173/?dev=1 dans deux onglets : crée une salle dans l'un, rejoins avec le code dans l'autre,
-lance la partie (le mode dev autorise moins de 8 joueurs). Clic droit pour se déplacer.
+Ouvre <http://localhost:5173/?dev=1> dans deux onglets : crée une salle dans le premier, rejoins-la avec le code dans
+le second, puis lance la partie. Le paramètre `?dev=1` autorise une salle de moins de 8 joueurs.
 
-Production : `npm run build && npm start` puis http://localhost:3000.
+Pour la version de production : `npm run build && npm start`, puis <http://localhost:3000>.
 
-## Portraits et 67 Master
+## Le jeu
 
-Chaque champion a son illustration de sélection : les treize portraits sont également repris au chargement,
-dans le HUD et le tableau des scores. Images locales WebP de 512 × 512, environ 700 Ko pour le roster complet ;
-le portrait SVG de secours reste disponible si une image ne charge pas. Prompts et provenance dans
-`packages/client/src/assets/champions/manifest.json`.
+- **Partie** : deux équipes de 4, phase de draft, puis la Faille des Vibes — trois voies, sbires, tours, inhibiteurs, nexus.
+- **Jungle et objectifs** : camps neutres, drakes élémentaires et leurs âmes, Larves, Colosse du Rift, Léviathan.
+- **Économie** : or, 101 objets avec recettes, boutique à la fontaine, rappel, balises de vision.
+- **Sorts d'invocateur** : 9, deux par joueur.
 
-Le **67 Master**, mage original en hoodie violet et cyan, alterne continuellement ses deux paumes,
-y compris pendant la course et les sorts. Sept impacts de sorts espacés déclenchent son passif.
+### Champions
 
-| Touche | Sort | Effet |
-|---|---|---|
-| Q | Six. | Projectile sur la première cible, dégâts et ralentissement |
-| W | Seven. | 7 géant retardé, dégâts de zone et immobilisation |
-| E | Les mains en l’air | Téléportation et bouclier temporaire |
-| R | SIX… SEVEN ! | Deux ondes : ralentissement, puis projection ; incantation initiale interruptible |
+Le roster compte 13 champions, chacun avec son portrait et son modèle dédié.
 
-Démo sans serveur : `?uilab=draft` pour les portraits et `?fxlab&champ=master67&close=1`
-pour le modèle et ses sorts (Q/W/E/R dans le panneau). Le labo FX utilise la vraie simulation du serveur.
+| Champion | Titre | Classe | Voies |
+|---|---|---|---|
+| Corvin | l'Archer des Corbeaux | Tireur | bot |
+| Grondak | le Rempart de Granit | Tank | top, jungle |
+| Ilyra | la Sentinelle du Givre | Mage | mid |
+| Kaelen | la Lame de l'Aube | Combattant | top |
+| Nyx | l'Ombre Sans Nom | Assassin | mid, jungle |
+| Sable | la Tireuse des Dunes | Tireur | bot |
+| Solenne | la Prêtresse de l'Aube | Support | bot, mid |
+| Tharox | la Charge Sauvage | Tank | jungle, top |
+| Vrenna | la Lance des Steppes | Combattant | jungle, top |
+| Zephyr | l'Arcaniste Instable | Mage | mid |
+| 67 Master | le Grand Maître du Six-Sept | Mage | mid, bot |
+| Mélenchon | le Tribun indigné | Mage | mid, bot |
+| Le Touilleur | le Virtuose du Moulinet | Mage | mid, jungle |
 
-## Modèles 3D inspirés des portraits
+Mélenchon est une caricature satirique. Le détail des sorts de chaque champion est affiché en jeu, dans le draft et au
+survol des sorts.
 
-Les treize champions reprennent désormais les silhouettes, coiffures, costumes et armes de leurs portraits :
-visages sculptés, étoffes plissées, capuches ouvertes, métal distinct du tissu, cristaux et ornements.
-Les animations existantes restent utilisées, y compris les gestes du 67 Master.
+### Commandes
 
-Pour les comparer : `npm run dev:client`, puis `http://localhost:5173/?modellab`.
-Choix du champion, portrait de référence, rotation/zoom, vue de jeu, course, attaque, Q/W/E/R et mort/retour.
-Un lien comme `?modellab&champ=master67` sélectionne directement un champion.
-Ce labo montre les animations ; `?fxlab` reste le banc de test des sorts avec simulation.
-
-[Aperçu comparatif des douze modèles](docs/previews/champion-models.webp) — rendu CPU de la géométrie réelle,
-sans les contours GPU ni le bloom du jeu. [Détails de vérification](docs/champion-models.md).
+| Touche | Action |
+|---|---|
+| Clic droit | Se déplacer, attaquer |
+| A + clic | Attaque-déplacement |
+| Q W E R | Sorts |
+| Ctrl + Q/W/E/R | Monter un sort |
+| D / F | Sorts d'invocateur |
+| 1-3, 5-7 | Objets |
+| 4 | Balise |
+| B | Rappel |
+| S | Stop |
+| P | Boutique |
+| Tab (maintenir) | Tableau des scores |
+| C | Statistiques |
+| Espace | Centrer la caméra |
+| Y | Verrouiller la caméra |
+| Alt + clic | Ping |
+| Échap | Fermer, paramètres |
 
 ## Le Touilleur, le Virtuose du Moulinet
 
@@ -73,59 +95,80 @@ ordre d'arrêt/déplacement, mort, stase ou rupture de proximité terminent le c
 Portrait, modèle et moulinet : `?modellab&champ=touilleur`. Sorts réellement simulés :
 `?fxlab&champ=touilleur&close=1`. [Aperçu du portrait et du modèle](docs/previews/touilleur.webp).
 
-## Mélenchon, le Tribun indigné
-
-Une caricature satirique de mage, disponible dans le draft. Le micro n'a pas de bouton d'arrêt ; ses sorts ont bien des cooldowns.
-
-| Touche | Sort | Effet |
-|---|---|---|
-| P | Indignation permanente | Trois impacts de sorts espacés sur des champions donnent bouclier et vitesse |
-| Q | Question au gouvernement | Micro projectile, première cible touchée et ralentie |
-| W | Motion de censure | Pluie d'amendements retardée, dégâts de zone et silence |
-| E | Hologramme | Téléportation et bouclier ; le double resté au départ explose après 1,2 s |
-| R | La République, c’est moi ! | Déclaration interruptible de 0,6 s, onde tricolore, provocation et bouclier |
-
-Pour examiner le modèle sans serveur, lance `npm run dev:client` et ouvre `http://localhost:5173/?melenchonlab`.
-Boutons Q/W/E/R ou touches correspondantes ; vues Portrait/Silhouette, rotation à la souris et marche.
-Ce labo est une vitrine visuelle ; les règles réelles sont exécutées et testées côté serveur.
-Le champion et ses effets sont aussi disponibles dans `?fxlab`.
-
-## Scripts
+## Développement
 
 | Commande | Rôle |
 |---|---|
-| `npm run dev` | serveur (tsx watch) + client (Vite) |
-| `npm run typecheck` | TypeScript sur les 3 paquets |
-| `npm test` | tests vitest (simulation headless) |
-| `npm run build` | build du client dans `packages/client/dist` |
-| `DEV_LOBBY=1 npm run dev:server` | toutes les salles en mode dev (draft accéléré : 10 s / tour, 3 s de finalisation, 2 s de chargement) |
-| `LOV_PERF=1 npm run dev:server` | log toutes les 10 s : durée des ticks, coût et régularité des snapshots, débit par client, retard de la boucle Node |
-| `SKIP_DRAFT=1 npm run dev:server` | pas de draft : la partie démarre directement (champions attribués automatiquement) |
-| `npx tsx scripts/bots.ts --url ws://localhost:3000/ws --bots 8 --seconds 30` | test de charge : 8 bots WebSocket (CI uniquement) |
+| `npm run dev` | Serveur (tsx watch) et client (Vite) |
+| `npm run dev:server` / `npm run dev:client` | L'un ou l'autre seul |
+| `npm run typecheck` | TypeScript strict sur les trois paquets |
+| `npm test` | Tests vitest, simulation sans navigateur |
+| `npm run build` | Build du client dans `packages/client/dist` |
+| `npm start` | Serveur de production, qui sert aussi le client construit |
+
+### Variables du serveur
+
+| Variable | Effet |
+|---|---|
+| `PORT` | Port HTTP et WebSocket (3000 par défaut) |
+| `DEV_LOBBY=1` | Toutes les salles en mode dev, draft accéléré (10 s par tour) |
+| `SKIP_DRAFT=1` | Pas de draft : champions attribués automatiquement, la partie démarre directement |
+| `LOV_PERF=1` | Journal toutes les 10 s : durée des ticks, snapshots, débit par client, retard de la boucle |
+
+Exemple : `SKIP_DRAFT=1 DEV_LOBBY=1 npm run dev:server`.
+
+### Pages de démo
+
+Elles s'ouvrent sur le client seul (`npm run dev:client`), sans serveur.
+
+| URL | Contenu |
+|---|---|
+| `?fxlab` | Sorts et effets, pilotés par la vraie simulation du serveur. `&champ=<id>` choisit le champion |
+| `?modellab` | Modèles 3D et animations, à côté du portrait de référence. `&champ=<id>` |
+| `?melenchonlab` | Vitrine du modèle de Mélenchon |
+| `?maplab` | Carte seule |
+| `?uilab=home`, `?uilab=draft`, `?uilab=game` | Écrans et HUD avec des données factices |
+
+Les identifiants de champion sont les noms en minuscules (`nyx`, `grondak`…), plus `master67`, `melenchon` et `touilleur`.
+
+### Test de charge
+
+```bash
+npx tsx scripts/bots.ts --url ws://localhost:3000/ws --bots 8 --seconds 30
+```
+
+Huit bots WebSocket rejoignent une salle et jouent. La CI lance ce script à chaque PR.
 
 ## Déploiement
 
-Le serveur sert le client construit et le WebSocket sur le même port (`PORT`, défaut 3000). `GET /health` renvoie
-`{ ok, uptime, rooms, players }`. Une partie tient en mémoire dans un seul processus : **une seule instance**
-(pas de répartition de charge sans affinité de session).
+Le serveur sert le client construit et le WebSocket sur le même port. `GET /health` renvoie
+`{ ok, uptime, rooms, players }`.
 
-**Docker**
+Une partie vit en mémoire dans un seul processus : déploie **une seule instance**, sans répartition de charge.
+
 ```bash
 docker build -t league-of-vibes .
 docker run -p 3000:3000 league-of-vibes
 ```
 
-**Fly.io** : `fly launch` (le Dockerfile est détecté), `internal_port = 3000`, health check HTTP sur `/health`,
-`min_machines_running = 1` et `auto_stop_machines = false` (sinon la machine s'arrête en pleine partie).
+- **Fly.io** : `fly launch` détecte le Dockerfile. Règle `internal_port = 3000`, un health check HTTP sur `/health`,
+  `min_machines_running = 1` et `auto_stop_machines = false`, sinon la machine s'arrête en pleine partie.
+- **Render** : *Web Service* avec le runtime Docker, health check `/health`. En runtime Node : build
+  `npm ci && npm run build`, start `npm start`.
+- **Reverse proxy** (nginx, Caddy) : transmets l'upgrade WebSocket sur `/ws`.
 
-**Render** : nouveau *Web Service* depuis le dépôt, runtime Docker (ou Node : build `npm ci && npm run build`,
-start `npm start`), health check `/health`. Les WebSockets sont pris en charge sans configuration.
+## Contribuer
 
-Derrière un reverse proxy (nginx, Caddy), transmettre l'upgrade WebSocket sur `/ws`.
+| Chemin | Contenu |
+|---|---|
+| `packages/shared` | Types, protocole, données de jeu (champions, objets, monstres, structures) |
+| `packages/server` | Simulation autoritaire, salles, draft, réseau |
+| `packages/client` | Rendu, effets, audio, interface |
+| [`PLAN.md`](PLAN.md) | Design complet du jeu, architecture, contrats |
+| [`AGENTS.md`](AGENTS.md) | Règles de collaboration des sept IA |
+| [`docs/REVIEW.md`](docs/REVIEW.md) | Relecture et merge des PR |
+| `docs/plans/`, `docs/progress/` | Mission et avancement de chaque branche |
+| [`ASSETS.md`](ASSETS.md) | Source et licence de chaque asset |
+| [`docs/champion-models.md`](docs/champion-models.md) | Vérification des modèles 3D |
 
-## Organisation
-
-- `PLAN.md` — design complet du jeu
-- `AGENTS.md` — règles de collaboration des 7 IA
-- `docs/plans/` — mission de chaque branche · `docs/progress/` — avancement
-- `packages/shared` — types, protocole, données · `packages/server` — simulation · `packages/client` — rendu, FX, UI
+Tout changement passe par une Pull Request vers `main` avec la CI verte ; la marche à suivre est dans `AGENTS.md`.

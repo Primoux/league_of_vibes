@@ -5,6 +5,7 @@ import { AbilityCard, ItemCard, SummonerCard, tip } from '../components.tsx';
 import { juice, selfEntity, useWorld } from '../game/world.ts';
 import { useMini } from '../useStore.ts';
 import { AbilityIcon, ChampionPortrait, Glyph, ItemIcon, SummonerIcon } from '../icons/Icons.tsx';
+import { ITEM_GLYPH } from '../icons/glyphs.ts';
 import { buffInitials, buffName, formatCooldown, formatInt, isDebuff } from '../logic/format.ts';
 import { canRankUp, cooldownFraction, hastedCooldown, rankValue } from '../logic/game.ts';
 import { ITEMS } from '@lov/shared';
@@ -38,16 +39,17 @@ export function BottomBar() {
       <BuffBar ent={ent} />
       {self.recalling !== undefined && self.recalling > 0 && <RecallBar remaining={self.recalling} />}
       <div class="lov-bottom-frame">
+        <StatGrid self={self} ent={ent} champ={champ} />
         <Portrait self={self} ent={ent} champ={champ} />
         <div class="lov-bottom-core">
-          <div class="lov-abilities">
+          <div class="lov-abilities lov-ab-tray">
             <div class="lov-passive" {...tip(() => <AbilityCard ability={champ.passive} championId={champ.id} stats={self.stats} />)}>
               <AbilityIcon ability={champ.passive} championId={champ.id} size="100%" />
             </div>
             {(['Q', 'W', 'E', 'R'] as const).map((slot) => (
               <AbilitySlotView key={slot} slot={slot} self={self} ent={ent} champ={champ} />
             ))}
-            <div class="lov-sum-gap" />
+            <div class="lov-sum-gap" aria-hidden="true" />
             {(['D', 'F'] as const).map((slot) => (
               <SummonerSlotView key={slot} slot={slot} self={self} />
             ))}
@@ -74,18 +76,52 @@ function LevelBurst() {
 
 function Portrait({ self, ent, champ }: BarData) {
   const xpFrac = self.xpToNext > 0 ? Math.min(1, self.xp / self.xpToNext) : 1;
-  const r = 47;
-  const c = 2 * Math.PI * r;
   return (
-    <div class={`lov-hud-portrait ${ent.dead ? 'dead' : ''}`} {...tip(() => <span>Expérience : {Math.floor(self.xp)} / {Math.floor(self.xpToNext)}</span>)}>
-      <ChampionPortrait id={champ.id} size="100%" variant="round" grayscale={ent.dead} />
-      <svg class="xp" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r={r} class="track" />
-        <circle cx="50" cy="50" r={r} class="bar" stroke-dasharray={c} stroke-dashoffset={c * (1 - xpFrac)} transform="rotate(90 50 50)" />
-      </svg>
-      <span class="lvl">{self.level}</span>
+    <div class={`lov-hud-portrait sq ${ent.dead ? 'dead' : ''}`} {...tip(() => <span>Expérience : {Math.floor(self.xp)} / {Math.floor(self.xpToNext)}</span>)}>
+      <div class="pic">
+        <ChampionPortrait id={champ.id} size="100%" grayscale={ent.dead} />
+      </div>
       <LevelBurst />
+      <div class="xpbar" aria-hidden="true">
+        <i style={{ height: `${xpFrac * 100}%` }} />
+      </div>
+      <div class="plate">
+        <b>{self.level}</b>
+        <span>{champ.name}</span>
+      </div>
       {self.skillPoints > 0 && <span class="pts">+{self.skillPoints}</span>}
+    </div>
+  );
+}
+
+/** Panneau de statistiques permanent (à gauche du portrait). */
+const STAT_ROWS: { k: keyof SelfState['stats']; icon: string; color: string; label: string; fmt?: (v: number) => string }[] = [
+  { k: 'ad', icon: 'sword', color: '#ffaa5c', label: "Dégâts d'attaque" },
+  { k: 'ap', icon: 'wand', color: '#c48bff', label: 'Puissance' },
+  { k: 'armor', icon: 'shield', color: '#f1d37f', label: 'Armure' },
+  { k: 'mr', icon: 'cloak', color: '#7fc6ff', label: 'Résistance magique' },
+  { k: 'attackSpeed', icon: 'dagger', color: '#ffd16b', label: "Vitesse d'attaque", fmt: (v) => v.toFixed(2).replace('.', ',') },
+  { k: 'abilityHaste', icon: 'hourglass', color: '#9fe7ff', label: 'Accélération' },
+  { k: 'critChance', icon: 'blade', color: '#ff7a6b', label: 'Chances de critique', fmt: (v) => `${Math.round(v * 100)}%` },
+  { k: 'moveSpeed', icon: 'boots', color: '#9ff0c2', label: 'Vitesse de déplacement' },
+  { k: 'armorPen', icon: 'scythe', color: '#ff9a5c', label: 'Létalité' },
+  { k: 'magicPen', icon: 'flask', color: '#d2a8ff', label: 'Pénétration magique' },
+];
+
+function StatGrid({ self }: BarData) {
+  return (
+    <div class="lov-statgrid">
+      {STAT_ROWS.map((r) => {
+        const v = self.stats[r.k] ?? 0;
+        return (
+          <div key={r.k} class="row" {...tip(() => <span>{r.label}</span>)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d={ITEM_GLYPH[r.icon]} fill={r.color} fill-rule="evenodd" />
+            </svg>
+            <b>{r.fmt ? r.fmt(v) : Math.round(v)}</b>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -111,13 +147,15 @@ function AbilitySlotView({ slot, self, ent, champ }: { slot: AbilitySlot } & Bar
         <AbilityIcon ability={ab} championId={champ.id} size="100%" />
         {cd > 0 && <div class="cd-sweep" style={{ '--f': frac } as Record<string, number>} />}
         {cd > 0 && <span class="cd-num">{formatCooldown(cd)}</span>}
-        <kbd>{slot}</kbd>
-        {cost > 0 && <span class="cost">{cost}</span>}
       </div>
-      <div class="ranks">
-        {Array.from({ length: ab.maxRank }, (_, i) => (
-          <i key={i} class={i < rank ? 'on' : ''} />
-        ))}
+      <div class="plate">
+        <kbd>{slot}</kbd>
+        <span class="ranks">
+          {Array.from({ length: ab.maxRank }, (_, i) => (
+            <i key={i} class={i < rank ? 'on' : ''} />
+          ))}
+        </span>
+        {cost > 0 && <em class="cost">{cost}</em>}
       </div>
     </div>
   );
@@ -133,6 +171,8 @@ function SummonerSlotView({ slot, self }: { slot: SummonerSlot; self: SelfState 
         <SummonerIcon id={id} size="100%" />
         {cd > 0 && <div class="cd-sweep" style={{ '--f': cooldownFraction(cd, Math.max(total, cd)) } as Record<string, number>} />}
         {cd > 0 && <span class="cd-num">{formatCooldown(cd)}</span>}
+      </div>
+      <div class="plate">
         <kbd>{slot}</kbd>
       </div>
     </div>
