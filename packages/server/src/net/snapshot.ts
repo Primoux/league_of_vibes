@@ -4,7 +4,7 @@
  * - Delta : après le premier snapshot complet, seules les entités modifiées sont envoyées + `removed`.
  * - Événements filtrés : pas d'événement concernant une unité ennemie invisible ; or/achats/rappel privés à l'équipe.
  */
-import { FOUNTAINS, FOUNTAIN_RADIUS, dist, type EntityId, type EntitySnapshot, type GameEvent, type PlayerId, type SelfState, type Snapshot, type Team } from '@lov/shared';
+import { FOUNTAINS, FOUNTAIN_RADIUS, dist, type EntityId, type EntityPatch, type EntitySnapshot, type GameEvent, type PlayerId, type SelfState, type Snapshot, type Stats, type Team } from '@lov/shared';
 import { isVisibleTo } from '../systems/vision.ts';
 import type { Entity, World } from '../world.ts';
 
@@ -43,20 +43,34 @@ export function toEntitySnapshot(e: Entity, world?: World): EntitySnapshot {
   return s;
 }
 
+// Arrondis du SelfState (envoyé à chaque snapshot) : des flottants à 15 décimales coûtent cher en JSON.
+const ceil1 = (v: number): number => (v > 0 ? Math.ceil(v * 10) / 10 : 0);
+const round2 = (v: number): number => Math.round(v * 100) / 100;
+
+function roundCooldowns(cd: SelfState['cooldowns']): SelfState['cooldowns'] {
+  return { Q: ceil1(cd.Q), W: ceil1(cd.W), E: ceil1(cd.E), R: ceil1(cd.R), D: ceil1(cd.D), F: ceil1(cd.F) };
+}
+
+function roundStats(st: Stats): Stats {
+  const out = {} as Record<string, number>;
+  for (const k in st) out[k] = round2(st[k as keyof Stats]);
+  return out as unknown as Stats;
+}
+
 export function selfState(e: Entity, world?: World): SelfState | undefined {
   const c = e.champ;
   if (!c) return undefined;
   const s: SelfState = {
     entityId: e.id,
     gold: Math.floor(c.gold),
-    xp: c.xp,
+    xp: Math.floor(c.xp),
     xpToNext: 0,
     level: c.level,
     skillPoints: c.skillPoints,
     abilityLevels: c.abilityLevels,
-    cooldowns: c.cooldowns,
+    cooldowns: roundCooldowns(c.cooldowns),
     summoners: c.summoners,
-    stats: e.stats,
+    stats: roundStats(e.stats),
     canShop: e.dead || (e.team !== 'neutral' && dist(e.pos, FOUNTAINS[e.team]) <= FOUNTAIN_RADIUS),
   };
   if (world) for (const fn of world.hooks.selfState) fn(e, s, world);
@@ -96,14 +110,18 @@ export class SnapshotFrame {
   readonly snaps = new Map<EntityId, EntitySnapshot>();
   readonly json = new Map<EntityId, string>();
   readonly score: Score;
-  readonly serverTime = Date.now();
+  readonly serverTime: number;
+  /** JSON des champs objets (champ, buffs...) par entité, calculé à la demande pour les patches. */
+  private nested = new Map<EntityId, Record<string, string>>();
 
   constructor(
     readonly world: World,
     readonly events: GameEvent[],
     score: Score,
+    serverTime = Date.now(),
   ) {
     this.score = score;
+    this.serverTime = serverTime;
     for (const e of world.entities.values()) {
       if (e.kind === 'projectile' && e.data.hidden) continue;
       const s = toEntitySnapshot(e, world);
@@ -111,11 +129,56 @@ export class SnapshotFrame {
       this.json.set(e.id, JSON.stringify(s));
     }
   }
+
+  nestedOf(id: EntityId): Record<string, string> {
+    let n = this.nested.get(id);
+    if (!n) {
+      n = {};
+      const s = this.snaps.get(id) as unknown as Record<string, unknown> | undefined;
+      if (s) for (const k in s) if (typeof s[k] === 'object' && s[k] !== null) n[k] = JSON.stringify(s[k]);
+      this.nested.set(id, n);
+    }
+    return n;
+  }
 }
 
-/** État de delta d'un client (dernière version envoyée de chaque entité). Remettre à zéro → prochain snapshot complet. */
+/**
+ * Rafraîchissement complet étalé : chaque entité est renvoyée en entier (dans `entities`) tous les REFRESH_TICKS
+ * ticks, à un tick qui dépend de son id. Un client qui aurait manqué l'état de base d'une entité (patch ignoré)
+ * se resynchronise donc en ≤ 2 s, pour ~1/60 du coût d'un snapshot complet par tick.
+ */
+export const REFRESH_TICKS = 60;
+
+interface Sent {
+  json: string;
+  snap: EntitySnapshot;
+  nested: Record<string, string>;
+}
+
+/** Patch des champs qui diffèrent entre deux versions d'une entité (objets comparés via leur JSON). */
+export function diffEntity(prev: Sent, snap: EntitySnapshot, nested: Record<string, string>): EntityPatch {
+  const a = prev.snap as unknown as Record<string, unknown>;
+  const b = snap as unknown as Record<string, unknown>;
+  const patch: Record<string, unknown> = { id: snap.id };
+  for (const k in b) {
+    if (k === 'id') continue;
+    const v = b[k];
+    if (typeof v === 'object' && v !== null) {
+      if (prev.nested[k] !== nested[k]) patch[k] = v;
+    } else if (a[k] !== v) patch[k] = v;
+  }
+  let unset: string[] | undefined;
+  for (const k in a) if (!(k in b) || b[k] === undefined) (unset ??= []).push(k);
+  if (unset) patch.u = unset;
+  return patch as unknown as EntityPatch;
+}
+
+/**
+ * État de delta d'un client (dernière version envoyée de chaque entité). Remettre à zéro → prochain snapshot complet.
+ * Entité nouvelle / redevenue visible → complète dans `entities` ; entité déjà connue et modifiée → `patches`.
+ */
 export class ClientView {
-  private sent = new Map<EntityId, string>();
+  private sent = new Map<EntityId, Sent>();
   private full = true;
 
   reset(): void {
@@ -127,6 +190,7 @@ export class ClientView {
     const world = frame.world;
     const self = world.championOf(playerId);
     const entities: EntitySnapshot[] = [];
+    const patches: EntityPatch[] = [];
     const removed: EntityId[] = [];
     const seen = new Set<EntityId>();
     for (const e of world.entities.values()) {
@@ -134,9 +198,14 @@ export class ClientView {
       const json = frame.json.get(e.id);
       if (json === undefined) continue;
       seen.add(e.id);
-      if (!this.full && this.sent.get(e.id) === json) continue;
-      this.sent.set(e.id, json);
-      entities.push(frame.snaps.get(e.id)!);
+      const prev = this.full ? undefined : this.sent.get(e.id);
+      const refresh = (e.id + world.tick) % REFRESH_TICKS === 0;
+      if (prev?.json === json && !refresh) continue;
+      const snap = frame.snaps.get(e.id)!;
+      const nested = frame.nestedOf(e.id);
+      if (prev && !refresh) patches.push(diffEntity(prev, snap, nested));
+      else entities.push(snap);
+      this.sent.set(e.id, { json, snap, nested });
     }
     for (const id of this.sent.keys()) {
       if (!seen.has(id)) {
@@ -152,7 +221,10 @@ export class ClientView {
       events: filterEvents(world, frame.events, team),
       score: frame.score,
     };
-    if (!this.full) snap.removed = removed;
+    if (!this.full) {
+      snap.removed = removed;
+      if (patches.length) snap.patches = patches;
+    }
     this.full = false;
     if (self) snap.self = selfState(self, world);
     let timers: Record<string, number> | undefined;
