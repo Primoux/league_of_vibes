@@ -35,6 +35,9 @@ jobs:
     # Une PR = une area = une issue. Les fichiers de contrat partagés passent par une PR « contract: » seule.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,6 +50,23 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           BASE_REF: ${{ github.base_ref }}
         run: node scripts/check-areas.mjs
+      - name: Label de l'area
+        # Pose « area:<scope> » sur la PR pour qu'on puisse filtrer la file comme les issues.
+        # Jamais bloquant : un label raté ne doit pas faire échouer une PR correcte.
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          scope=$(printf '%s' "$PR_TITLE" | sed -nE 's/^[a-z]+\(([^)]+)\)!?:.*/\1/p')
+          if printf '%s' "$PR_TITLE" | grep -qE '^contract(\(|:)'; then scope=contrat; fi
+          [ -n "$scope" ] || { echo "Pas de scope dans le titre, rien à labelliser."; exit 0; }
+          label=$([ "$scope" = contrat ] && echo contrat || echo "area:$scope")
+          gh label list --limit 200 --json name -q '.[].name' | grep -qxF "$label" \
+            && gh pr edit "$PR_NUMBER" --add-label "$label" && echo "Label posé : $label" \
+            || echo "Label « $label » inexistant (sync-labels le créera au prochain merge)."
 
   size:
     # Une PR relisible : au-delà, on découpe. Avertissement seulement, jamais bloquant.

@@ -84,6 +84,9 @@ périmètre. Deux personnes ne peuvent pas prendre la même issue, et ça marche
 - Rien ne te va ? Ouvre une issue avec le modèle fourni, puis assigne-la toi.
 - Tu abandonnes, ou tu n'avances plus ? **Désassigne-toi tout de suite** pour libérer le verrou. Ce n'est pas
   un échec, c'est la seule chose à faire pour ne pas bloquer les autres.
+- Si tu oublies : une issue assignée sans activité pendant **14 jours** est désassignée automatiquement,
+  avec un commentaire. Rien n'est perdu — tu te la réassignes si tu es toujours dessus. Mais préfère ouvrir
+  une PR en brouillon que de garder du travail commencé sur ta machine.
 
 ---
 
@@ -168,6 +171,8 @@ Le titre porte l'area. Le corps référence l'issue (`Closes #57`). Trois jobs t
 | `areas` | ta PR reste dans son area, ne touche aucun contrat partagé, et ne couvre qu'un champion |
 | `size` | avertit au-delà de ~800 lignes modifiées |
 
+Le job `areas` pose aussi le label `area:<ton-area>` sur la PR, pour qu'on filtre la file comme les issues.
+
 **CI rouge = la PR ne sera pas relue.** Corrige sur ta branche et repousse : la PR se met à jour toute seule.
 
 `main` a bougé pendant ce temps ?
@@ -180,6 +185,9 @@ git fetch origin && git merge origin/main      # puis repousse
 commit sur `main`. Pendant l'attente, tu prends la tâche suivante — tu ne restes pas bloqué.
 
 Si on te demande des changements : corrige, repousse, réponds au commentaire. Pas besoin de rouvrir une PR.
+
+Une PR sans activité pendant **3 jours** reçoit un rappel automatique : à ce stade elle a pris du retard sur
+`main`, il faut la resynchroniser, la faire relancer, ou la fermer si elle est abandonnée.
 
 ---
 
@@ -243,7 +251,24 @@ attrape la première. Pour la seconde, regarde toi-même le diff des tests avant
 
 ---
 
-## 10. Ce qui n'existe plus
+## 10. Ce qu'il y a dans `.github/`
+
+| Fichier | Rôle |
+|---|---|
+| `areas.json` | le découpage du projet. **La source de vérité** : les labels et le contrôle de périmètre en découlent |
+| `workflows/ci.yml` | les trois jobs (`check`, `areas`, `size`) et le label d'area |
+| `workflows/labels.yml` | recrée les labels `area:*` dès que `areas.json` change. Aucun label n'est supprimé |
+| `workflows/verrous.yml` | libère les verrous dormants et réveille les PR qui dorment, une fois par jour |
+| `CODEOWNERS` | demande automatiquement la relecture d'un mainteneur, et surveille les fichiers de contrat |
+| `pull_request_template.md` | le corps de PR à remplir |
+| `ISSUE_TEMPLATE/` | `tache.md`, `bug.md`, `champion.md` |
+
+Les scripts correspondants (`scripts/check-areas.mjs`, `sync-labels.mjs`, `stale-locks.mjs`) tournent aussi en
+local : tous acceptent `--dry-run` ou `--title/--files` pour que tu puisses vérifier avant de pousser.
+
+---
+
+## 11. Ce qui n'existe plus
 
 Si une doc, un script ou une IA te parle de ça, c'est périmé — le projet a changé de modèle quand il s'est
 ouvert à plusieurs contributeurs :
