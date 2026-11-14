@@ -10,9 +10,16 @@ if [ -z "$who" ]; then
   exit 1
 fi
 
-echo "$who" > .agent                       # non versionné : dit aux IA de cette machine qui elles sont
-git config user.name "$who"                # sinon toutes les contributions sont indistinguables
-echo "Identité de ce clone : $who  (.agent + git config user.name)"
+# .agent dit aux IA de cette machine qui elles sont. Non versionné.
+echo "$who" > .agent
+echo "Identité de ce clone : $who (.agent)"
+
+# On ne touche PAS à l'identité git : la tienne est déjà la bonne, et GitHub attribue les
+# commits sur l'adresse e-mail. On prévient seulement si elle manque.
+if [ -z "$(git config user.email)" ]; then
+  echo "⚠ git config user.email n'est pas réglé : tes commits ne seront rattachés à aucun compte GitHub."
+  echo "  Règle-le avec l'adresse de ton compte : git config --global user.email \"toi@exemple.com\""
+fi
 
 if command -v node >/dev/null; then
   want="$(cat .nvmrc)"; have="$(node -v | sed 's/^v//;s/\..*//')"

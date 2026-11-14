@@ -3,6 +3,7 @@
 //
 //   usage : node scripts/check-areas.mjs [--title "feat(fx-core): ..."] [--base origin/main]
 //           node scripts/check-areas.mjs --title "..." --files "a.ts,b.ts"   (pour les tests)
+//           node scripts/check-areas.mjs --labels --title "..." --body "..."  (labels à poser sur la PR)
 //
 // Règles (voir AGENTS.md §2) :
 //   1. Le titre suit le commit conventionnel : type(area): résumé — ou « contract: ... ».
@@ -80,6 +81,13 @@ if (!isContract && !scope) {
       `  Areas disponibles : ${areaNames.join(', ')}`,
   );
   process.exit(1);
+}
+
+// --- mode --labels : liste les labels correspondant aux areas déclarées, un par ligne ---
+if (process.argv.includes('--labels')) {
+  const labels = isContract ? ['contrat'] : declared.filter((n) => cfg.areas[n]).map((n) => `area:${n}`);
+  console.log(labels.join('\n'));
+  process.exit(0);
 }
 
 const touchedContracts = files.filter((f) => cfg.contracts.includes(f));

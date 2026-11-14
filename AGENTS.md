@@ -8,7 +8,7 @@ pour qu'on puisse être nombreux **sans se marcher dessus** et sans faire explos
 
 1. Lis **`PLAN.md`** : le design du jeu, l'architecture, les contrats.
 2. Prépare ta machine, une seule fois : `scripts/setup.sh <ton-pseudo>`.
-   (Écrit `.agent` — non versionné, c'est l'identité de ce clone — règle `git config user.name`, installe, teste.)
+   (Écrit `.agent` — non versionné, c'est l'identité de ce clone, pour tes IA — installe et teste.)
 3. `npm install && npm run typecheck && npm test` doivent passer **avant** que tu commences.
 4. Prends une tâche : voir §1.
 
