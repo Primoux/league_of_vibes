@@ -462,6 +462,63 @@
 .lov-shop2-group { grid-column: 1 / -1; margin: 8px 0 0; display: flex; align-items: baseline; gap: 8px; font-size: 0.72em; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); }
 .lov-shop2-group::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, rgba(217, 178, 95, 0.4), transparent); }
 .lov-shop2-group small { font-size: 0.9em; color: var(--muted); letter-spacing: 0.05em; }
+
+/* boutique v3 : barre d'outils collante, cartes plus lisibles, aperçu au survol, retour d'achat */
+.lov-shop2-tools { grid-column: 1 / -1; position: sticky; top: -14px; z-index: 3; margin: -14px -14px 2px; padding: 10px 14px 8px; display: flex; flex-direction: column; gap: 8px;
+  background: linear-gradient(180deg, rgba(14, 16, 32, 0.99) 85%, rgba(14, 16, 32, 0)); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.lov-shop2-tools .lov-stat-filters { position: static; grid-column: auto; margin: 0; padding: 0; border: 0; background: none; }
+.lov-shop2-tools .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lov-shop2-tools .lov-chip.toggle .coin { width: 0.85em; height: 0.85em; }
+.lov-shop2-tools .lov-chip.clear { color: #ffc2c2; border-color: rgba(255, 107, 107, 0.4); font-size: 0.74em; padding: 4px 10px; }
+.lov-shop2-tools select { font: inherit; font-size: 0.78em; font-weight: 600; padding: 4px 8px; border-radius: 99px; color: var(--text); background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.12); cursor: pointer; }
+.lov-shop2-tools select option { background: #11132a; }
+.lov-shop2-tools .ctx { font-size: 0.78em; color: var(--muted); margin-left: auto; }
+.lov-shop2-tools .ctx + .clear { margin-left: 0; }
+.lov-shop2-tools .row > .clear:only-of-type { margin-left: auto; }
+.lov-search2 .clear { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.08); color: var(--muted); cursor: pointer; }
+.lov-search2 .clear:hover { color: var(--text); background: rgba(255, 255, 255, 0.16); }
+
+.lov-shop2-nav hr { border: 0; height: 1px; margin: 6px 8px; background: rgba(255, 255, 255, 0.07); }
+.lov-shop2-nav button.up:not(.on) { color: #bff5e8; }
+.lov-shop2-nav button.up small { color: var(--teal); opacity: 1; font-weight: 800; }
+.lov-shop2-nav .legend { margin-top: auto; padding: 12px 6px 2px; display: flex; flex-direction: column; gap: 6px; font-size: 0.7em; color: var(--muted); line-height: 1.5; }
+.lov-shop2-nav .legend p { margin: 0; }
+.lov-shop2-nav kbd { font: inherit; font-size: 0.95em; font-weight: 700; padding: 0 5px; border-radius: 4px; color: var(--gold-hi); background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(246, 220, 148, 0.25); }
+
+.lov-shop2-group.up { color: var(--teal); }
+.lov-shop2-group.up::after { background: linear-gradient(90deg, rgba(62, 230, 200, 0.45), transparent); }
+
+.lov-item-card { outline: none; }
+.lov-item-card .ic { position: relative; }
+.lov-item-card .owned-tag { top: 2px; right: 2px; bottom: auto; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; font-size: 0.66em; letter-spacing: 0; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6); }
+.lov-item-card .chips em.fx { color: #f6e3b0; background: rgba(246, 220, 148, 0.1); }
+.lov-item-card .foot { display: flex; align-items: center; gap: 8px; }
+.lov-item-card .price s { margin-left: 4px; font-weight: 600; font-size: 0.85em; color: var(--muted); }
+.lov-item-card .missing { white-space: nowrap; font-size: 0.72em; font-weight: 700; color: #e79a9a; padding: 0 5px; border-radius: 4px; background: rgba(255, 90, 90, 0.1); }
+.lov-item-card.poor { opacity: 0.72; }
+.lov-item-card.poor:hover, .lov-item-card.poor.sel { opacity: 1; }
+.lov-item-card .quick { position: absolute; bottom: 8px; right: 8px; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 1px solid var(--gold-hi); border-radius: 7px; cursor: pointer;
+  color: #1a1002; background: linear-gradient(180deg, #fff1c4, #e2b450); box-shadow: 0 4px 12px rgba(246, 200, 90, 0.4); opacity: 0; transform: scale(0.8); transition: opacity 0.15s, transform 0.15s var(--ease); }
+.lov-item-card:hover .quick, .lov-item-card.sel .quick { opacity: 1; transform: none; }
+.lov-item-card .quick:hover { filter: brightness(1.1); transform: scale(1.1); }
+.lov-item-card.sel { background: linear-gradient(160deg, color-mix(in srgb, var(--rar) 22%, rgba(26, 26, 44, 0.95)), rgba(12, 12, 22, 0.95)); }
+.lov-item-card .buy-burst { position: absolute; inset: -1px; border-radius: 10px; pointer-events: none; box-shadow: 0 0 0 2px var(--teal), 0 0 26px rgba(62, 230, 200, 0.7); animation: lov-buy-burst 0.6s var(--ease) forwards; }
+@keyframes lov-buy-burst { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(1.06); } }
+
+.lov-shop2-empty { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 48px 16px; color: var(--muted); text-align: center; }
+.lov-shop2-empty p { margin: 0; }
+
+.lov-shop2-det { position: relative; }
+.lov-shop2-det .peek { align-self: stretch; font-size: 0.66em; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 3px 8px; border-radius: 99px; border: 1px dashed rgba(255, 255, 255, 0.15); }
+.lov-shop2-det .lov-buy { margin: 4px 0 2px; position: relative; }
+.lov-buy-progress { position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p) * 100%); background: linear-gradient(90deg, #e2b450, #fff1c4); z-index: 1; transition: width 0.3s; }
+.lov-shop2-det .lov-buy:disabled .lov-cta-label { font-size: 1em; }
+.lov-shop2-det .lov-buy small { font-size: 0.8em; letter-spacing: 0.02em; text-transform: none; color: rgba(40, 24, 2, 0.85); }
+.lov-shop2-det .lov-buy:disabled small { color: rgba(255, 255, 255, 0.85); }
+
+.lov-shop2-inv .slot { position: relative; }
+.lov-shop2-inv .slot.used { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal), 0 0 12px rgba(62, 230, 200, 0.5); }
+.lov-shop2-inv .actions .danger { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lov-cta > .lov-cta-label, .lov-cta > small { position: relative; z-index: 1; }
 .lov-inventory .slot .cd-sweep { position: absolute; inset: 0; background: conic-gradient(rgba(4, 5, 12, 0.75) calc(var(--f) * 360deg), rgba(255, 245, 210, 0.9) calc(var(--f) * 360deg) calc(var(--f) * 360deg + 4deg), transparent calc(var(--f) * 360deg + 4deg)); }
 .lov-inventory .slot .cd-num { background: none; text-shadow: 0 0 3px #000, 0 0 2px #000; }
