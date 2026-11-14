@@ -8,6 +8,7 @@ import { fxBus } from '../../fx/FxBus.ts';
 import { registerChampionFactory } from '../EntityView.ts';
 import type { EntityView } from '../EntityView.ts';
 import { MelenchonView } from './melenchon.ts';
+import { TouilleurView } from './TouilleurView.ts';
 import { ProceduralChampionView, TEAM_HEX, type ChampionModelDef } from './ChampionView.ts';
 import { genericFor } from './models/generic.ts';
 import { grondakModel } from './models/grondak.ts';
@@ -63,7 +64,9 @@ export function createChampionView(snap: Pick<EntitySnapshot, 'id' | 'subtype' |
   const id = snap.subtype;
   if (!id || !CHAMPIONS[id]) return null;
   const team = snap.team in TEAM_HEX ? (snap.team as keyof typeof TEAM_HEX) : 'neutral';
-  const view = id === 'melenchon' ? new MelenchonView(false, team) : new ProceduralChampionView(snap.id, id, team, modelFor(id));
+  const view = id === 'melenchon' ? new MelenchonView(false, team)
+    : id === 'touilleur' ? new TouilleurView(snap.id, team)
+    : new ProceduralChampionView(snap.id, id, team, modelFor(id));
   views.set(snap.id, view);
   const dispose = view.dispose.bind(view);
   view.dispose = () => {

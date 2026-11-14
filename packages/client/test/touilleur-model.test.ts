@@ -40,6 +40,16 @@ describe('index du Touilleur', () => {
     view.update({ ...snap, dead: true }, 2.5); view.update(snap, .2);
     expect(view.object3d.children[0]!.visible).toBe(true); view.dispose();
   });
+  it('termine l’animation de canal dès que le buff serveur disparaît', () => {
+    const view = createChampionView({ id: 303, subtype: 'touilleur', team: 'blue' }) as ProceduralChampionView;
+    const snap: EntitySnapshot = { id: 303, kind: 'champion', subtype: 'touilleur', team: 'blue', x: 0, y: 0, facing: 0, hp: 100, maxHp: 100 };
+    view.cast('R'); view.update({ ...snap, buffs: [{ id: 'touilleur_r_channel', remaining: 2 }] }, .1);
+    expect(view.animator.current).toBe('cast_R');
+    view.update(snap, .1); expect(view.animator.current).toBe('idle');
+    view.update({ ...snap, buffs: [{ id: 'touilleur_r_channel', remaining: 2 }] }, .1);
+    view.update({ ...snap, buffs: [{ id: 'stun', remaining: 1 }] }, .1);
+    expect(view.animator.current).toBe('stunned'); view.dispose();
+  });
 });
 
 describe('moulinets FX', () => {
