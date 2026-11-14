@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
 
 /** Lance le garde-fou de périmètre sur une liste de fichiers simulée. */
-function check(title: string, files: string[]): { ok: boolean; out: string } {
+function check(title: string, files: string[], body = ''): { ok: boolean; out: string } {
   try {
-    const out = execFileSync('node', ['scripts/check-areas.mjs', '--title', title, '--files', files.join(',')], {
+    const out = execFileSync('node', ['scripts/check-areas.mjs', '--title', title, '--files', files.join(','), '--body', body], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -85,5 +85,53 @@ describe('check-areas : tranche verticale champion', () => {
     const r = check('feat(champion): Nyx et Zephyr', [...nyx, 'packages/client/src/fx/champions/zephyr.ts']);
     expect(r.ok).toBe(false);
     expect(r.out).toContain('zephyr');
+  });
+});
+
+describe('check-areas : fonctionnalité qui traverse plusieurs areas', () => {
+  const boutique = [
+    'packages/client/src/ui/hud/Shop.tsx',
+    'packages/client/src/ui/logic/shop.ts',
+    'packages/client/src/ui/redesign.css',
+  ];
+
+  it('refuse deux areas quand une seule est déclarée', () => {
+    const r = check('feat(ui-hud): boutique plus claire', boutique);
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain('logic/shop.ts');
+  });
+
+  it('accepte un scope à plusieurs areas dans le titre', () => {
+    const r = check('feat(ui-hud,ui-core): boutique plus claire', boutique);
+    expect(r.ok).toBe(true);
+    expect(r.out).toContain('ui-hud, ui-core');
+  });
+
+  it('accepte des areas déclarées dans le corps de la PR', () => {
+    const r = check('feat(ui-hud): boutique plus claire', boutique, 'Résumé\n\nAreas: ui-hud, ui-core\n');
+    expect(r.ok).toBe(true);
+  });
+
+  it('refuse une area inconnue parmi plusieurs', () => {
+    const r = check('feat(ui-hud,cuisine): boutique', boutique);
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain('cuisine');
+  });
+
+  it('avertit sans bloquer au-delà de trois areas', () => {
+    const r = check('feat(input,ui-hud,ui-core,client-net,render): mode jeu', [
+      'packages/client/src/input/gameMode.ts',
+      'packages/client/src/ui/hud/Hud.tsx',
+      'packages/client/src/ui/styles.css',
+      'packages/client/src/state.ts',
+      'packages/client/src/main.ts',
+    ]);
+    expect(r.ok).toBe(true);
+    expect(r.out).toContain('5 areas déclarées');
+  });
+
+  it('refuse toujours un contrat, même avec plusieurs areas', () => {
+    const r = check('feat(ui-hud,ui-core): boutique', [...boutique, 'packages/shared/src/schema.ts']);
+    expect(r.ok).toBe(false);
   });
 });

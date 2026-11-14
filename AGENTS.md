@@ -40,6 +40,10 @@ quelqu'un d'autre, tu ne touches pas à son périmètre. C'est ce qui remplace l
 
 **Le scope de ton titre de PR est l'area** : `feat(fx-core): …`, `fix(ui-hud): …`, `feat(nav): …`.
 
+Une fonctionnalité qui traverse vraiment plusieurs areas les déclare toutes, dans le titre
+(`feat(input,ui-hud): …`) ou par une ligne `Areas: input, ui-hud` dans le corps de la PR. Au-delà de trois,
+la CI avertit : la PR est probablement à découper. Par défaut, une PR = une area.
+
 ### Tranches verticales : un champion = une tâche
 
 Le code stocke **un fichier par champion** à chaque étage, ce qui permet de livrer un champion de bout en
