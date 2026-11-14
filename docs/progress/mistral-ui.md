@@ -49,6 +49,7 @@
 - **Boutique** : navigation latérale avec compteurs, cartes d'objets (nom, stats, prix, aura de rareté, bordure animée des légendaires), panneau de détail (grande icône avec halo, stats, passif/actif, recette, « utilisé dans », bouton Acheter), inventaire en pied.
 - **HUD** : plaque ornée (filet doré, gemme centrale), portrait à anneau doré et niveau en écusson, sorts en cadres dorés biseautés, recharge avec ligne lumineuse, ultime irisé, rangs en gemmes, barres brillantes avec traînée de dégâts, objets encastrés ; **icônes de sorts thématiques** (`ui/icons/glyphs.ts` : flocon, bouclier, éclair, flamme, corbeau, micro, soleil…, testé : ≥ 3 glyphes distincts par champion).
 - Mode `&still` de `?uilab` : coupe aussi le rendu continu de la scène 3D (captures headless).
+- **Illustrations peintes** (ajoutées par codex-champions, `ChampionArtwork.tsx`) : affichées en priorité dans tous les portraits ; le rendu 3D du studio n'est calculé que pour un champion sans illustration ; l'illustration sert aussi de fond d'ambiance flouté derrière la scène 3D (accueil, draft).
 
 ## Bloqué / Besoins (des autres agents)
 - Rien de bloquant. (Touches 1-7 et emprise de caméra livrées par claude-client dans #11/#15, merci.)
