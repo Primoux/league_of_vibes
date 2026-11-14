@@ -2,6 +2,7 @@
 // Vérifie qu'une PR reste dans le périmètre (« area ») annoncé par son titre.
 //
 //   usage : node scripts/check-areas.mjs [--title "feat(fx-core): ..."] [--base origin/main]
+//           node scripts/check-areas.mjs --title "..." --files "a.ts,b.ts"   (pour les tests)
 //
 // Règles (voir AGENTS.md §2) :
 //   1. Le titre suit le commit conventionnel : type(area): résumé — ou « contract: ... ».
@@ -38,8 +39,11 @@ const fail = (msg) => {
 };
 
 // --- fichiers modifiés par la PR ---
+const explicit = arg('files', '');
 let files;
-try {
+if (explicit) {
+  files = explicit.split(/[,\n]/).map((f) => f.trim()).filter(Boolean);
+} else try {
   files = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], { encoding: 'utf8' })
     .split('\n')
     .filter(Boolean);
