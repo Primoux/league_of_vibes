@@ -2,7 +2,8 @@
 
 mod common;
 
-use common::{champ, core_world, dummy, player_of, v};
+use common::{champ, champ_as, core_world, dummy, player_of, v};
+use lov_shared::data::champions::get_champion;
 use lov_shared::map::FOUNTAINS;
 use lov_shared::math::dist;
 use lov_shared::protocol::ClientMsg;
@@ -61,29 +62,20 @@ fn poursuit_une_cible_hors_de_portee_puis_attaque() {
     assert!(s.e(t).hp < 1000.0);
 }
 
-/// TS : champion à distance `sable`, dont `getChampion('sable')` fournit `attackWindup` et
-/// `projectileSpeed`. Seul Grondak (mêlée) est porté pour l'instant : on simule un champion à distance
-/// absent du registre (id `sable`, portée 550). `get_champion` renvoie alors `None` et le combat applique
-/// les défauts d'une entité sans définition (armement 0.3, projectile 1600 car portée > 300), que le
-/// test lit via `attack_config` plutôt que dans la définition. À repasser sur la vraie définition
-/// quand `sable` sera porté.
+/// Champion à distance : l'armement et la vitesse du projectile viennent de la définition de Sable.
 #[test]
 fn distance_projectile_qui_voyage_avant_de_toucher() {
     let mut s = core_world();
-    let a = champ(&mut s.world, Team::Blue, v(6000.0, 3000.0));
-    {
-        let e = s.e_mut(a);
-        e.champ.as_mut().unwrap().champion_id = "sable".into();
-        e.stats.attack_range = 550.0;
-    }
+    let a = champ_as(&mut s.world, Team::Blue, v(6000.0, 3000.0), "sable");
     let t = dummy(&mut s.world, TeamOrNeutral::Red, v(6500.0, 3000.0), |_| {});
     let pid = player_of(&s.world, a);
     s.world.commands.push(QueuedCommand {
         player_id: pid,
         msg: ClientMsg::Attack { target_id: t },
     });
-    let (windup, speed) = attack_config(s.e(a));
-    assert_eq!((windup, speed), (0.3, 1600.0));
+    let def = get_champion("sable").expect("sable est dans le registre");
+    let (windup, speed) = (def.attack_windup, def.projectile_speed);
+    assert!(speed.is_some());
     s.run(windup / s.e(a).stats.attack_speed + 0.04);
     assert_eq!(s.projectiles.pending(), 1);
     assert_eq!(s.e(t).hp, 1000.0);
@@ -100,7 +92,7 @@ fn distance_projectile_qui_voyage_avant_de_toucher() {
             ranged, speed: sp, ..
         }) => {
             assert!(ranged);
-            assert_eq!(sp, Some(speed));
+            assert_eq!(sp, speed);
         }
         other => panic!("autoAttack attendu, reçu {other:?}"),
     }
