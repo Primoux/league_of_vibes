@@ -10,6 +10,7 @@
 //! ce tableau.
 
 pub mod grondak;
+pub mod ilyra;
 
 use crate::abilities::registry::Kit;
 
@@ -19,4 +20,5 @@ use crate::abilities::registry::Kit;
 #[rustfmt::skip]
 pub static KITS: &[&Kit] = &[
     &grondak::KIT,
+    &ilyra::KIT,
 ];
