@@ -1,16 +1,14 @@
 //! Vues d'entités. PROTOTYPE : une forme simple par type d'entité, colorée par équipe, sans modèle,
-//! sans animation ni barre de vie. La position suit le dernier snapshot avec un lissage exponentiel,
-//! pas encore l'interpolation à 100 ms du client web.
+//! sans animation ni barre de vie. La position est celle de `GameState::pose` : interpolée à
+//! `INTERP_DELAY_MS` pour les autres entités, prédite pour le champion local.
 
 use std::collections::HashMap;
 
 use bevy::prelude::*;
 
 use super::to_world;
-use crate::net::GameState;
-use lov_shared::types::{EntityId, EntityKind, EntitySnapshot, TeamOrNeutral};
-
-const SMOOTHING: f32 = 18.0;
+use crate::net::{GameState, Pose};
+use lov_shared::types::{EntityId, EntityKind, TeamOrNeutral};
 
 #[derive(Component)]
 struct EntityView;
@@ -83,9 +81,9 @@ fn load_assets(
     });
 }
 
-fn target(e: &EntitySnapshot, lift: f32) -> Transform {
-    Transform::from_translation(to_world(Vec2::new(e.x as f32, e.y as f32), lift))
-        .with_rotation(Quat::from_rotation_y(e.facing as f32))
+fn target(p: Pose, lift: f32) -> Transform {
+    Transform::from_translation(to_world(Vec2::new(p.x as f32, p.y as f32), lift))
+        .with_rotation(Quat::from_rotation_y(p.facing as f32))
 }
 
 fn sync_views(
@@ -94,10 +92,8 @@ fn sync_views(
     assets: Res<ViewAssets>,
     mut index: ResMut<ViewIndex>,
     mut views: Query<&mut Transform, With<EntityView>>,
-    time: Res<Time>,
 ) {
-    let blend = 1.0 - (-SMOOTHING * time.delta_secs()).exp();
-    for (id, e) in &state.entities {
+    for (id, e) in state.entities() {
         let dead = e.dead.unwrap_or(false);
         // Les zones (blizzard, piège…) n'ont pas encore de vue.
         let Some(shape) = assets.shapes.get(&e.kind).filter(|_| !dead) else {
@@ -106,10 +102,12 @@ fn sync_views(
             }
             continue;
         };
-        let goal = target(e, shape.lift);
+        let Some(pose) = state.pose(*id) else {
+            continue;
+        };
+        let goal = target(pose, shape.lift);
         if let Some(mut transform) = index.0.get(id).and_then(|view| views.get_mut(*view).ok()) {
-            transform.translation = transform.translation.lerp(goal.translation, blend);
-            transform.rotation = transform.rotation.slerp(goal.rotation, blend);
+            *transform = goal;
         } else if !index.0.contains_key(id) {
             let material = if state.my_entity == Some(*id) {
                 &assets.me
@@ -132,7 +130,7 @@ fn sync_views(
         }
     }
     index.0.retain(|id, view| {
-        let known = state.entities.contains_key(id);
+        let known = state.entities().contains_key(id);
         if !known {
             commands.entity(*view).despawn();
         }

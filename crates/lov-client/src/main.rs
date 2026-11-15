@@ -76,7 +76,7 @@ fn update_status(
          Clic droit : bouger | Espace : centrer | Y : fixer la vue | Molette : zoom\n\
          F11 : plein ecran | V : vsync | Esc : rendre la souris | Ctrl+Q : quitter",
         state.status,
-        state.entities.len(),
+        state.entities().len(),
         state.snapshots,
         if rig.locked { "fixe" } else { "libre" },
     );

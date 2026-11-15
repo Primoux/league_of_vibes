@@ -9,8 +9,19 @@
 //! `abilities/mod.rs`). Rien d'autre à modifier : les systèmes, le moteur et les passifs parcourent
 //! ce tableau.
 
+pub mod corvin;
 pub mod grondak;
+pub mod ilyra;
+pub mod kaelen;
+pub mod master67;
 pub mod melenchon;
+pub mod nyx;
+pub mod sable;
+pub mod solenne;
+pub mod tharox;
+pub mod touilleur;
+pub mod vrenna;
+pub mod zephyr;
 
 use crate::abilities::registry::Kit;
 
@@ -20,5 +31,16 @@ use crate::abilities::registry::Kit;
 #[rustfmt::skip]
 pub static KITS: &[&Kit] = &[
     &grondak::KIT,
+    &tharox::KIT,
+    &kaelen::KIT,
+    &vrenna::KIT,
+    &ilyra::KIT,
+    &zephyr::KIT,
+    &sable::KIT,
+    &corvin::KIT,
+    &nyx::KIT,
+    &solenne::KIT,
     &melenchon::KIT,
+    &master67::KIT,
+    &touilleur::KIT,
 ];
