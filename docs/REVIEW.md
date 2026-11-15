@@ -101,7 +101,16 @@ Le TypeScript est gelé : `npm ci && npm test` ne sert que si une PR touche `pac
   n'est pas sorti dans sa propre PR `contract:` : c'est normal, ne la merge pas en l'état.
 - **CI verte, mais sur un ancien `main`** : la protection n'exige pas une branche à jour. Si tu viens de
   merger une PR qui touche les mêmes registres (`systems/mod.rs`, `tests/common/`), teste localement
-  `main` + la PR suivante avant de la merger.
+  `main` + la PR suivante avant de la merger. Dans une série (kits de champions…), fais-le pour **chaque**
+  PR, même sans conflit : un kit peut casser le test d'un autre kit mergé entre-temps.
+- **Un test qui échoue, ce n'est pas forcément la faute de la PR** : avant de demander des changements,
+  relance-le plusieurs fois sur `main` seul. Un test qui passe avec `--test-threads=1` mais échoue en
+  parallèle trahit un état global partagé entre tests (registre `static`, `register_*` sans portée par
+  monde, ids d'entités identiques d'un `World` à l'autre) : ouvre une issue pour l'auteur du test, et ne
+  bloque pas la PR.
+- **Échec du job `check` dans `packages/` sur une PR qui ne touche que `crates/`** : ce sont les tests TS
+  gelés, dont certains sont instables (timeouts de `minions*.test.ts`). Relance le job
+  (`gh run rerun <id> --failed`) ; ce n'est pas une raison de refuser la PR.
 
 ## Garder la file courte
 
