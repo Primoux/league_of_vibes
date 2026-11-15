@@ -7,6 +7,7 @@
 mod _helpers;
 pub mod grondak;
 pub mod master67;
+pub mod tharox;
 
 use crate::schema::ChampionDef;
 use std::sync::LazyLock;
@@ -18,6 +19,7 @@ use std::sync::LazyLock;
 pub static CHAMPIONS: LazyLock<Vec<&'static ChampionDef>> = LazyLock::new(|| {
     vec![
         &*grondak::CHAMPION,
+        &*tharox::CHAMPION,
         &*master67::CHAMPION,
     ]
 });
