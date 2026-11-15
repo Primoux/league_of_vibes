@@ -1,57 +1,323 @@
-//! Connexion au serveur (protocole JSON v2) et état de partie reçu.
+//! Connexion au serveur (protocole JSON v2) et état client : port de `packages/client/src/net/*` et
+//! de `state.ts`.
 //!
-//! Les messages sont les types de `lov_shared::protocol` (`ClientMsg` / `ServerMsg`), les entités
-//! celles de `lov_shared::types`. PROTOTYPE : l'interpolation et la prédiction ne sont pas portées.
+//! - Un fil réseau tient la WebSocket (bloquante, `tungstenite`) : `hello` avec le jeton de session,
+//!   reconnexion avec attente croissante, `netPing` toutes les 2 s pour mesurer la latence.
+//! - [`GameState`] (le `store` du client web) reçoit lobby, draft, chargement, début et fin de partie,
+//!   snapshots fusionnés dans un [`SnapshotBuffer`], état privé du joueur.
+//! - Chaque image, [`GameState::poses`] donne la position interpolée de chaque entité au temps
+//!   serveur `serveur − INTERP_DELAY_MS`, et la position prédite du champion local.
+//! - Les événements de jeu sont publiés en [`ServerEvent`] (le `fxBus` du client web) quand le rendu
+//!   interpolé atteint leur snapshot, pour que les FX coïncident avec les positions affichées.
+//!
+//! En attendant les écrans (lobby, draft), le client crée une salle de dev, la lance et choisit un
+//! champion libre tout seul.
 
-use std::collections::HashMap;
+pub mod clock;
+pub mod prediction;
+pub mod snapshots;
+
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::io::ErrorKind;
 use std::net::TcpStream;
 use std::sync::Mutex;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use bevy::prelude::*;
+use lov_shared::constants::INTERP_DELAY_MS;
+use lov_shared::data::champions::CHAMPIONS;
 use lov_shared::protocol::{
-    ClientMsg, DraftState, PROTOCOL_VERSION, RoomPhase, ServerMsg, Snapshot, apply_entity_patch,
-    decode, encode,
+    ClientMsg, DraftState, GameOver, GameStart, LobbyState, PROTOCOL_VERSION, RoomPhase, Score,
+    ServerMsg, Snapshot, decode, encode,
 };
-use lov_shared::types::{EntityId, EntitySnapshot};
+use lov_shared::types::{EntityId, EntitySnapshot, GameEvent, SelfState};
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket};
 
+pub use clock::ServerClock;
+pub use prediction::{MovePredictor, ServerView};
+pub use snapshots::{Pose, SnapshotBuffer};
+
 const DEFAULT_URL: &str = "ws://localhost:3000/ws";
-/// Champions tentés au draft, dans l'ordre, quand le serveur ne tourne pas avec `SKIP_DRAFT=1`.
-const DRAFT_ORDER: [&str; 6] = ["grondak", "kaelen", "ilyra", "sable", "nyx", "solenne"];
+/// Attentes successives avant de retenter la connexion (ms).
+const RECONNECT_DELAYS: [u64; 5] = [500, 1000, 2000, 4000, 8000];
+const PING_EVERY: Duration = Duration::from_secs(2);
+/// Au-delà, les événements en attente sont publiés sans attendre (horloge incohérente…).
+const MAX_PENDING_SNAPSHOTS: usize = 40;
+/// Vitesse prise pour la prédiction tant que l'état privé n'est pas arrivé.
+const DEFAULT_MOVE_SPEED: f64 = 335.0;
+/// Latence supposée tant qu'aucun `pong` n'est revenu (ms).
+const DEFAULT_RTT: f64 = 80.0;
+
+/// Horloge locale (ms depuis l'époque Unix), comme `Date.now()`.
+pub fn now_ms() -> f64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0.0, |d| d.as_secs_f64() * 1000.0)
+}
+
+/// Un événement de jeu, publié quand le rendu interpolé atteint son snapshot (le `fxBus` du web).
+#[derive(Message, Debug, Clone)]
+pub struct ServerEvent(pub GameEvent);
 
 /// Canal vers le fil réseau, en messages typés.
 #[derive(Resource)]
 pub struct Connection {
     outgoing: Sender<ClientMsg>,
     incoming: Mutex<Receiver<ServerMsg>>,
+    /// Ordres qui comptent pour la prédiction, relus par `pump_network`.
+    local_orders: Mutex<Vec<ClientMsg>>,
 }
 
 impl Connection {
+    fn new(outgoing: Sender<ClientMsg>, incoming: Receiver<ServerMsg>) -> Self {
+        Self {
+            outgoing,
+            incoming: Mutex::new(incoming),
+            local_orders: Mutex::new(Vec::new()),
+        }
+    }
+
     pub fn send(&self, msg: ClientMsg) {
+        if matches!(
+            msg,
+            ClientMsg::Move { .. }
+                | ClientMsg::AttackMove { .. }
+                | ClientMsg::Attack { .. }
+                | ClientMsg::Stop
+                | ClientMsg::Cast { .. }
+        ) && let Ok(mut orders) = self.local_orders.lock()
+        {
+            orders.push(msg.clone());
+        }
         // Le fil réseau s'arrête quand la connexion tombe : un envoi perdu est alors sans conséquence.
         let _ = self.outgoing.send(msg);
     }
 }
 
-/// Dernier état connu de la partie, reconstruit à partir des snapshots complets et delta.
+/// État client (le `store` du client web).
 #[derive(Resource, Default)]
 pub struct GameState {
+    /// Ligne d'état courte pour l'affichage de debug.
     pub status: String,
+    pub connected: bool,
     pub player_id: Option<String>,
+    pub lobby: Option<LobbyState>,
+    pub draft: Option<DraftState>,
+    pub game: Option<GameStart>,
+    /// Fin du chargement (temps serveur, ms).
+    pub loading_ends_at: Option<f64>,
+    pub result: Option<GameOver>,
+    pub error: Option<String>,
+    /// Latence aller-retour lissée (ms).
+    pub rtt: Option<f64>,
+    /// Entité du joueur local.
     pub my_entity: Option<EntityId>,
-    pub entities: HashMap<EntityId, EntitySnapshot>,
+    /// Vue complète fusionnée et historique des positions.
+    pub buffer: SnapshotBuffer,
+    pub clock: ServerClock,
+    pub predictor: MovePredictor,
+    /// Position affichée de chaque entité, recalculée chaque image.
+    pub poses: HashMap<EntityId, Pose>,
+    /// Méta-données du dernier snapshot.
+    pub tick: u64,
+    pub time: f64,
+    pub score: Option<Score>,
+    pub self_state: Option<SelfState>,
+    pub objective_timers: Option<BTreeMap<String, f64>>,
+    /// Événements du dernier snapshot (lecture immédiate par l'interface).
+    pub events: Vec<GameEvent>,
+    /// Snapshots reçus depuis le lancement.
     pub snapshots: u64,
-    start_requested: bool,
+    pending: VecDeque<(f64, Vec<GameEvent>)>,
+    room_requested: bool,
 }
 
 impl GameState {
-    pub fn me(&self) -> Option<&EntitySnapshot> {
-        self.entities.get(&self.my_entity?)
+    pub fn entities(&self) -> &HashMap<EntityId, EntitySnapshot> {
+        &self.buffer.entities
+    }
+
+    /// Position affichée d'une entité : interpolée, ou à défaut celle du dernier snapshot.
+    pub fn pose(&self, id: EntityId) -> Option<Pose> {
+        self.poses.get(&id).copied().or_else(|| {
+            self.buffer.entities.get(&id).map(|e| Pose {
+                x: e.x,
+                y: e.y,
+                facing: e.facing,
+            })
+        })
+    }
+
+    /// Temps serveur (ms) auquel le rendu affiche les entités.
+    pub fn render_time(&self, local_now: f64) -> f64 {
+        self.clock.server_now(local_now) - f64::from(INTERP_DELAY_MS)
+    }
+
+    fn rtt_or_default(&self) -> f64 {
+        self.rtt.unwrap_or(DEFAULT_RTT)
+    }
+
+    /// Route un message du serveur.
+    pub fn route(&mut self, msg: ServerMsg, local_now: f64) {
+        match msg {
+            ServerMsg::Welcome { player_id, .. } => {
+                self.player_id = Some(player_id);
+                self.connected = true;
+                self.error = None;
+            }
+            ServerMsg::Error { message } => {
+                warn!("serveur : {message}");
+                self.status.clone_from(&message);
+                self.error = Some(message);
+            }
+            ServerMsg::Lobby { state } => {
+                self.lobby = Some(state);
+                self.error = None;
+            }
+            ServerMsg::Draft { state } => self.draft = Some(state),
+            ServerMsg::Loading { ends_at } => self.loading_ends_at = Some(ends_at),
+            ServerMsg::GameStart { start } => {
+                self.buffer.clear();
+                self.clock.reset();
+                self.pending.clear();
+                self.poses.clear();
+                self.predictor = MovePredictor::default();
+                self.my_entity = Some(start.entity_id);
+                self.result = None;
+                self.self_state = None;
+                self.game = Some(start);
+                info!("partie lancée, entité du joueur : {:?}", self.my_entity);
+            }
+            ServerMsg::Snapshot { snap } => self.on_snapshot(*snap, local_now),
+            ServerMsg::GameOver { result } => self.result = Some(result),
+            ServerMsg::Pong { client_time, .. } => {
+                if let Some(sent) = client_time {
+                    let sample = (local_now - sent).max(0.0);
+                    let rtt = match self.rtt {
+                        None => sample,
+                        Some(prev) => prev * 0.7 + sample * 0.3,
+                    }
+                    .round();
+                    self.rtt = Some(rtt);
+                }
+            }
+        }
+    }
+
+    fn on_snapshot(&mut self, snap: Snapshot, local_now: f64) {
+        self.clock.sample(snap.server_time, local_now);
+        if !self.buffer.push(&snap) {
+            return;
+        }
+        self.snapshots += 1;
+        for id in &self.buffer.removed {
+            self.poses.remove(id);
+        }
+        // Un dash du joueur local suspend la prédiction le temps du dash.
+        for ev in &snap.events {
+            if let GameEvent::Dash {
+                source, duration, ..
+            } = ev
+                && Some(*source) == self.my_entity
+            {
+                self.predictor.suspend(duration + 0.1);
+            }
+        }
+        if self.my_entity.is_none() {
+            self.my_entity = snap.self_state.as_ref().map(|s| s.entity_id);
+        }
+        self.tick = snap.tick;
+        self.time = snap.time;
+        self.score = Some(snap.score);
+        self.self_state = snap.self_state;
+        self.objective_timers = snap.objective_timers;
+        if !snap.events.is_empty() {
+            self.pending
+                .push_back((snap.server_time, snap.events.clone()));
+        }
+        self.events = snap.events;
+    }
+
+    /// Ordre local : la prédiction démarre sans attendre le serveur.
+    pub fn local_order(&mut self, msg: &ClientMsg) {
+        let latency = self.rtt_or_default() / 1000.0;
+        match msg {
+            ClientMsg::Move { pos } | ClientMsg::AttackMove { pos } => {
+                self.predictor.command(*pos, latency);
+            }
+            _ => self.predictor.cancel(),
+        }
+    }
+
+    /// Recalcule les positions affichées (`dt` en secondes) et renvoie les événements atteints par
+    /// le rendu, à publier.
+    pub fn advance(&mut self, dt: f64, local_now: f64, due: &mut Vec<GameEvent>) {
+        self.clock.update(dt * 1000.0);
+        let rt = self.render_time(local_now);
+        let me = self.my_entity;
+        for (&id, e) in &self.buffer.entities {
+            if Some(id) == me {
+                continue;
+            }
+            let pose = self.buffer.sample(id, rt).unwrap_or(Pose {
+                x: e.x,
+                y: e.y,
+                facing: e.facing,
+            });
+            self.poses.insert(id, pose);
+        }
+        if let Some(id) = me {
+            self.predict_self(id, dt, local_now);
+        }
+        while self.pending.front().is_some_and(|(at, _)| *at <= rt)
+            || self.pending.len() > MAX_PENDING_SNAPSHOTS
+        {
+            if let Some((_, events)) = self.pending.pop_front() {
+                due.extend(events);
+            }
+        }
+    }
+
+    fn predict_self(&mut self, id: EntityId, dt: f64, local_now: f64) {
+        let (Some(e), Some(last)) = (self.buffer.entities.get(&id), self.buffer.latest_sample(id))
+        else {
+            return;
+        };
+        let (vx, vy) = self.buffer.velocity(id).unwrap_or((0.0, 0.0));
+        let lead =
+            (self.clock.server_now(local_now) - last.t) / 1000.0 + self.rtt_or_default() / 2000.0;
+        let speed = self
+            .self_state
+            .as_ref()
+            .map_or(DEFAULT_MOVE_SPEED, |s| s.stats.move_speed);
+        let prev = self.poses.get(&id).copied();
+        let server = ServerView {
+            x: last.x,
+            y: last.y,
+            vx,
+            vy,
+            lead,
+        };
+        let alive = e.dead != Some(true);
+        let facing = e.facing;
+        let pos = self.predictor.update(dt, server, speed, alive);
+        let facing = match prev {
+            Some(p) if self.predictor.moving() && (pos.x - p.x).hypot(pos.y - p.y) > 1.0 => {
+                (pos.y - p.y).atan2(pos.x - p.x)
+            }
+            _ => facing,
+        };
+        self.poses.insert(
+            id,
+            Pose {
+                x: pos.x,
+                y: pos.y,
+                facing,
+            },
+        );
     }
 }
 
@@ -60,94 +326,150 @@ pub struct NetPlugin;
 impl Plugin for NetPlugin {
     fn build(&self, app: &mut App) {
         let url = std::env::var("LOV_URL").unwrap_or_else(|_| DEFAULT_URL.to_string());
+        let name = std::env::var("LOV_NAME").unwrap_or_else(|_| "Natif".to_string());
         let (outgoing, from_game) = mpsc::channel();
         let (to_game, incoming) = mpsc::channel();
-        thread::spawn(move || network_thread(&url, &from_game, &to_game));
-        app.insert_resource(Connection {
-            outgoing,
-            incoming: Mutex::new(incoming),
-        })
-        .insert_resource(GameState {
-            status: "Connexion…".into(),
-            ..default()
-        })
-        .add_systems(PreUpdate, pump_network);
+        thread::spawn(move || network_thread(&url, &name, &from_game, &to_game));
+        app.insert_resource(Connection::new(outgoing, incoming))
+            .insert_resource(GameState {
+                status: "Connexion…".into(),
+                ..default()
+            })
+            .add_message::<ServerEvent>()
+            .add_systems(PreUpdate, (pump_network, update_poses).chain())
+            .add_systems(Update, trace_events);
     }
 }
 
-/// Mode hors ligne (scène de charge) : mêmes ressources, mais aucun fil réseau. Les ordres envoyés
-/// sont perdus car le récepteur du canal est abandonné.
+/// Mode hors ligne (scène de charge) : mêmes ressources, sans fil réseau. Les ordres envoyés sont
+/// perdus : le récepteur du canal est abandonné.
 pub struct OfflinePlugin;
 
 impl Plugin for OfflinePlugin {
     fn build(&self, app: &mut App) {
         let (outgoing, _) = mpsc::channel();
         let (_, incoming) = mpsc::channel();
-        app.insert_resource(Connection {
-            outgoing,
-            incoming: Mutex::new(incoming),
-        })
-        .init_resource::<GameState>();
+        app.insert_resource(Connection::new(outgoing, incoming))
+            .init_resource::<GameState>()
+            .add_message::<ServerEvent>();
     }
 }
 
+// ------------------------------------------------------------------------------------------------
+// Fil réseau
+// ------------------------------------------------------------------------------------------------
+
+type Socket = WebSocket<MaybeTlsStream<TcpStream>>;
+
 /// Signale un problème de connexion au jeu sous la forme d'un `ServerMsg` d'erreur.
-fn report(to_game: &Sender<ServerMsg>, message: String) {
-    let _ = to_game.send(ServerMsg::Error { message });
+fn report(to_game: &Sender<ServerMsg>, message: String) -> bool {
+    to_game.send(ServerMsg::Error { message }).is_ok()
 }
 
-fn network_thread(url: &str, from_game: &Receiver<ClientMsg>, to_game: &Sender<ServerMsg>) {
-    let mut socket = match tungstenite::connect(url) {
-        Ok((socket, _)) => socket,
-        Err(e) => return report(to_game, format!("Connexion à {url} impossible : {e}")),
-    };
+/// Comment s'est terminée une session WebSocket.
+enum Ended {
+    /// Le jeu s'est arrêté : le fil aussi.
+    GameGone,
+    /// Connexion perdue : on peut retenter.
+    Lost(String),
+}
+
+fn network_thread(
+    url: &str,
+    name: &str,
+    from_game: &Receiver<ClientMsg>,
+    to_game: &Sender<ServerMsg>,
+) {
+    let mut token: Option<String> = None;
+    let mut attempts = 0usize;
+    loop {
+        let ended = match tungstenite::connect(url) {
+            Ok((socket, _)) => {
+                attempts = 0;
+                session(socket, name, &mut token, from_game, to_game)
+            }
+            Err(e) => Ended::Lost(format!("Connexion à {url} impossible : {e}")),
+        };
+        let Ended::Lost(reason) = ended else { return };
+        if !report(to_game, reason) {
+            return;
+        }
+        let delay = RECONNECT_DELAYS[attempts.min(RECONNECT_DELAYS.len() - 1)];
+        attempts += 1;
+        thread::sleep(Duration::from_millis(delay));
+    }
+}
+
+/// Une connexion : `hello`, puis relais des messages dans les deux sens jusqu'à la coupure.
+fn session(
+    mut socket: Socket,
+    name: &str,
+    token: &mut Option<String>,
+    from_game: &Receiver<ClientMsg>,
+    to_game: &Sender<ServerMsg>,
+) -> Ended {
     // Lecture à délai court : la même boucle sert les envois et les réceptions.
     if let MaybeTlsStream::Plain(stream) = socket.get_mut() {
         let _ = stream.set_read_timeout(Some(Duration::from_millis(2)));
+        let _ = stream.set_nodelay(true);
     }
     let hello = ClientMsg::Hello {
-        name: "Natif".into(),
+        name: name.to_owned(),
         version: PROTOCOL_VERSION,
-        reconnect_token: None,
+        reconnect_token: token.clone(),
     };
     if !send_msg(&mut socket, &hello) {
-        return report(to_game, "Connexion fermée pendant le hello".into());
+        return Ended::Lost("Connexion fermée pendant le hello".into());
     }
+    let mut last_ping: Option<Instant> = None;
     loop {
+        if last_ping.is_none_or(|t| t.elapsed() >= PING_EVERY) {
+            last_ping = Some(Instant::now());
+            let ping = ClientMsg::NetPing {
+                client_time: now_ms(),
+            };
+            if !send_msg(&mut socket, &ping) {
+                return Ended::Lost("Connexion perdue".into());
+            }
+        }
         loop {
             match from_game.try_recv() {
                 Ok(msg) => {
                     if !send_msg(&mut socket, &msg) {
-                        return report(to_game, "Connexion perdue".into());
+                        return Ended::Lost("Connexion perdue".into());
                     }
                 }
                 Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => return,
+                Err(TryRecvError::Disconnected) => return Ended::GameGone,
             }
         }
         match socket.read() {
             // Donnée venue du réseau : un message illisible est journalisé puis ignoré.
             Ok(Message::Text(raw)) => match decode::<ServerMsg>(raw.as_str()) {
                 Ok(msg) => {
+                    if let ServerMsg::Welcome {
+                        reconnect_token, ..
+                    } = &msg
+                    {
+                        *token = Some(reconnect_token.clone());
+                    }
                     if to_game.send(msg).is_err() {
-                        return;
+                        return Ended::GameGone;
                     }
                 }
                 Err(e) => warn!("message serveur illisible, ignoré : {e}"),
             },
-            Ok(Message::Close(_)) => {
-                return report(to_game, "Le serveur a fermé la connexion".into());
-            }
+            Ok(Message::Close(_)) => return Ended::Lost("Le serveur a fermé la connexion".into()),
             Ok(_) => {}
             Err(tungstenite::Error::Io(e))
                 if matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {}
-            Err(e) => return report(to_game, format!("Connexion perdue : {e}")),
+            Err(e) => return Ended::Lost(format!("Connexion perdue : {e}")),
         }
     }
 }
 
 /// Encode et envoie un message ; `false` si la connexion est tombée.
-fn send_msg(socket: &mut WebSocket<MaybeTlsStream<TcpStream>>, msg: &ClientMsg) -> bool {
+fn send_msg(socket: &mut Socket, msg: &ClientMsg) -> bool {
     match encode(msg) {
         Ok(raw) => socket.send(Message::text(raw)).is_ok(),
         Err(e) => {
@@ -157,53 +479,86 @@ fn send_msg(socket: &mut WebSocket<MaybeTlsStream<TcpStream>>, msg: &ClientMsg) 
     }
 }
 
+// ------------------------------------------------------------------------------------------------
+// Systèmes
+// ------------------------------------------------------------------------------------------------
+
 fn pump_network(conn: Res<Connection>, mut state: ResMut<GameState>) {
+    if let Ok(mut orders) = conn.local_orders.lock() {
+        for msg in orders.drain(..) {
+            state.local_order(&msg);
+        }
+    }
     // Le verrou n'est jamais disputé : ce système est le seul lecteur.
     let Ok(incoming) = conn.incoming.lock() else {
         return;
     };
+    let now = now_ms();
     while let Ok(msg) = incoming.try_recv() {
-        match msg {
-            ServerMsg::Welcome { player_id, .. } => {
-                state.player_id = Some(player_id);
-                state.status = "Création de la salle…".into();
-                conn.send(ClientMsg::CreateRoom {
-                    dev_mode: Some(true),
-                });
-            }
-            ServerMsg::Lobby { state: lobby } => {
-                if lobby.phase == RoomPhase::Lobby && !state.start_requested {
-                    state.start_requested = true;
-                    state.status = "Salle créée, lancement…".into();
-                    conn.send(ClientMsg::SetReady { ready: true });
-                    conn.send(ClientMsg::StartGame);
-                }
-            }
-            ServerMsg::Draft { state: draft } => {
-                state.status = "Draft…".into();
-                lock_first_free_champion(&conn, &state, &draft);
-            }
-            ServerMsg::Loading { .. } => state.status = "Chargement…".into(),
-            ServerMsg::GameStart { start } => {
-                state.my_entity = Some(start.entity_id);
-                state.status = "En jeu".into();
-                info!("partie lancée, entité du joueur : {:?}", state.my_entity);
-            }
-            ServerMsg::Snapshot { snap } => apply_snapshot(&mut state, *snap),
-            ServerMsg::GameOver { .. } => state.status = "Partie terminée".into(),
-            ServerMsg::Error { message } => {
-                warn!("serveur : {message}");
-                state.status = message;
-            }
-            ServerMsg::Pong { .. } => {}
+        let autoplay = autoplay_step(&conn, &mut state, &msg);
+        state.route(msg, now);
+        if let Some(status) = autoplay {
+            state.status = status;
         }
     }
 }
 
-fn lock_first_free_champion(conn: &Connection, state: &GameState, draft: &DraftState) {
-    let Some(me) = state.player_id.as_deref() else {
-        return;
-    };
+fn update_poses(
+    mut state: ResMut<GameState>,
+    time: Res<Time>,
+    mut events: MessageWriter<ServerEvent>,
+    mut due: Local<Vec<GameEvent>>,
+) {
+    due.clear();
+    state.advance(f64::from(time.delta_secs()), now_ms(), &mut due);
+    for ev in due.drain(..) {
+        events.write(ServerEvent(ev));
+    }
+}
+
+/// Trace des événements de jeu publiés (`RUST_LOG=lov_client=debug`), en attendant les FX.
+fn trace_events(mut events: MessageReader<ServerEvent>) {
+    for ServerEvent(ev) in events.read() {
+        debug!("événement : {ev:?}");
+    }
+}
+
+/// En attendant les écrans de lobby et de draft : crée une salle de dev, la lance, choisit un
+/// champion libre. Renvoie la ligne d'état à afficher.
+fn autoplay_step(conn: &Connection, state: &mut GameState, msg: &ServerMsg) -> Option<String> {
+    match msg {
+        ServerMsg::Welcome { .. } => {
+            // Une reconnexion reprend la salle : on ne recrée rien.
+            if state.lobby.is_some() || state.game.is_some() {
+                return Some("Reconnecté".into());
+            }
+            conn.send(ClientMsg::CreateRoom {
+                dev_mode: Some(true),
+            });
+            Some("Création de la salle…".into())
+        }
+        ServerMsg::Lobby { state: lobby } => {
+            if lobby.phase == RoomPhase::Lobby && !state.room_requested {
+                state.room_requested = true;
+                conn.send(ClientMsg::SetReady { ready: true });
+                conn.send(ClientMsg::StartGame);
+                return Some("Salle créée, lancement…".into());
+            }
+            None
+        }
+        ServerMsg::Draft { state: draft } => {
+            lock_first_free_champion(conn, state.player_id.as_deref(), draft);
+            Some("Draft…".into())
+        }
+        ServerMsg::Loading { .. } => Some("Chargement…".into()),
+        ServerMsg::GameStart { .. } => Some("En jeu".into()),
+        ServerMsg::GameOver { .. } => Some("Partie terminée".into()),
+        _ => None,
+    }
+}
+
+fn lock_first_free_champion(conn: &Connection, me: Option<&str>, draft: &DraftState) {
+    let Some(me) = me else { return };
     let my_turn = draft
         .turns
         .get(draft.current_turn as usize)
@@ -212,148 +567,18 @@ fn lock_first_free_champion(conn: &Connection, state: &GameState, draft: &DraftS
     if !my_turn || locked {
         return;
     }
-    let free = DRAFT_ORDER.iter().find(|id| {
+    let free = CHAMPIONS.iter().map(|c| c.id.as_str()).find(|id| {
         !draft
             .picks
             .iter()
-            .any(|p| p.champion_id.as_deref() == Some(**id))
+            .any(|p| p.champion_id.as_deref() == Some(*id))
     });
     if let Some(id) = free {
         conn.send(ClientMsg::DraftLock {
-            champion_id: (*id).to_string(),
+            champion_id: id.to_owned(),
         });
     }
 }
 
-/// Même sémantique que le client web : sans `removed`, le snapshot est complet ; avec, c'est un delta
-/// dont `patches` porte les mises à jour partielles (voir `apply_entity_patch` de `lov-shared`).
-fn apply_snapshot(state: &mut GameState, snap: Snapshot) {
-    state.snapshots += 1;
-    if state.snapshots == 1 {
-        info!("premier snapshot reçu");
-    }
-    if !snap.is_delta() {
-        state.entities.clear();
-    }
-    for entity in snap.entities {
-        state.entities.insert(entity.id, entity);
-    }
-    for id in snap.removed.iter().flatten() {
-        state.entities.remove(id);
-    }
-    for patch in snap.patches.iter().flatten() {
-        if let Some(entity) = state.entities.get_mut(&patch.id) {
-            *entity = apply_entity_patch(entity, patch);
-        }
-    }
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use lov_shared::protocol::{EntityField, EntityPatch, Score, TeamScore};
-    use lov_shared::types::{EntityKind, TeamOrNeutral};
-
-    fn ent(id: EntityId, x: f64) -> EntitySnapshot {
-        EntitySnapshot {
-            id,
-            kind: EntityKind::Minion,
-            team: TeamOrNeutral::Blue,
-            x,
-            y: 5.0,
-            facing: 0.0,
-            hp: 1.0,
-            max_hp: 1.0,
-            mana: None,
-            max_mana: None,
-            shield: None,
-            dead: None,
-            subtype: None,
-            owner_id: None,
-            level: None,
-            anim: Some("run".into()),
-            buffs: None,
-            champ: None,
-        }
-    }
-
-    fn snap(
-        entities: Vec<EntitySnapshot>,
-        removed: Option<Vec<EntityId>>,
-        patches: Option<Vec<EntityPatch>>,
-    ) -> Snapshot {
-        let team = || TeamScore {
-            kills: 0,
-            towers: 0,
-            dragons: vec![],
-            grubs: 0,
-        };
-        Snapshot {
-            tick: 0,
-            time: 0.0,
-            server_time: 0.0,
-            entities,
-            removed,
-            patches,
-            events: vec![],
-            self_state: None,
-            objective_timers: None,
-            score: Score {
-                blue: team(),
-                red: team(),
-            },
-        }
-    }
-
-    fn state_after(snaps: Vec<Snapshot>) -> GameState {
-        let mut state = GameState::default();
-        for s in snaps {
-            apply_snapshot(&mut state, s);
-        }
-        state
-    }
-
-    #[test]
-    fn snapshot_complet_remplace_tout() {
-        let state = state_after(vec![
-            snap(vec![ent(1, 10.0), ent(2, 20.0)], None, None),
-            snap(vec![ent(2, 25.0)], None, None),
-        ]);
-        assert_eq!(state.entities.len(), 1);
-        assert_eq!(state.entities[&2].x, 25.0);
-    }
-
-    #[test]
-    fn delta_conserve_les_absentes_et_retire_les_removed() {
-        let state = state_after(vec![
-            snap(vec![ent(1, 10.0), ent(2, 20.0), ent(3, 30.0)], None, None),
-            snap(vec![ent(4, 40.0)], Some(vec![2]), None),
-        ]);
-        let mut ids: Vec<_> = state.entities.keys().copied().collect();
-        ids.sort_unstable();
-        assert_eq!(ids, [1, 3, 4]);
-    }
-
-    #[test]
-    fn patch_modifie_et_supprime_des_champs() {
-        let mut patch = EntityPatch::new(1);
-        patch.x = Some(12.0);
-        patch.u = Some(vec![EntityField::Anim]);
-        let state = state_after(vec![
-            snap(vec![ent(1, 10.0)], None, None),
-            snap(vec![], Some(vec![]), Some(vec![patch])),
-        ]);
-        let e = &state.entities[&1];
-        assert_eq!(e.x, 12.0);
-        assert_eq!(e.y, 5.0);
-        assert_eq!(e.anim, None);
-    }
-
-    #[test]
-    fn patch_d_une_entite_inconnue_est_ignore() {
-        let mut patch = EntityPatch::new(9);
-        patch.x = Some(1.0);
-        let state = state_after(vec![snap(vec![], Some(vec![]), Some(vec![patch]))]);
-        assert!(state.entities.is_empty());
-    }
-}
+mod tests;
