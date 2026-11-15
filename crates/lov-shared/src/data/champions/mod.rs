@@ -6,6 +6,7 @@
 
 mod _helpers;
 pub mod grondak;
+pub mod kaelen;
 pub mod tharox;
 pub mod vrenna;
 
@@ -21,6 +22,7 @@ pub static CHAMPIONS: LazyLock<Vec<&'static ChampionDef>> = LazyLock::new(|| {
         &*grondak::CHAMPION,
         &*tharox::CHAMPION,
         &*vrenna::CHAMPION,
+        &*kaelen::CHAMPION,
     ]
 });
 
