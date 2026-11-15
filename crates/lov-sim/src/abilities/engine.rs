@@ -111,10 +111,8 @@ pub fn ability_state(e: &mut Entity) -> &mut AbilityState {
     e.data.get_or_insert_with(AbilityState::default)
 }
 
-/// `cooldownWithHaste(seconds, haste)`.
-pub fn cooldown_with_haste(seconds: f64, haste: f64) -> f64 {
-    seconds * 100.0 / (100.0 + haste.max(0.0))
-}
+/// `cooldownWithHaste(seconds, haste)` : défini par le système de niveaux, comme en TypeScript.
+pub use crate::systems::leveling::cooldown_with_haste;
 
 /// `c.cooldowns[slot]`.
 pub fn cooldown(c: &ChampionState, slot: AbilitySlot) -> f64 {
