@@ -17,7 +17,7 @@
     "crates/lov-shared/src/constants.rs",
     "crates/lov-shared/src/map.rs",
     "crates/lov-shared/src/math.rs",
-    "crates/lov-sim/src/systems/mod.rs"
+    "crates/lov-sim/src/systems/registry.rs"
   ],
   "always": [
     "docs/**/*.md",

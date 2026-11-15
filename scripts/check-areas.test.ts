@@ -146,6 +146,19 @@ describe('check-areas : contrats Rust', () => {
   });
 });
 
+describe('check-areas : registre des systèmes Rust', () => {
+  it('un système ajoute sa ligne à systems/mod.rs sans PR de contrat', () => {
+    const r = check('feat(systems): mouvement', ['crates/lov-sim/src/systems/movement.rs', 'crates/lov-sim/src/systems/mod.rs']);
+    expect(r.ok).toBe(true);
+  });
+
+  it('l’ordre des systèmes (registry.rs) reste un contrat', () => {
+    const r = check('feat(systems): mouvement', ['crates/lov-sim/src/systems/movement.rs', 'crates/lov-sim/src/systems/registry.rs']);
+    expect(r.ok).toBe(false);
+    expect(r.out).toContain('registry.rs');
+  });
+});
+
 describe('check-areas : fonctionnalité qui traverse plusieurs areas', () => {
   const boutique = [
     'packages/client/src/ui/hud/Shop.tsx',
