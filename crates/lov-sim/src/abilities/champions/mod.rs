@@ -31,10 +31,10 @@ use crate::abilities::registry::Kit;
 #[rustfmt::skip]
 pub static KITS: &[&Kit] = &[
     &grondak::KIT,
+    &ilyra::KIT,
     &tharox::KIT,
     &kaelen::KIT,
     &vrenna::KIT,
-    &ilyra::KIT,
     &zephyr::KIT,
     &sable::KIT,
     &corvin::KIT,

@@ -9,6 +9,9 @@ use lov_shared::types::{AbilitySlot, DamageType, GameEvent, PartialStats};
 use lov_sim::combat::buffs::{StatModifiers, get_buff, has_cc, register_stat_source};
 use lov_sim::combat::damage::{DamageOpts, apply_damage};
 
+/// Marque l'entité qui reçoit les +25 AD du test du E.
+struct BonusAdForTest;
+
 fn close(a: f64, b: f64) {
     assert!((a - b).abs() < 1e-6, "{a} != {b}");
 }
@@ -60,15 +63,16 @@ fn w_bloque_un_coup_de_champion_et_etourdit_un_attaquant_de_melee() {
 fn e_bondit_et_son_bouclier_suit_l_ad_bonus() {
     let mut g = game("kaelen");
     let (s, t) = (g.source, g.target);
-    let off = register_stat_source(move |_, e| {
-        (e.id == s && e.champ.as_ref().is_some_and(|c| c.champion_id == "kaelen")).then(|| {
-            StatModifiers {
-                flat: PartialStats {
-                    ad: Some(25.0),
-                    ..PartialStats::default()
-                },
-                ..StatModifiers::default()
-            }
+    // Le registre des sources de stats est global au processus et les tests tournent en parallèle :
+    // la source ne s'applique qu'à l'entité marquée par ce test, jamais au Kaelen d'un autre test.
+    g.e_mut(s).data.insert(BonusAdForTest);
+    let off = register_stat_source(|_, e| {
+        e.data.contains::<BonusAdForTest>().then(|| StatModifiers {
+            flat: PartialStats {
+                ad: Some(25.0),
+                ..PartialStats::default()
+            },
+            ..StatModifiers::default()
         })
     });
     g.step();
