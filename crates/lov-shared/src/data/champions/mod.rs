@@ -26,11 +26,11 @@ pub static CHAMPIONS: LazyLock<Vec<&'static ChampionDef>> = LazyLock::new(|| {
         &*grondak::CHAMPION,
         &*tharox::CHAMPION,
         &*kaelen::CHAMPION,
-        &*nyx::CHAMPION,
         &*vrenna::CHAMPION,
         &*ilyra::CHAMPION,
         &*zephyr::CHAMPION,
         &*corvin::CHAMPION,
+        &*nyx::CHAMPION,
     ]
 });
 
