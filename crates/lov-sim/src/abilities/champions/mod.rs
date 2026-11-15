@@ -10,7 +10,13 @@
 //! ce tableau.
 
 pub mod grondak;
+pub mod ilyra;
+pub mod kaelen;
 pub mod master67;
+pub mod sable;
+pub mod solenne;
+pub mod tharox;
+pub mod zephyr;
 
 use crate::abilities::registry::Kit;
 
@@ -20,5 +26,11 @@ use crate::abilities::registry::Kit;
 #[rustfmt::skip]
 pub static KITS: &[&Kit] = &[
     &grondak::KIT,
+    &tharox::KIT,
+    &kaelen::KIT,
+    &ilyra::KIT,
+    &zephyr::KIT,
+    &sable::KIT,
+    &solenne::KIT,
     &master67::KIT,
 ];

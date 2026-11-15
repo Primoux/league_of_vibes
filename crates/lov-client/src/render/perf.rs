@@ -35,7 +35,7 @@ fn log_perf(time: Res<Time<Real>>, state: Res<GameState>, mut w: ResMut<Window5s
             1.0 / avg,
             avg * 1000.0,
             w.worst * 1000.0,
-            state.entities.len()
+            state.entities().len()
         );
         *w = Window5s::default();
     }
