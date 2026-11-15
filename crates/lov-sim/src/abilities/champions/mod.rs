@@ -10,6 +10,7 @@
 //! ce tableau.
 
 pub mod corvin;
+pub mod grondak;
 
 use crate::abilities::registry::Kit;
 
@@ -18,5 +19,6 @@ use crate::abilities::registry::Kit;
 // n'ajoute qu'une ligne (rustfmt replierait la liste sur une ligne tant qu'elle est courte).
 #[rustfmt::skip]
 pub static KITS: &[&Kit] = &[
+    &grondak::KIT,
     &corvin::KIT,
 ];
