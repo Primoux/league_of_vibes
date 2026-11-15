@@ -174,9 +174,11 @@ pub fn game_systems(skip: &[&str]) -> Vec<System> {
     use lov_sim::systems::leveling::leveling_system;
     use lov_sim::systems::minions::minions_system;
     use lov_sim::systems::structures::structures_system;
+    use lov_sim::systems::summoners::summoners_system;
     let all = vec![
         input_system(),
         buffs_system(),
+        summoners_system(),
         abilities_system(),
         movement_system(),
         combat_system_with_projectiles().0,

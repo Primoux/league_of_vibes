@@ -9,4 +9,5 @@ pub mod leveling;
 pub mod minions;
 pub mod movement;
 pub mod structures;
+pub mod summoners;
 pub mod vision;
