@@ -9,5 +9,6 @@ pub mod jungle;
 pub mod leveling;
 pub mod minions;
 pub mod movement;
+pub mod objectives;
 pub mod structures;
 pub mod vision;
