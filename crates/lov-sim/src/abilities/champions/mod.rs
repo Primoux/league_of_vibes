@@ -14,6 +14,7 @@ pub mod grondak;
 pub mod ilyra;
 pub mod kaelen;
 pub mod master67;
+pub mod nyx;
 pub mod sable;
 pub mod solenne;
 pub mod tharox;
@@ -36,6 +37,7 @@ pub static KITS: &[&Kit] = &[
     &zephyr::KIT,
     &sable::KIT,
     &corvin::KIT,
+    &nyx::KIT,
     &solenne::KIT,
     &master67::KIT,
     &touilleur::KIT,
