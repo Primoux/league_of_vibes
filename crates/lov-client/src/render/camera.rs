@@ -5,8 +5,9 @@ use bevy::input::mouse::AccumulatedMouseScroll;
 use bevy::prelude::*;
 
 use super::map::MAP_SIZE;
-use super::{RENDER_SCALE, to_world};
-use crate::net::{GameState, num};
+use super::{RENDER_SCALE, from_shared, to_world};
+use crate::net::GameState;
+use lov_shared::map::NEXUS;
 
 const EDGE_PX: f32 = 14.0;
 const PAN_SPEED: f32 = 32.0;
@@ -27,7 +28,7 @@ pub struct CameraPlugin;
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CameraRig {
-            focus: to_world(Vec2::new(1500.0, 1500.0), 0.0),
+            focus: to_world(from_shared(NEXUS.blue), 0.0),
             distance: DEFAULT_DISTANCE,
             locked: false,
             centered_once: false,
@@ -80,7 +81,7 @@ fn drive_camera(
 
     let me = state
         .me()
-        .map(|e| to_world(Vec2::new(num(e, "x"), num(e, "y")), 0.0));
+        .map(|e| to_world(Vec2::new(e.x as f32, e.y as f32), 0.0));
     let follow = rig.locked || keys.pressed(KeyCode::Space) || !rig.centered_once;
     if let Some(me) = me.filter(|_| follow) {
         rig.focus = me;

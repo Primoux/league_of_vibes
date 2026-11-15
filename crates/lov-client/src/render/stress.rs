@@ -3,55 +3,24 @@
 //! projectiles). Les entités sont mises à jour à 30 Hz comme les snapshots du serveur, donc la synchro
 //! des vues et le lissage de `entities.rs` travaillent exactement comme en jeu.
 
-use bevy::prelude::*;
-use serde_json::{Value, json};
+use std::collections::HashMap;
 
+use bevy::prelude::*;
+use lov_shared::map::{LANE_PATHS, TOWERS};
+use lov_shared::types::{EntityId, EntityKind, EntitySnapshot, Team, TeamOrNeutral};
+
+use super::from_shared;
 use super::map::MAP_SIZE;
-use crate::net::{EntityData, GameState};
+use crate::net::GameState;
 
 const TICK: f32 = 1.0 / 30.0;
 const MINION_SPEED: f32 = 350.0;
 const PROJECTILE_RATE: f32 = 2.5;
 const LATERAL_SPREAD: f32 = 160.0;
-const CHAMPION_ID: u64 = 1;
-const TOWER_ID: u64 = 2;
-const MINION_ID: u64 = 100;
-const PROJECTILE_ID: u64 = 100_000;
-
-/// PROTOTYPE : copie de `LANE_PATHS` de `packages/shared/src/map.ts`, du côté bleu vers le côté rouge.
-/// À remplacer par `lov-shared` dès que la PR `contract:` est mergée.
-const LANE_PATHS: [&[(f32, f32)]; 3] = [
-    &[
-        (1300.0, 2000.0),
-        (1100.0, 9500.0),
-        (1600.0, 10400.0),
-        (2500.0, 10900.0),
-        (10000.0, 10700.0),
-    ],
-    &[(2000.0, 2000.0), (10000.0, 10000.0)],
-    &[
-        (2000.0, 1300.0),
-        (9500.0, 1100.0),
-        (10400.0, 1600.0),
-        (10900.0, 2500.0),
-        (10700.0, 10000.0),
-    ],
-];
-
-/// PROTOTYPE : copie de `BLUE_TOWERS` de `map.ts` ; les tours rouges sont leur miroir (`mirror`).
-const BLUE_TOWERS: [(f32, f32); 11] = [
-    (1100.0, 8000.0),
-    (1200.0, 5600.0),
-    (1100.0, 3500.0),
-    (4900.0, 4900.0),
-    (4000.0, 4000.0),
-    (3100.0, 3100.0),
-    (8000.0, 1100.0),
-    (5600.0, 1200.0),
-    (3500.0, 1100.0),
-    (1900.0, 1300.0),
-    (1300.0, 1900.0),
-];
+const CHAMPION_ID: EntityId = 1;
+const TOWER_ID: EntityId = 2;
+const MINION_ID: EntityId = 100;
+const PROJECTILE_ID: EntityId = 100_000;
 
 /// Nombre d'unités demandé par `LOV_STRESS`, s'il est défini et valide.
 pub fn units_from_env() -> Option<usize> {
@@ -102,16 +71,17 @@ pub struct StressScene {
     projectiles: Vec<Projectile>,
     /// Position de chaque unité (champion, tours, sbires), indexée comme les projectiles la visent.
     positions: Vec<Vec2>,
+    /// Chemins des trois voies (haut, milieu, bas), du côté bleu vers le côté rouge.
+    lanes: [Vec<Vec2>; 3],
     lane_lengths: [f32; 3],
     accumulator: f32,
 }
 
 /// Point à la distance `s` sur la voie, décalé latéralement, et direction du segment (radians).
-fn along_lane(lane: usize, s: f32, lateral: f32) -> (Vec2, f32) {
-    let pts = LANE_PATHS[lane];
+fn along_lane(pts: &[Vec2], s: f32, lateral: f32) -> (Vec2, f32) {
     let mut left = s;
     for w in pts.windows(2) {
-        let (a, b) = (Vec2::new(w[0].0, w[0].1), Vec2::new(w[1].0, w[1].1));
+        let (a, b) = (w[0], w[1]);
         let len = a.distance(b);
         if left <= len || w[1] == pts[pts.len() - 1] {
             let dir = (b - a) / len;
@@ -123,56 +93,87 @@ fn along_lane(lane: usize, s: f32, lateral: f32) -> (Vec2, f32) {
     (Vec2::ZERO, 0.0)
 }
 
-fn lane_length(lane: usize) -> f32 {
-    LANE_PATHS[lane]
-        .windows(2)
-        .map(|w| Vec2::new(w[0].0, w[0].1).distance(Vec2::new(w[1].0, w[1].1)))
-        .sum()
+fn lane_length(pts: &[Vec2]) -> f32 {
+    pts.windows(2).map(|w| w[0].distance(w[1])).sum()
 }
 
-fn entity(id: u64, kind: &str, team: &str, pos: Vec2) -> EntityData {
-    match json!({ "id": id, "kind": kind, "team": team, "x": pos.x, "y": pos.y, "facing": 0.0 }) {
-        Value::Object(map) => map,
-        _ => EntityData::new(),
+fn entity(id: EntityId, kind: EntityKind, team: TeamOrNeutral, pos: Vec2) -> EntitySnapshot {
+    EntitySnapshot {
+        id,
+        kind,
+        team,
+        x: f64::from(pos.x),
+        y: f64::from(pos.y),
+        facing: 0.0,
+        hp: 1.0,
+        max_hp: 1.0,
+        mana: None,
+        max_mana: None,
+        shield: None,
+        dead: None,
+        subtype: None,
+        owner_id: None,
+        level: None,
+        anim: None,
+        buffs: None,
+        champ: None,
     }
 }
 
-fn set_pose(e: &mut EntityData, pos: Vec2, facing: f32) {
-    // Mise à jour en place : pas de nouvelle clé, donc pas d'allocation de chaîne.
-    for (key, value) in [("x", pos.x), ("y", pos.y), ("facing", facing)] {
-        if let Some(v) = e.get_mut(key) {
-            *v = Value::from(f64::from(value));
-        }
-    }
+fn set_pose(e: &mut EntitySnapshot, pos: Vec2, facing: f32) {
+    e.x = f64::from(pos.x);
+    e.y = f64::from(pos.y);
+    e.facing = f64::from(facing);
 }
 
 impl StressScene {
     /// Crée la scène et remplit `entities` : 1 champion, 22 tours, `units` sbires, `units / 4` projectiles.
-    pub fn new(units: usize, entities: &mut std::collections::HashMap<u64, EntityData>) -> Self {
+    pub fn new(units: usize, entities: &mut HashMap<EntityId, EntitySnapshot>) -> Self {
         let mut rng = Rng(0x0010_F0F7_1BE5);
-        let lane_lengths = [lane_length(0), lane_length(1), lane_length(2)];
+        let lanes = [&LANE_PATHS.top, &LANE_PATHS.mid, &LANE_PATHS.bot]
+            .map(|path| path.iter().copied().map(from_shared).collect::<Vec<_>>());
+        let lane_lengths = [
+            lane_length(&lanes[0]),
+            lane_length(&lanes[1]),
+            lane_length(&lanes[2]),
+        ];
         let mut positions = vec![Vec2::splat(MAP_SIZE / 2.0)];
         entities.insert(
             CHAMPION_ID,
-            entity(CHAMPION_ID, "champion", "blue", positions[0]),
+            entity(
+                CHAMPION_ID,
+                EntityKind::Champion,
+                TeamOrNeutral::Blue,
+                positions[0],
+            ),
         );
-        for (i, (x, y)) in BLUE_TOWERS.iter().enumerate() {
-            let blue = Vec2::new(*x, *y);
-            let red = Vec2::splat(MAP_SIZE) - blue;
-            for (k, (team, pos)) in [("blue", blue), ("red", red)].into_iter().enumerate() {
-                let id = TOWER_ID + (2 * i + k) as u64;
-                entities.insert(id, entity(id, "tower", team, pos));
-                positions.push(pos);
-            }
+        for (i, tower) in TOWERS.iter().enumerate() {
+            let pos = from_shared(tower.pos);
+            let team = match tower.team {
+                Team::Blue => TeamOrNeutral::Blue,
+                Team::Red => TeamOrNeutral::Red,
+            };
+            let id = TOWER_ID + i as EntityId;
+            entities.insert(id, entity(id, EntityKind::Tower, team, pos));
+            positions.push(pos);
         }
         let mut minions = Vec::with_capacity(units);
         for i in 0..units {
             let lane = i % 3;
             let blue = (i / 3) % 2 == 0;
-            let id = MINION_ID + i as u64;
+            let id = MINION_ID + i as EntityId;
             entities.insert(
                 id,
-                entity(id, "minion", if blue { "blue" } else { "red" }, Vec2::ZERO),
+                entity(
+                    id,
+                    EntityKind::Minion,
+                    if blue {
+                        TeamOrNeutral::Blue
+                    } else {
+                        TeamOrNeutral::Red
+                    },
+                    Vec2::ZERO,
+                ),
             );
             minions.push(Minion {
                 lane,
@@ -184,8 +185,16 @@ impl StressScene {
         }
         let mut projectiles = Vec::with_capacity(units / 4);
         for i in 0..units / 4 {
-            let id = PROJECTILE_ID + i as u64;
-            entities.insert(id, entity(id, "projectile", "neutral", Vec2::ZERO));
+            let id = PROJECTILE_ID + i as EntityId;
+            entities.insert(
+                id,
+                entity(
+                    id,
+                    EntityKind::Projectile,
+                    TeamOrNeutral::Neutral,
+                    Vec2::ZERO,
+                ),
+            );
             projectiles.push(Projectile {
                 from: rng.below(positions.len()),
                 to: rng.below(positions.len()),
@@ -197,6 +206,7 @@ impl StressScene {
             minions,
             projectiles,
             positions,
+            lanes,
             lane_lengths,
             accumulator: 0.0,
         };
@@ -205,8 +215,8 @@ impl StressScene {
     }
 
     /// Avance la simulation de `dt` secondes et écrit les poses dans `entities`.
-    fn tick(&mut self, dt: f32, entities: &mut std::collections::HashMap<u64, EntityData>) {
-        let first_minion = 1 + 2 * BLUE_TOWERS.len();
+    fn tick(&mut self, dt: f32, entities: &mut HashMap<EntityId, EntitySnapshot>) {
+        let first_minion = 1 + TOWERS.len();
         for (i, m) in self.minions.iter_mut().enumerate() {
             m.s += m.dir * MINION_SPEED * dt;
             let len = self.lane_lengths[m.lane];
@@ -214,9 +224,9 @@ impl StressScene {
                 m.s = m.s.clamp(0.0, len);
                 m.dir = -m.dir;
             }
-            let (pos, angle) = along_lane(m.lane, m.s, m.lateral);
+            let (pos, angle) = along_lane(&self.lanes[m.lane], m.s, m.lateral);
             self.positions[first_minion + i] = pos;
-            if let Some(e) = entities.get_mut(&(MINION_ID + i as u64)) {
+            if let Some(e) = entities.get_mut(&(MINION_ID + i as EntityId)) {
                 set_pose(
                     e,
                     pos,
@@ -237,7 +247,7 @@ impl StressScene {
                 p.to = self.rng.below(count);
             }
             let (a, b) = (self.positions[p.from], self.positions[p.to]);
-            if let Some(e) = entities.get_mut(&(PROJECTILE_ID + i as u64)) {
+            if let Some(e) = entities.get_mut(&(PROJECTILE_ID + i as EntityId)) {
                 set_pose(e, a.lerp(b, p.progress), (b - a).to_angle());
             }
         }
@@ -275,42 +285,35 @@ fn run_scene(mut scene: ResMut<StressScene>, mut state: ResMut<GameState>, time:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::net::{num, text};
-    use std::collections::HashMap;
 
-    fn count(entities: &HashMap<u64, EntityData>, kind: &str) -> usize {
-        entities
-            .values()
-            .filter(|e| text(e, "kind") == kind)
-            .count()
+    fn count(entities: &HashMap<EntityId, EntitySnapshot>, kind: EntityKind) -> usize {
+        entities.values().filter(|e| e.kind == kind).count()
     }
 
     #[test]
     fn produit_le_nombre_demande() {
         let mut entities = HashMap::new();
         StressScene::new(300, &mut entities);
-        assert_eq!(count(&entities, "minion"), 300);
-        assert_eq!(count(&entities, "tower"), 22);
-        assert_eq!(count(&entities, "champion"), 1);
-        assert_eq!(count(&entities, "projectile"), 75);
+        assert_eq!(count(&entities, EntityKind::Minion), 300);
+        assert_eq!(count(&entities, EntityKind::Tower), 22);
+        assert_eq!(count(&entities, EntityKind::Champion), 1);
+        assert_eq!(count(&entities, EntityKind::Projectile), 75);
     }
 
     #[test]
     fn tout_reste_dans_la_carte_et_bouge() {
         let mut entities = HashMap::new();
         let mut scene = StressScene::new(300, &mut entities);
-        let before: Vec<f32> = (0..300)
-            .map(|i| num(&entities[&(MINION_ID + i)], "x"))
-            .collect();
+        let before: Vec<f64> = (0..300).map(|i| entities[&(MINION_ID + i)].x).collect();
+        let map_size = f64::from(MAP_SIZE);
         for _ in 0..3000 {
             scene.tick(TICK, &mut entities);
             for e in entities.values() {
-                let (x, y) = (num(e, "x"), num(e, "y"));
-                assert!((0.0..=MAP_SIZE).contains(&x) && (0.0..=MAP_SIZE).contains(&y));
+                assert!((0.0..=map_size).contains(&e.x) && (0.0..=map_size).contains(&e.y));
             }
         }
         let moved = (0..300)
-            .filter(|i| num(&entities[&(MINION_ID + i)], "x") != before[*i as usize])
+            .filter(|i| entities[&(MINION_ID + i)].x != before[*i as usize])
             .count();
         assert!(moved > 250);
     }
