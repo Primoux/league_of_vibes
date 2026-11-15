@@ -44,6 +44,22 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Test de charge du serveur Rust (8 bots WebSocket)
+        # Partie lancée sans draft : les bots choisissent dans la liste TypeScript des champions, pas
+        # encore tous portés en Rust. Le draft est couvert par les tests de lov-server.
+        run: |
+          cargo build -p lov-server
+          PORT=3001 DEV_LOBBY=1 SKIP_DRAFT=1 CLIENT_DIST=/nonexistent target/debug/lov-server > server-rust.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:3001/health && break; sleep 1; done
+          timeout 120 npx tsx scripts/bots.ts --url ws://localhost:3001/ws --bots 8 --seconds 15
+      - name: Logs du serveur Rust
+        if: always()
+        run: cat server-rust.log || true
 
   areas:
     # Une PR = une area = une issue. Les fichiers de contrat partagés passent par une PR « contract: » seule.
