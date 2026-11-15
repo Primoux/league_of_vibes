@@ -11,6 +11,7 @@
 
 pub mod grondak;
 pub mod ilyra;
+pub mod kaelen;
 pub mod tharox;
 
 use crate::abilities::registry::Kit;
@@ -22,5 +23,6 @@ use crate::abilities::registry::Kit;
 pub static KITS: &[&Kit] = &[
     &grondak::KIT,
     &tharox::KIT,
+    &kaelen::KIT,
     &ilyra::KIT,
 ];
