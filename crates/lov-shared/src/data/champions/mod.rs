@@ -5,6 +5,7 @@
 //! le test `tests/champions.rs` couvre automatiquement tout champion enregistré.
 
 mod _helpers;
+pub mod corvin;
 pub mod grondak;
 pub mod ilyra;
 pub mod kaelen;
@@ -27,6 +28,7 @@ pub static CHAMPIONS: LazyLock<Vec<&'static ChampionDef>> = LazyLock::new(|| {
         &*vrenna::CHAMPION,
         &*ilyra::CHAMPION,
         &*zephyr::CHAMPION,
+        &*corvin::CHAMPION,
     ]
 });
 
