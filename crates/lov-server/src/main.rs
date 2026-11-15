@@ -4,7 +4,7 @@
 //! Variables d'environnement : `PORT` (3000), `DEV_LOBBY=1`, `SKIP_DRAFT=1`, et `CLIENT_DIST` (dossier du
 //! build client, `packages/client/dist` par défaut : le TS le déduisait de l'emplacement du source).
 
-use lov_server::room::UnportedRooms;
+use lov_server::room::GameRooms;
 use lov_server::server::{GameServerOptions, create_game_server};
 use lov_shared::protocol::WS_PATH;
 use std::{path::PathBuf, process::ExitCode, sync::Arc};
@@ -33,8 +33,7 @@ async fn main() -> ExitCode {
         client_dist: Some(client_dist),
         ..GameServerOptions::default()
     };
-    // PLACEHOLDER : les salles ne sont pas encore portées (voir `room.rs`).
-    let server = match create_game_server(opts, Arc::new(UnportedRooms)).await {
+    let server = match create_game_server(opts, Arc::new(GameRooms::default())).await {
         Ok(s) => s,
         Err(e) => {
             eprintln!("[lov] impossible d'écouter sur le port {port} : {e}");

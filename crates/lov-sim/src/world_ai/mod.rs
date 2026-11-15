@@ -3,4 +3,5 @@
 
 pub mod burns;
 pub mod monsters;
+pub mod objective_effects;
 pub mod runtime;

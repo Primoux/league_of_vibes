@@ -164,33 +164,11 @@ pub fn dummy(
     dummy_kind(world, team, pos, tweak, EntityKind::Minion)
 }
 
-/// Systèmes de la partie déjà portés en Rust, dans l'ordre de `packages/server/src/systems/index.ts`
-/// (les systèmes pas encore portés sont simplement absents). `skip` retire des systèmes par nom, comme
-/// le `createSystems().filter(...)` des tests TypeScript.
+/// `createSystems()` (le registre `create_systems`), sans les systèmes de `skip` : le
+/// `createSystems().filter(...)` des tests TypeScript.
 pub fn game_systems(skip: &[&str]) -> Vec<System> {
-    use lov_sim::systems::abilities::abilities_system;
-    use lov_sim::systems::buffs::buffs_system;
-    use lov_sim::systems::economy::economy_system;
-    use lov_sim::systems::jungle::jungle_system;
-    use lov_sim::systems::leveling::leveling_system;
-    use lov_sim::systems::minions::minions_system;
-    use lov_sim::systems::structures::structures_system;
-    use lov_sim::systems::summoners::summoners_system;
-    let all = vec![
-        input_system(),
-        buffs_system(),
-        summoners_system(),
-        abilities_system(),
-        movement_system(),
-        combat_system_with_projectiles().0,
-        minions_system(true),
-        structures_system(true),
-        jungle_system(true),
-        leveling_system(),
-        economy_system(),
-        vision_system(),
-    ];
-    all.into_iter()
+    lov_sim::systems::registry::create_systems()
+        .into_iter()
         .filter(|s| !skip.contains(&s.name))
         .collect()
 }
