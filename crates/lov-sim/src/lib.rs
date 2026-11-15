@@ -11,6 +11,7 @@
 
 pub mod abilities;
 pub mod combat;
+pub mod items;
 pub mod nav;
 pub mod systems;
 pub mod world;
