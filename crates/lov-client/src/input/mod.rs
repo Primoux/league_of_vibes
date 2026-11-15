@@ -3,11 +3,11 @@
 
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions, MonitorSelection, PresentMode, WindowMode};
-use serde_json::json;
+use lov_shared::protocol::ClientMsg;
 
 use crate::net::Connection;
 use crate::render::map::MAP_SIZE;
-use crate::render::to_game;
+use crate::render::{to_game, to_shared};
 
 /// Clic droit maintenu : un ordre toutes les 100 ms, comme le client web.
 const HOLD_REPEAT_SECS: f32 = 0.1;
@@ -45,7 +45,9 @@ fn move_orders(
         && let Some(point) = ray.plane_intersection_point(Vec3::ZERO, InfinitePlane3d::new(Vec3::Y))
     {
         let pos = to_game(point).clamp(Vec2::ZERO, Vec2::splat(MAP_SIZE));
-        conn.send(json!({ "t": "move", "pos": { "x": pos.x, "y": pos.y } }));
+        conn.send(ClientMsg::Move {
+            pos: to_shared(pos),
+        });
         *since_last = 0.0;
     }
 }
