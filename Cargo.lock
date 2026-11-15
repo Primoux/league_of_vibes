@@ -3706,8 +3706,7 @@ name = "lov-client"
 version = "0.0.0"
 dependencies = [
  "bevy",
- "serde",
- "serde_json",
+ "lov-shared",
  "tungstenite",
 ]
 
