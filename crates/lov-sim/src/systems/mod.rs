@@ -4,4 +4,5 @@ pub mod buffs;
 pub mod combat;
 pub mod input;
 pub mod movement;
+pub mod structures;
 pub mod vision;
