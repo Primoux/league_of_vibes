@@ -94,7 +94,9 @@ Le TypeScript est gelé : `npm ci && npm test` ne sert que si une PR touche `pac
   conflit. Merge-les une par une : resynchronise la suivante, attends sa CI, merge, puis la suivante.
   Les resynchroniser toutes d'avance gaspille la CI, puisque chaque merge les recasse. La résolution prend la
   version de `main` et réinsère les deux lignes : `pub mod` par ordre alphabétique, l'entrée de la table
-  **dans l'ordre du `CHAMPION_LIST` TypeScript** (le test `tests/champions.rs` vérifie l'ordre).
+  **dans l'ordre du TypeScript** : `CHAMPION_LIST` pour les données (`data/champions/mod.rs`, vérifié par
+  `tests/champions.rs`), `CHAMPION_ABILITIES` de `abilities/registry.ts` pour les kits
+  (`abilities/champions/mod.rs`, non testé : les passifs s'installent dans cet ordre).
 - **PR empilées** (B contient A, C contient B…) : merge dans l'ordre de la pile. Après le squash de A, B
   passe souvent en conflit sur les mêmes registres (`mod.rs`, `game_systems()`), même si les fichiers ajoutés
   sont identiques. Une pile qui embarque un fichier de contrat garde son job `areas` rouge tant que le contrat
