@@ -7,7 +7,8 @@ use std::collections::HashMap;
 use bevy::prelude::*;
 
 use super::to_world;
-use crate::net::{EntityData, GameState, num, text};
+use crate::net::GameState;
+use lov_shared::types::{EntityId, EntityKind, EntitySnapshot, TeamOrNeutral};
 
 const SMOOTHING: f32 = 18.0;
 
@@ -15,7 +16,7 @@ const SMOOTHING: f32 = 18.0;
 struct EntityView;
 
 #[derive(Resource, Default)]
-struct ViewIndex(HashMap<u64, Entity>);
+struct ViewIndex(HashMap<EntityId, Entity>);
 
 struct Shape {
     mesh: Handle<Mesh>,
@@ -25,7 +26,7 @@ struct Shape {
 
 #[derive(Resource)]
 struct ViewAssets {
-    shapes: HashMap<&'static str, Shape>,
+    shapes: HashMap<EntityKind, Shape>,
     blue: Handle<StandardMaterial>,
     red: Handle<StandardMaterial>,
     neutral: Handle<StandardMaterial>,
@@ -52,14 +53,26 @@ fn load_assets(
         lift,
     };
     let shapes = HashMap::from([
-        ("champion", shape(Capsule3d::new(0.42, 0.9).into(), 0.87)),
-        ("minion", shape(Sphere::new(0.3).into(), 0.3)),
-        ("tower", shape(Cylinder::new(0.7, 3.4).into(), 1.7)),
-        ("inhibitor", shape(Cuboid::new(1.6, 1.2, 1.6).into(), 0.6)),
-        ("nexus", shape(Sphere::new(1.6).into(), 1.6)),
-        ("monster", shape(Sphere::new(0.6).into(), 0.6)),
-        ("ward", shape(Cylinder::new(0.12, 0.7).into(), 0.35)),
-        ("projectile", shape(Sphere::new(0.14).into(), 0.9)),
+        (
+            EntityKind::Champion,
+            shape(Capsule3d::new(0.42, 0.9).into(), 0.87),
+        ),
+        (EntityKind::Minion, shape(Sphere::new(0.3).into(), 0.3)),
+        (
+            EntityKind::Tower,
+            shape(Cylinder::new(0.7, 3.4).into(), 1.7),
+        ),
+        (
+            EntityKind::Inhibitor,
+            shape(Cuboid::new(1.6, 1.2, 1.6).into(), 0.6),
+        ),
+        (EntityKind::Nexus, shape(Sphere::new(1.6).into(), 1.6)),
+        (EntityKind::Monster, shape(Sphere::new(0.6).into(), 0.6)),
+        (
+            EntityKind::Ward,
+            shape(Cylinder::new(0.12, 0.7).into(), 0.35),
+        ),
+        (EntityKind::Projectile, shape(Sphere::new(0.14).into(), 0.9)),
     ]);
     commands.insert_resource(ViewAssets {
         shapes,
@@ -70,9 +83,9 @@ fn load_assets(
     });
 }
 
-fn target(e: &EntityData, lift: f32) -> Transform {
-    Transform::from_translation(to_world(Vec2::new(num(e, "x"), num(e, "y")), lift))
-        .with_rotation(Quat::from_rotation_y(num(e, "facing")))
+fn target(e: &EntitySnapshot, lift: f32) -> Transform {
+    Transform::from_translation(to_world(Vec2::new(e.x as f32, e.y as f32), lift))
+        .with_rotation(Quat::from_rotation_y(e.facing as f32))
 }
 
 fn sync_views(
@@ -85,9 +98,9 @@ fn sync_views(
 ) {
     let blend = 1.0 - (-SMOOTHING * time.delta_secs()).exp();
     for (id, e) in &state.entities {
-        let dead = e.get("dead").and_then(|d| d.as_bool()).unwrap_or(false);
+        let dead = e.dead.unwrap_or(false);
         // Les zones (blizzard, piège…) n'ont pas encore de vue.
-        let Some(shape) = assets.shapes.get(text(e, "kind")).filter(|_| !dead) else {
+        let Some(shape) = assets.shapes.get(&e.kind).filter(|_| !dead) else {
             if let Some(view) = index.0.remove(id) {
                 commands.entity(view).despawn();
             }
@@ -101,10 +114,10 @@ fn sync_views(
             let material = if state.my_entity == Some(*id) {
                 &assets.me
             } else {
-                match text(e, "team") {
-                    "blue" => &assets.blue,
-                    "red" => &assets.red,
-                    _ => &assets.neutral,
+                match e.team {
+                    TeamOrNeutral::Blue => &assets.blue,
+                    TeamOrNeutral::Red => &assets.red,
+                    TeamOrNeutral::Neutral => &assets.neutral,
                 }
             };
             let view = commands

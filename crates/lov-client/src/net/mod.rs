@@ -1,38 +1,38 @@
 //! Connexion au serveur (protocole JSON v2) et état de partie reçu.
 //!
-//! PROTOTYPE : `lov-shared` n'existe pas encore, donc les messages sont manipulés comme du JSON brut
-//! (`serde_json::Value`) au lieu des types du protocole. À remplacer par les types de `lov-shared`
-//! dès que la PR `contract:` est mergée. L'interpolation et la prédiction ne sont pas portées.
+//! Les messages sont les types de `lov_shared::protocol` (`ClientMsg` / `ServerMsg`), les entités
+//! celles de `lov_shared::types`. PROTOTYPE : l'interpolation et la prédiction ne sont pas portées.
 
 use std::collections::HashMap;
 use std::io::ErrorKind;
+use std::net::TcpStream;
 use std::sync::Mutex;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use serde_json::{Map, Value, json};
-use tungstenite::Message;
+use lov_shared::protocol::{
+    ClientMsg, DraftState, PROTOCOL_VERSION, RoomPhase, ServerMsg, Snapshot, apply_entity_patch,
+    decode, encode,
+};
+use lov_shared::types::{EntityId, EntitySnapshot};
 use tungstenite::stream::MaybeTlsStream;
+use tungstenite::{Message, WebSocket};
 
-/// Doit rester égal à `PROTOCOL_VERSION` de `packages/shared/src/protocol.ts`.
-const PROTOCOL_VERSION: u32 = 2;
 const DEFAULT_URL: &str = "ws://localhost:3000/ws";
 /// Champions tentés au draft, dans l'ordre, quand le serveur ne tourne pas avec `SKIP_DRAFT=1`.
 const DRAFT_ORDER: [&str; 6] = ["grondak", "kaelen", "ilyra", "sable", "nyx", "solenne"];
 
-pub type EntityData = Map<String, Value>;
-
-/// Canal vers le fil réseau. Les messages sont du JSON conforme à `ClientMsg` / `ServerMsg`.
+/// Canal vers le fil réseau, en messages typés.
 #[derive(Resource)]
 pub struct Connection {
-    outgoing: Sender<Value>,
-    incoming: Mutex<Receiver<Value>>,
+    outgoing: Sender<ClientMsg>,
+    incoming: Mutex<Receiver<ServerMsg>>,
 }
 
 impl Connection {
-    pub fn send(&self, msg: Value) {
+    pub fn send(&self, msg: ClientMsg) {
         // Le fil réseau s'arrête quand la connexion tombe : un envoi perdu est alors sans conséquence.
         let _ = self.outgoing.send(msg);
     }
@@ -43,25 +43,16 @@ impl Connection {
 pub struct GameState {
     pub status: String,
     pub player_id: Option<String>,
-    pub my_entity: Option<u64>,
-    pub entities: HashMap<u64, EntityData>,
+    pub my_entity: Option<EntityId>,
+    pub entities: HashMap<EntityId, EntitySnapshot>,
     pub snapshots: u64,
     start_requested: bool,
 }
 
 impl GameState {
-    pub fn me(&self) -> Option<&EntityData> {
+    pub fn me(&self) -> Option<&EntitySnapshot> {
         self.entities.get(&self.my_entity?)
     }
-}
-
-/// Lit un nombre d'une entité (`x`, `y`, `hp`…), 0 si absent.
-pub fn num(e: &EntityData, key: &str) -> f32 {
-    e.get(key).and_then(Value::as_f64).unwrap_or(0.0) as f32
-}
-
-pub fn text<'a>(e: &'a EntityData, key: &str) -> &'a str {
-    e.get(key).and_then(Value::as_str).unwrap_or("")
 }
 
 pub struct NetPlugin;
@@ -101,11 +92,11 @@ impl Plugin for OfflinePlugin {
 }
 
 /// Signale un problème de connexion au jeu sous la forme d'un `ServerMsg` d'erreur.
-fn report(to_game: &Sender<Value>, message: String) {
-    let _ = to_game.send(json!({ "t": "error", "message": message }));
+fn report(to_game: &Sender<ServerMsg>, message: String) {
+    let _ = to_game.send(ServerMsg::Error { message });
 }
 
-fn network_thread(url: &str, from_game: &Receiver<Value>, to_game: &Sender<Value>) {
+fn network_thread(url: &str, from_game: &Receiver<ClientMsg>, to_game: &Sender<ServerMsg>) {
     let mut socket = match tungstenite::connect(url) {
         Ok((socket, _)) => socket,
         Err(e) => return report(to_game, format!("Connexion à {url} impossible : {e}")),
@@ -114,15 +105,19 @@ fn network_thread(url: &str, from_game: &Receiver<Value>, to_game: &Sender<Value
     if let MaybeTlsStream::Plain(stream) = socket.get_mut() {
         let _ = stream.set_read_timeout(Some(Duration::from_millis(2)));
     }
-    let hello = json!({ "t": "hello", "name": "Natif", "version": PROTOCOL_VERSION });
-    if socket.send(Message::text(hello.to_string())).is_err() {
+    let hello = ClientMsg::Hello {
+        name: "Natif".into(),
+        version: PROTOCOL_VERSION,
+        reconnect_token: None,
+    };
+    if !send_msg(&mut socket, &hello) {
         return report(to_game, "Connexion fermée pendant le hello".into());
     }
     loop {
         loop {
             match from_game.try_recv() {
                 Ok(msg) => {
-                    if socket.send(Message::text(msg.to_string())).is_err() {
+                    if !send_msg(&mut socket, &msg) {
                         return report(to_game, "Connexion perdue".into());
                     }
                 }
@@ -131,13 +126,14 @@ fn network_thread(url: &str, from_game: &Receiver<Value>, to_game: &Sender<Value
             }
         }
         match socket.read() {
-            Ok(Message::Text(raw)) => match serde_json::from_str::<Value>(raw.as_str()) {
+            // Donnée venue du réseau : un message illisible est journalisé puis ignoré.
+            Ok(Message::Text(raw)) => match decode::<ServerMsg>(raw.as_str()) {
                 Ok(msg) => {
                     if to_game.send(msg).is_err() {
                         return;
                     }
                 }
-                Err(e) => report(to_game, format!("Message illisible : {e}")),
+                Err(e) => warn!("message serveur illisible, ignoré : {e}"),
             },
             Ok(Message::Close(_)) => {
                 return report(to_game, "Le serveur a fermé la connexion".into());
@@ -150,132 +146,104 @@ fn network_thread(url: &str, from_game: &Receiver<Value>, to_game: &Sender<Value
     }
 }
 
+/// Encode et envoie un message ; `false` si la connexion est tombée.
+fn send_msg(socket: &mut WebSocket<MaybeTlsStream<TcpStream>>, msg: &ClientMsg) -> bool {
+    match encode(msg) {
+        Ok(raw) => socket.send(Message::text(raw)).is_ok(),
+        Err(e) => {
+            warn!("message client non encodable, ignoré : {e}");
+            true
+        }
+    }
+}
+
 fn pump_network(conn: Res<Connection>, mut state: ResMut<GameState>) {
     // Le verrou n'est jamais disputé : ce système est le seul lecteur.
     let Ok(incoming) = conn.incoming.lock() else {
         return;
     };
-    while let Ok(mut msg) = incoming.try_recv() {
-        let kind = msg
-            .get("t")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .to_string();
-        match kind.as_str() {
-            "welcome" => {
-                state.player_id = msg["playerId"].as_str().map(str::to_string);
+    while let Ok(msg) = incoming.try_recv() {
+        match msg {
+            ServerMsg::Welcome { player_id, .. } => {
+                state.player_id = Some(player_id);
                 state.status = "Création de la salle…".into();
-                conn.send(json!({ "t": "createRoom", "devMode": true }));
+                conn.send(ClientMsg::CreateRoom {
+                    dev_mode: Some(true),
+                });
             }
-            "lobby" => {
-                if msg["state"]["phase"] == "lobby" && !state.start_requested {
+            ServerMsg::Lobby { state: lobby } => {
+                if lobby.phase == RoomPhase::Lobby && !state.start_requested {
                     state.start_requested = true;
                     state.status = "Salle créée, lancement…".into();
-                    conn.send(json!({ "t": "setReady", "ready": true }));
-                    conn.send(json!({ "t": "startGame" }));
+                    conn.send(ClientMsg::SetReady { ready: true });
+                    conn.send(ClientMsg::StartGame);
                 }
             }
-            "draft" => {
+            ServerMsg::Draft { state: draft } => {
                 state.status = "Draft…".into();
-                lock_first_free_champion(&conn, &state, &msg["state"]);
+                lock_first_free_champion(&conn, &state, &draft);
             }
-            "loading" => state.status = "Chargement…".into(),
-            "gameStart" => {
-                state.my_entity = msg["start"]["entityId"].as_u64();
+            ServerMsg::Loading { .. } => state.status = "Chargement…".into(),
+            ServerMsg::GameStart { start } => {
+                state.my_entity = Some(start.entity_id);
                 state.status = "En jeu".into();
                 info!("partie lancée, entité du joueur : {:?}", state.my_entity);
             }
-            "snapshot" => {
-                if let Some(snap) = msg.get_mut("snap") {
-                    apply_snapshot(&mut state, snap.take());
-                }
-            }
-            "gameOver" => state.status = "Partie terminée".into(),
-            "error" => {
-                let message = msg["message"].as_str().unwrap_or("erreur inconnue");
+            ServerMsg::Snapshot { snap } => apply_snapshot(&mut state, *snap),
+            ServerMsg::GameOver { .. } => state.status = "Partie terminée".into(),
+            ServerMsg::Error { message } => {
                 warn!("serveur : {message}");
-                state.status = message.to_string();
+                state.status = message;
             }
-            _ => {}
+            ServerMsg::Pong { .. } => {}
         }
     }
 }
 
-fn lock_first_free_champion(conn: &Connection, state: &GameState, draft: &Value) {
+fn lock_first_free_champion(conn: &Connection, state: &GameState, draft: &DraftState) {
     let Some(me) = state.player_id.as_deref() else {
         return;
     };
-    let my_turn = draft["turns"][draft["currentTurn"].as_u64().unwrap_or(0) as usize]
-        .as_array()
+    let my_turn = draft
+        .turns
+        .get(draft.current_turn as usize)
         .is_some_and(|turn| turn.iter().any(|p| p == me));
-    let Some(picks) = draft["picks"].as_array() else {
-        return;
-    };
-    let locked = picks
-        .iter()
-        .any(|p| p["playerId"] == me && p["locked"] == true);
+    let locked = draft.picks.iter().any(|p| p.player_id == me && p.locked);
     if !my_turn || locked {
         return;
     }
-    let free = DRAFT_ORDER
-        .iter()
-        .find(|id| !picks.iter().any(|p| p["championId"] == **id));
+    let free = DRAFT_ORDER.iter().find(|id| {
+        !draft
+            .picks
+            .iter()
+            .any(|p| p.champion_id.as_deref() == Some(**id))
+    });
     if let Some(id) = free {
-        conn.send(json!({ "t": "draftLock", "championId": id }));
+        conn.send(ClientMsg::DraftLock {
+            champion_id: (*id).to_string(),
+        });
     }
 }
 
 /// Même sémantique que le client web : sans `removed`, le snapshot est complet ; avec, c'est un delta
-/// dont `patches` porte les mises à jour partielles (voir `applyEntityPatch` dans `protocol.ts`).
-fn apply_snapshot(state: &mut GameState, mut snap: Value) {
+/// dont `patches` porte les mises à jour partielles (voir `apply_entity_patch` de `lov-shared`).
+fn apply_snapshot(state: &mut GameState, snap: Snapshot) {
     state.snapshots += 1;
     if state.snapshots == 1 {
         info!("premier snapshot reçu");
     }
-    let is_delta = snap.get("removed").is_some_and(|r| !r.is_null());
-    if !is_delta {
+    if !snap.is_delta() {
         state.entities.clear();
     }
-    if let Some(Value::Array(entities)) = snap.get_mut("entities").map(Value::take) {
-        for entity in entities {
-            if let Value::Object(data) = entity
-                && let Some(id) = data.get("id").and_then(Value::as_u64)
-            {
-                state.entities.insert(id, data);
-            }
-        }
+    for entity in snap.entities {
+        state.entities.insert(entity.id, entity);
     }
-    if let Some(removed) = snap["removed"].as_array() {
-        for id in removed.iter().filter_map(Value::as_u64) {
-            state.entities.remove(&id);
-        }
+    for id in snap.removed.iter().flatten() {
+        state.entities.remove(id);
     }
-    if let Some(Value::Array(patches)) = snap.get_mut("patches").map(Value::take) {
-        for patch in patches {
-            let Value::Object(patch) = patch else {
-                continue;
-            };
-            let Some(entity) = patch
-                .get("id")
-                .and_then(Value::as_u64)
-                .and_then(|id| state.entities.get_mut(&id))
-            else {
-                continue;
-            };
-            for (key, value) in patch {
-                if key == "u" {
-                    for unset in value
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .filter_map(Value::as_str)
-                    {
-                        entity.remove(unset);
-                    }
-                } else {
-                    entity.insert(key, value);
-                }
-            }
+    for patch in snap.patches.iter().flatten() {
+        if let Some(entity) = state.entities.get_mut(&patch.id) {
+            *entity = apply_entity_patch(entity, patch);
         }
     }
 }
@@ -283,30 +251,83 @@ fn apply_snapshot(state: &mut GameState, mut snap: Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lov_shared::protocol::{EntityField, EntityPatch, Score, TeamScore};
+    use lov_shared::types::{EntityKind, TeamOrNeutral};
 
-    fn state_after(snaps: &[Value]) -> GameState {
+    fn ent(id: EntityId, x: f64) -> EntitySnapshot {
+        EntitySnapshot {
+            id,
+            kind: EntityKind::Minion,
+            team: TeamOrNeutral::Blue,
+            x,
+            y: 5.0,
+            facing: 0.0,
+            hp: 1.0,
+            max_hp: 1.0,
+            mana: None,
+            max_mana: None,
+            shield: None,
+            dead: None,
+            subtype: None,
+            owner_id: None,
+            level: None,
+            anim: Some("run".into()),
+            buffs: None,
+            champ: None,
+        }
+    }
+
+    fn snap(
+        entities: Vec<EntitySnapshot>,
+        removed: Option<Vec<EntityId>>,
+        patches: Option<Vec<EntityPatch>>,
+    ) -> Snapshot {
+        let team = || TeamScore {
+            kills: 0,
+            towers: 0,
+            dragons: vec![],
+            grubs: 0,
+        };
+        Snapshot {
+            tick: 0,
+            time: 0.0,
+            server_time: 0.0,
+            entities,
+            removed,
+            patches,
+            events: vec![],
+            self_state: None,
+            objective_timers: None,
+            score: Score {
+                blue: team(),
+                red: team(),
+            },
+        }
+    }
+
+    fn state_after(snaps: Vec<Snapshot>) -> GameState {
         let mut state = GameState::default();
-        for snap in snaps {
-            apply_snapshot(&mut state, snap.clone());
+        for s in snaps {
+            apply_snapshot(&mut state, s);
         }
         state
     }
 
     #[test]
     fn snapshot_complet_remplace_tout() {
-        let state = state_after(&[
-            json!({ "entities": [{ "id": 1, "x": 10.0 }, { "id": 2, "x": 20.0 }] }),
-            json!({ "entities": [{ "id": 2, "x": 25.0 }] }),
+        let state = state_after(vec![
+            snap(vec![ent(1, 10.0), ent(2, 20.0)], None, None),
+            snap(vec![ent(2, 25.0)], None, None),
         ]);
         assert_eq!(state.entities.len(), 1);
-        assert_eq!(num(&state.entities[&2], "x"), 25.0);
+        assert_eq!(state.entities[&2].x, 25.0);
     }
 
     #[test]
     fn delta_conserve_les_absentes_et_retire_les_removed() {
-        let state = state_after(&[
-            json!({ "entities": [{ "id": 1, "x": 10.0 }, { "id": 2, "x": 20.0 }, { "id": 3, "x": 30.0 }] }),
-            json!({ "entities": [{ "id": 4, "x": 40.0 }], "removed": [2] }),
+        let state = state_after(vec![
+            snap(vec![ent(1, 10.0), ent(2, 20.0), ent(3, 30.0)], None, None),
+            snap(vec![ent(4, 40.0)], Some(vec![2]), None),
         ]);
         let mut ids: Vec<_> = state.entities.keys().copied().collect();
         ids.sort_unstable();
@@ -315,13 +336,24 @@ mod tests {
 
     #[test]
     fn patch_modifie_et_supprime_des_champs() {
-        let state = state_after(&[
-            json!({ "entities": [{ "id": 1, "x": 10.0, "y": 5.0, "anim": "run" }] }),
-            json!({ "entities": [], "removed": [], "patches": [{ "id": 1, "x": 12.0, "u": ["anim"] }] }),
+        let mut patch = EntityPatch::new(1);
+        patch.x = Some(12.0);
+        patch.u = Some(vec![EntityField::Anim]);
+        let state = state_after(vec![
+            snap(vec![ent(1, 10.0)], None, None),
+            snap(vec![], Some(vec![]), Some(vec![patch])),
         ]);
         let e = &state.entities[&1];
-        assert_eq!(num(e, "x"), 12.0);
-        assert_eq!(num(e, "y"), 5.0);
-        assert!(!e.contains_key("anim"));
+        assert_eq!(e.x, 12.0);
+        assert_eq!(e.y, 5.0);
+        assert_eq!(e.anim, None);
+    }
+
+    #[test]
+    fn patch_d_une_entite_inconnue_est_ignore() {
+        let mut patch = EntityPatch::new(9);
+        patch.x = Some(1.0);
+        let state = state_after(vec![snap(vec![], Some(vec![]), Some(vec![patch]))]);
+        assert!(state.entities.is_empty());
     }
 }
