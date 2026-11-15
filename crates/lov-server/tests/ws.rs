@@ -6,7 +6,7 @@
 //! salle factice.
 
 use futures_util::{SinkExt, StreamExt};
-use lov_server::room::{Conn, Room, RoomFactory, UnportedRooms};
+use lov_server::room::{Conn, GameRooms, Room, RoomFactory};
 use lov_server::server::{GameServer, GameServerOptions, create_game_server};
 use lov_shared::protocol::{
     ClientMsg, LobbyPlayer, LobbyState, PROTOCOL_VERSION, RoomPhase, ServerMsg, WS_PATH, decode,
@@ -35,7 +35,7 @@ fn quiet() -> GameServerOptions {
 }
 
 async fn start() -> GameServer {
-    create_game_server(quiet(), Arc::new(UnportedRooms))
+    create_game_server(quiet(), Arc::new(GameRooms::default()))
         .await
         .expect("le serveur démarre")
 }
@@ -284,10 +284,10 @@ async fn token_libere_a_la_deconnexion_hors_salle() {
 }
 
 #[tokio::test]
-async fn creation_de_salle_refusee_par_le_placeholder() {
+async fn creation_de_salle_puis_code_inconnu() {
     let server = start().await;
     let mut a = connect(&server).await;
-    handshake(&mut a, "Alice").await;
+    let (player_id, _) = handshake(&mut a, "Alice").await;
     send_msg(
         &mut a,
         &ClientMsg::CreateRoom {
@@ -296,11 +296,16 @@ async fn creation_de_salle_refusee_par_le_placeholder() {
     )
     .await;
     match recv(&mut a).await {
-        ServerMsg::Error { message } => {
-            assert!(message.contains("pas encore portées"), "{message}")
+        ServerMsg::Lobby { state } => {
+            assert_eq!(state.code.len(), 5);
+            assert!(state.dev_mode);
+            assert_eq!(state.players.len(), 1);
+            assert_eq!(state.players[0].id, player_id);
+            assert!(state.players[0].is_host);
         }
         other => panic!("{other:?}"),
     }
+    assert_eq!(server.room_count(), 1);
     send_msg(
         &mut a,
         &ClientMsg::JoinRoom {

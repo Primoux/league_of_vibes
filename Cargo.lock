@@ -3909,8 +3909,10 @@ name = "lov-server"
 version = "0.0.0"
 dependencies = [
  "axum",
+ "flate2",
  "futures-util",
  "lov-shared",
+ "lov-sim",
  "serde_json",
  "tokio",
  "tokio-tungstenite",

@@ -1,7 +1,7 @@
-//! Serveur de League of Vibes : portage de `packages/server/src/{index.ts,net/server.ts,net/validate.ts}`.
-//!
-//! Les salles (`room.ts`) ne sont pas portées : voir [`room`].
+//! Serveur de League of Vibes : portage de `packages/server/src/{index.ts,room.ts,net/*}`.
 
+pub mod perf;
 pub mod room;
 pub mod server;
+pub mod snapshot;
 pub mod validate;
