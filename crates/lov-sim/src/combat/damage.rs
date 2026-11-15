@@ -559,13 +559,16 @@ pub fn kill(world: &mut World, target: EntityId, killer: Option<EntityId>) {
     let bounty = world.hook_bounty(target, credited, &assists);
 
     if target_is_champ {
+        // `deaths++` avant les hooks de respawn, comme en TypeScript : un hook peut lire le compteur.
+        if let Some(ch) = world.get_mut(target).and_then(|t| t.champ.as_mut()) {
+            ch.deaths += 1;
+        }
         let respawn = world.hook_respawn_time(target);
         let credited_champ_enemy = credited
             .and_then(|c| world.get(c))
             .is_some_and(|c| c.champ.is_some() && c.team != target_team);
         if let Some(t) = world.get_mut(target) {
             if let Some(ch) = t.champ.as_mut() {
-                ch.deaths += 1;
                 ch.respawn_in = respawn.unwrap_or_else(|| default_respawn_time(ch.level, time));
             }
             combat_in(&mut t.data).champion_damagers.clear();
