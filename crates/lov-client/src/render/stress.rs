@@ -1,7 +1,7 @@
 //! Scène de charge : `LOV_STRESS=<n>` remplit `GameState` d'entités synthétiques, sans serveur, pour
 //! mesurer les FPS sur une scène aussi chargée qu'une vraie partie (champion, `n` sbires, tours,
-//! projectiles). Les entités sont mises à jour à 30 Hz comme les snapshots du serveur, donc la synchro
-//! des vues et le lissage de `entities.rs` travaillent exactement comme en jeu.
+//! projectiles). Les entités sont mises à jour à 30 Hz et passent par le même chemin que les snapshots
+//! du serveur (fusion, horloge, interpolation) : les vues travaillent exactement comme en jeu.
 
 use std::collections::HashMap;
 
@@ -11,7 +11,8 @@ use lov_shared::types::{EntityId, EntityKind, EntitySnapshot, Team, TeamOrNeutra
 
 use super::from_shared;
 use super::map::MAP_SIZE;
-use crate::net::GameState;
+use crate::net::{GameState, now_ms};
+use lov_shared::protocol::{Score, ServerMsg, Snapshot, TeamScore};
 
 const TICK: f32 = 1.0 / 30.0;
 const MINION_SPEED: f32 = 350.0;
@@ -256,29 +257,79 @@ impl StressScene {
 
 pub struct StressPlugin(pub usize);
 
+/// Entités de la scène et numéro du dernier snapshot synthétique.
+#[derive(Resource, Default)]
+struct StressEntities {
+    entities: HashMap<EntityId, EntitySnapshot>,
+    tick: u64,
+}
+
+impl StressEntities {
+    /// Envoie l'état de la scène comme un snapshot complet du serveur.
+    fn publish(&mut self, state: &mut GameState) {
+        self.tick += 1;
+        let now = now_ms();
+        let team = || TeamScore {
+            kills: 0,
+            towers: 0,
+            dragons: vec![],
+            grubs: 0,
+        };
+        let snap = Snapshot {
+            tick: self.tick,
+            time: self.tick as f64 * f64::from(TICK),
+            server_time: now,
+            entities: self.entities.values().cloned().collect(),
+            removed: None,
+            patches: None,
+            events: vec![],
+            self_state: None,
+            objective_timers: None,
+            score: Score {
+                blue: team(),
+                red: team(),
+            },
+        };
+        state.route(
+            ServerMsg::Snapshot {
+                snap: Box::new(snap),
+            },
+            now,
+        );
+    }
+}
+
 impl Plugin for StressPlugin {
     fn build(&self, app: &mut App) {
         let units = self.0;
         app.add_systems(
             Startup,
             move |mut commands: Commands, mut state: ResMut<GameState>| {
-                let scene = StressScene::new(units, &mut state.entities);
+                let mut stress = StressEntities::default();
+                let scene = StressScene::new(units, &mut stress.entities);
                 state.my_entity = Some(CHAMPION_ID);
                 state.status = format!("SCENE DE CHARGE, sans serveur ({units} sbires)");
+                stress.publish(&mut state);
                 commands.insert_resource(scene);
+                commands.insert_resource(stress);
             },
         )
         .add_systems(Update, run_scene);
     }
 }
 
-fn run_scene(mut scene: ResMut<StressScene>, mut state: ResMut<GameState>, time: Res<Time>) {
+fn run_scene(
+    mut scene: ResMut<StressScene>,
+    mut stress: ResMut<StressEntities>,
+    mut state: ResMut<GameState>,
+    time: Res<Time>,
+) {
     // Au plus 3 ticks par image : une machine lente ralentit la scène au lieu de s'effondrer.
     scene.accumulator = (scene.accumulator + time.delta_secs()).min(3.0 * TICK);
     while scene.accumulator >= TICK {
         scene.accumulator -= TICK;
-        scene.tick(TICK, &mut state.entities);
-        state.snapshots += 1;
+        scene.tick(TICK, &mut stress.entities);
+        stress.publish(&mut state);
     }
 }
 

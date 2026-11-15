@@ -79,9 +79,11 @@ fn drive_camera(
     }
     rig.distance = (rig.distance - scroll.delta.y * 3.0).clamp(20.0, 90.0);
 
+    // Position affichée (prédite) du champion local, pour que la caméra ne tremble pas.
     let me = state
-        .me()
-        .map(|e| to_world(Vec2::new(e.x as f32, e.y as f32), 0.0));
+        .my_entity
+        .and_then(|id| state.pose(id))
+        .map(|p| to_world(Vec2::new(p.x as f32, p.y as f32), 0.0));
     let follow = rig.locked || keys.pressed(KeyCode::Space) || !rig.centered_once;
     if let Some(me) = me.filter(|_| follow) {
         rig.focus = me;
