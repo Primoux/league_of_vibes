@@ -80,6 +80,14 @@ impl Connection {
         }
     }
 
+    /// Connexion de test : renvoie aussi le récepteur des messages envoyés.
+    #[cfg(test)]
+    pub fn for_tests() -> (Self, Receiver<ClientMsg>) {
+        let (outgoing, sent) = mpsc::channel();
+        let (_, incoming) = mpsc::channel();
+        (Self::new(outgoing, incoming), sent)
+    }
+
     pub fn send(&self, msg: ClientMsg) {
         if matches!(
             msg,
