@@ -174,6 +174,7 @@ pub fn game_systems(skip: &[&str]) -> Vec<System> {
     use lov_sim::systems::jungle::jungle_system;
     use lov_sim::systems::leveling::leveling_system;
     use lov_sim::systems::minions::minions_system;
+    use lov_sim::systems::objectives::objectives_system;
     use lov_sim::systems::structures::structures_system;
     use lov_sim::systems::summoners::summoners_system;
     let all = vec![
@@ -186,6 +187,7 @@ pub fn game_systems(skip: &[&str]) -> Vec<System> {
         minions_system(true),
         structures_system(true),
         jungle_system(true),
+        objectives_system(),
         leveling_system(),
         economy_system(),
         vision_system(),
