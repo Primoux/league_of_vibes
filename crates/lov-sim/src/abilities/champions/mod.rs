@@ -11,6 +11,7 @@
 
 pub mod grondak;
 pub mod ilyra;
+pub mod tharox;
 
 use crate::abilities::registry::Kit;
 
@@ -20,5 +21,6 @@ use crate::abilities::registry::Kit;
 #[rustfmt::skip]
 pub static KITS: &[&Kit] = &[
     &grondak::KIT,
+    &tharox::KIT,
     &ilyra::KIT,
 ];
