@@ -139,8 +139,11 @@ crates/lov-client   rendu, FX, interface, audio, entrées (Bevy)
 
 - **Le protocole JSON v2 ne bouge pas pendant la migration.** Le client Rust joue contre le serveur Node,
   le client web contre le serveur Rust : chaque moitié se valide contre l'autre, le jeu reste jouable.
-- **Le TypeScript est gelé** : corrections de bugs seulement. Une règle de jeu à changer se change dans
-  le portage Rust du système concerné.
+- **Le TypeScript est gelé, entièrement** : plus aucune PR sur `packages/`, même pour corriger un bug.
+  Il reste la référence du portage, rien de plus. Un bug ou une règle de jeu à changer se traite dans
+  le portage Rust du système concerné ; les anciennes issues web sont fermées avec le label `web-gelé`.
+- **Où en est le portage, et quoi prendre** : l'issue épinglée #86 liste chaque morceau, coché ou non,
+  avec son issue. C'est le point d'entrée pour aider.
 - **Les areas gardent leurs noms** et couvrent en plus les chemins Rust équivalents (`.github/areas.json`).
   La tranche verticale d'un champion existe à l'identique :
   `lov-shared/src/data/champions/<nom>.rs`, `lov-sim/src/abilities/champions/<nom>.rs`,
