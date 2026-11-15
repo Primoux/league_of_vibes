@@ -15,6 +15,7 @@ pub mod nyx;
 pub mod sable;
 pub mod solenne;
 pub mod tharox;
+pub mod touilleur;
 pub mod vrenna;
 pub mod zephyr;
 
@@ -39,6 +40,7 @@ pub static CHAMPIONS: LazyLock<Vec<&'static ChampionDef>> = LazyLock::new(|| {
         &*solenne::CHAMPION,
         &*melenchon::CHAMPION,
         &*master67::CHAMPION,
+        &*touilleur::CHAMPION,
     ]
 });
 
