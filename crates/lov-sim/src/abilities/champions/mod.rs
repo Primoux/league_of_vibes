@@ -17,6 +17,7 @@ pub mod sable;
 pub mod solenne;
 pub mod tharox;
 pub mod touilleur;
+pub mod vrenna;
 pub mod zephyr;
 
 use crate::abilities::registry::Kit;
@@ -29,6 +30,7 @@ pub static KITS: &[&Kit] = &[
     &grondak::KIT,
     &tharox::KIT,
     &kaelen::KIT,
+    &vrenna::KIT,
     &ilyra::KIT,
     &zephyr::KIT,
     &sable::KIT,
