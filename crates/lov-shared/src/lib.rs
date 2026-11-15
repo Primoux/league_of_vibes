@@ -4,6 +4,7 @@
 //! identique à celui du serveur Node et du client web (protocole v2).
 
 pub mod constants;
+pub mod data;
 pub mod map;
 pub mod math;
 pub mod protocol;
