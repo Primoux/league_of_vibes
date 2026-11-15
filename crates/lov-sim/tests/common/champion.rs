@@ -1,7 +1,7 @@
 //! Outils des tests de sorts : port de `packages/server/test/champion-helpers.ts`.
 //!
-//! `game(id)` crée un monde avec les systèmes `buffs`, `abilities`, `movement` (le TS y ajoute
-//! `summoners`, pas encore porté), un champion bleu `id` en (1000, 1000) et un champion rouge cible en
+//! `game(id)` crée un monde avec les systèmes `buffs`, `summoners`, `abilities`, `movement`, un
+//! champion bleu `id` en (1000, 1000) et un champion rouge cible en
 //! (1250, 1000), tous deux au niveau 6. Les kits de champions arrivent un par un : tant qu'un champion
 //! n'a pas son kit, les tests du moteur enregistrent un kit de test (`register_kit`).
 //!
@@ -29,6 +29,7 @@ use lov_sim::combat::damage::{DamageOpts, apply_damage};
 use lov_sim::systems::abilities::abilities_system;
 use lov_sim::systems::buffs::buffs_system;
 use lov_sim::systems::movement::movement_system;
+use lov_sim::systems::summoners::summoners_system;
 use lov_sim::{CreateChampion, Entity, QueuedCommand, System, World, create_champion};
 
 /// Un coup enregistré par `damage`.
@@ -104,7 +105,12 @@ pub fn game(id: &str) -> Game {
 /// `game(id, level)` avec le champion cible de son choix.
 pub fn game_vs(id: &str, target_champion: &str, level: u32) -> Game {
     let mut world = World::new(1);
-    let mut systems = vec![buffs_system(), abilities_system(), movement_system()];
+    let mut systems = vec![
+        buffs_system(),
+        summoners_system(),
+        abilities_system(),
+        movement_system(),
+    ];
     let source = spawn_champion(&mut world, "p1", id, id, Team::Blue, point(1000.0, 1000.0));
     let target = spawn_champion(
         &mut world,
