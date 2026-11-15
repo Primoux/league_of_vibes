@@ -73,8 +73,8 @@ fn update_status(
     // n'a pas apporté une police du jeu.
     text.0 = format!(
         "{} | {} unites | {} snapshots | vue {}\n\
-         Clic droit : bouger | Espace : centrer | Y : fixer la vue | Molette : zoom\n\
-         F11 : plein ecran | V : vsync | Esc : rendre la souris | Ctrl+Q : quitter",
+         Clic droit : bouger/attaquer | QWER : sorts | DF : invocateur | A : attaque-deplacement\n\
+         Espace : centrer | Y : fixer la vue | F11 : plein ecran | V : vsync | Esc : reglages",
         state.status,
         state.entities().len(),
         state.snapshots,

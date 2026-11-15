@@ -65,7 +65,7 @@ fn spawn_camera(mut commands: Commands) {
     ));
 }
 
-fn drive_camera(
+pub fn drive_camera(
     mut rig: ResMut<CameraRig>,
     mut camera: Single<&mut Transform, With<Camera3d>>,
     window: Single<&Window>,
