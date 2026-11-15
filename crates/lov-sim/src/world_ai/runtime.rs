@@ -32,9 +32,9 @@ use crate::world::{Entity, World};
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct PveCombat;
 
-/// `data.xpReward` : expérience donnée à la mort.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct XpReward(pub f64);
+/// `data.xpReward` : expérience donnée à la mort. C'est le type que lit le système de niveaux :
+/// un seul type, sinon la récompense posée ici ne serait jamais lue.
+pub use crate::systems::leveling::XpReward;
 
 /// `data.rewards` (`RewardData` de l'économie) : tous les champs sont optionnels.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
