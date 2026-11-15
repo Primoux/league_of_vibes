@@ -9,6 +9,7 @@
 //!
 //! Squelette : les modules arrivent un par un, une issue chacun.
 
+pub mod nav;
 pub mod world;
 
 pub use world::{
