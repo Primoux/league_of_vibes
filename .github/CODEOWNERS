@@ -16,7 +16,7 @@
 /packages/server/src/systems/index.ts @Primoux
 /crates/lov-shared/Cargo.toml         @Primoux
 /crates/lov-shared/src/*.rs           @Primoux
-/crates/lov-sim/src/systems/mod.rs    @Primoux
+/crates/lov-sim/src/systems/registry.rs @Primoux
 
 # Règles du projet et outillage d'intégration.
 /AGENTS.md                            @Primoux
