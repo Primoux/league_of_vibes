@@ -171,6 +171,7 @@ pub fn game_systems(skip: &[&str]) -> Vec<System> {
     use lov_sim::systems::abilities::abilities_system;
     use lov_sim::systems::buffs::buffs_system;
     use lov_sim::systems::economy::economy_system;
+    use lov_sim::systems::jungle::jungle_system;
     use lov_sim::systems::leveling::leveling_system;
     use lov_sim::systems::minions::minions_system;
     use lov_sim::systems::structures::structures_system;
@@ -182,6 +183,7 @@ pub fn game_systems(skip: &[&str]) -> Vec<System> {
         combat_system_with_projectiles().0,
         minions_system(true),
         structures_system(true),
+        jungle_system(true),
         leveling_system(),
         economy_system(),
         vision_system(),
