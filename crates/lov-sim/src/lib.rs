@@ -9,10 +9,12 @@
 //!
 //! Squelette : les modules arrivent un par un, une issue chacun.
 
+pub mod abilities;
 pub mod combat;
 pub mod nav;
 pub mod systems;
 pub mod world;
+pub mod world_ai;
 
 pub use world::{
     AttackContext, ChampionState, CreateChampion, DamageContext, DataTable, Entity, EventBus,

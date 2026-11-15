@@ -4,6 +4,8 @@
 // `dead_code` : sans cet `allow`, chaque binaire de test avertirait des helpers qu'il n'emploie pas.
 #![allow(dead_code)]
 
+pub mod champion;
+
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use lov_shared::data::champions::get_champion;
