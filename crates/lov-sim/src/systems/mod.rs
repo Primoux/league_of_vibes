@@ -3,6 +3,7 @@
 pub mod abilities;
 pub mod buffs;
 pub mod combat;
+pub mod economy;
 pub mod input;
 pub mod jungle;
 pub mod leveling;

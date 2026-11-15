@@ -163,3 +163,51 @@ pub fn dummy(
 ) -> EntityId {
     dummy_kind(world, team, pos, tweak, EntityKind::Minion)
 }
+
+/// Systèmes de la partie déjà portés en Rust, dans l'ordre de `packages/server/src/systems/index.ts`
+/// (les systèmes pas encore portés sont simplement absents). `skip` retire des systèmes par nom, comme
+/// le `createSystems().filter(...)` des tests TypeScript.
+pub fn game_systems(skip: &[&str]) -> Vec<System> {
+    use lov_sim::systems::abilities::abilities_system;
+    use lov_sim::systems::buffs::buffs_system;
+    use lov_sim::systems::economy::economy_system;
+    use lov_sim::systems::leveling::leveling_system;
+    use lov_sim::systems::minions::minions_system;
+    use lov_sim::systems::structures::structures_system;
+    let all = vec![
+        input_system(),
+        buffs_system(),
+        abilities_system(),
+        movement_system(),
+        combat_system_with_projectiles().0,
+        minions_system(true),
+        structures_system(true),
+        leveling_system(),
+        economy_system(),
+        vision_system(),
+    ];
+    all.into_iter()
+        .filter(|s| !skip.contains(&s.name))
+        .collect()
+}
+
+/// `new World(createSystems()); w.init()` avec les systèmes portés, sauf ceux de `skip`.
+pub fn game_world(skip: &[&str]) -> Sim {
+    let mut systems = game_systems(skip);
+    let mut world = World::new(1);
+    world.init(&mut systems);
+    Sim {
+        world,
+        systems,
+        projectiles: combat_system_with_projectiles().1,
+    }
+}
+
+/// `cmd(world, ent, msg)` : met la commande en file puis avance d'un tick.
+pub fn cmd(sim: &mut Sim, id: EntityId, msg: lov_shared::protocol::ClientMsg) {
+    let player_id = player_of(&sim.world, id);
+    sim.world
+        .commands
+        .push(lov_sim::QueuedCommand { player_id, msg });
+    sim.step();
+}
