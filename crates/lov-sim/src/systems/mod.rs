@@ -3,5 +3,6 @@
 pub mod buffs;
 pub mod combat;
 pub mod input;
+pub mod leveling;
 pub mod movement;
 pub mod vision;
