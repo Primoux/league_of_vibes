@@ -16,6 +16,7 @@ pub mod master67;
 pub mod sable;
 pub mod solenne;
 pub mod tharox;
+pub mod touilleur;
 pub mod zephyr;
 
 use crate::abilities::registry::Kit;
@@ -33,4 +34,5 @@ pub static KITS: &[&Kit] = &[
     &sable::KIT,
     &solenne::KIT,
     &master67::KIT,
+    &touilleur::KIT,
 ];
