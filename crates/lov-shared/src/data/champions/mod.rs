@@ -5,10 +5,19 @@
 //! le test `tests/champions.rs` couvre automatiquement tout champion enregistré.
 
 mod _helpers;
+pub mod corvin;
 pub mod grondak;
+pub mod ilyra;
 pub mod kaelen;
+pub mod master67;
+pub mod melenchon;
+pub mod nyx;
+pub mod sable;
+pub mod solenne;
 pub mod tharox;
 pub mod touilleur;
+pub mod vrenna;
+pub mod zephyr;
 
 use crate::schema::ChampionDef;
 use std::sync::LazyLock;
@@ -22,6 +31,15 @@ pub static CHAMPIONS: LazyLock<Vec<&'static ChampionDef>> = LazyLock::new(|| {
         &*grondak::CHAMPION,
         &*tharox::CHAMPION,
         &*kaelen::CHAMPION,
+        &*vrenna::CHAMPION,
+        &*ilyra::CHAMPION,
+        &*zephyr::CHAMPION,
+        &*sable::CHAMPION,
+        &*corvin::CHAMPION,
+        &*nyx::CHAMPION,
+        &*solenne::CHAMPION,
+        &*melenchon::CHAMPION,
+        &*master67::CHAMPION,
         &*touilleur::CHAMPION,
     ]
 });
