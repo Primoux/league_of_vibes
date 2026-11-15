@@ -9,6 +9,7 @@
 //! `abilities/mod.rs`). Rien d'autre à modifier : les systèmes, le moteur et les passifs parcourent
 //! ce tableau.
 
+pub mod corvin;
 pub mod grondak;
 pub mod ilyra;
 pub mod kaelen;
@@ -34,6 +35,7 @@ pub static KITS: &[&Kit] = &[
     &ilyra::KIT,
     &zephyr::KIT,
     &sable::KIT,
+    &corvin::KIT,
     &solenne::KIT,
     &master67::KIT,
     &touilleur::KIT,
