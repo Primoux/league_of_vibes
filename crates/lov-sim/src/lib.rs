@@ -9,6 +9,7 @@
 //!
 //! Squelette : les modules arrivent un par un, une issue chacun.
 
+pub mod abilities;
 pub mod combat;
 pub mod nav;
 pub mod systems;
