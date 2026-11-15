@@ -1,10 +1,7 @@
 //! Tests des buffs : port de `packages/server/test/buffs.test.ts`.
 //!
-//! Le TS importe `applyShield` de `abilities/effects.ts`, qui n'est pas portée : ce wrapper ajoute au
-//! bouclier de `combat/damage` un buff (`add_buff`) portant `shieldId`, et garde le plus grand des deux
-//! montants pour un même id. Il est reproduit ici (`apply_shield_wrapped`) ligne à ligne, sans la vue
-//! vivante `shieldRemaining` (inobservable par ces tests). `applyDamage` et `applyHeal` sont de simples
-//! ré-exports de `combat/damage`.
+//! `applyShield` vient de `abilities/effects.ts` (le vrai wrapper, `lov_sim::abilities::effects`) ;
+//! `applyDamage` et `applyHeal` sont de simples ré-exports de `combat/damage`.
 
 mod common;
 
@@ -13,13 +10,12 @@ use lov_shared::data::champions::get_champion;
 use lov_shared::schema::CcType;
 use lov_shared::types::{DamageType, EntityId, EntityKind, GameEvent, Team, TeamOrNeutral};
 use lov_shared::types::{PartialStats, SummonerId};
+use lov_sim::abilities::effects::{ShieldOptions, apply_shield as apply_spell_shield};
 use lov_sim::combat::buffs::{
-    BuffDefOverride, BuffOptions, BuffParams, Stasis, StatModifiers, add_buff, get_buff, get_buffs,
-    has_cc, recalculate_stats, register_stat_source,
+    BuffOptions, Stasis, StatModifiers, add_buff, get_buff, get_buffs, has_cc, recalculate_stats,
+    register_stat_source,
 };
-use lov_sim::combat::damage::{
-    DamageOpts, HealOpts, ShieldOpts, apply_damage, apply_heal, apply_shield, combat_data,
-};
+use lov_sim::combat::damage::{DamageOpts, HealOpts, apply_damage, apply_heal};
 use lov_sim::systems::buffs::buffs_system;
 use lov_sim::{CreateChampion, Entity, System, World, create_champion};
 
@@ -56,7 +52,7 @@ fn opts(duration: f64, source: Option<EntityId>, amount: Option<f64>) -> BuffOpt
     o
 }
 
-/// `applyShield` de `abilities/effects.ts`.
+/// `applyShield` de `abilities/effects.ts` (le wrapper de sorts, pas celui de `combat/damage`).
 fn apply_shield_wrapped(
     world: &mut World,
     source: EntityId,
@@ -65,44 +61,10 @@ fn apply_shield_wrapped(
     duration: Option<f64>,
     buff_id: &str,
 ) -> f64 {
-    if !world.contains(source)
-        || world.get(target).is_none_or(|t| t.dead)
-        || !amount.is_finite()
-        || amount <= 0.0
-    {
-        return 0.0;
-    }
-    let id = format!("{buff_id}:{source}");
-    let previous = combat_data(world.get_mut(target).unwrap())
-        .shields
-        .iter()
-        .find(|s| s.id.as_deref() == Some(&id))
-        .map_or(0.0, |s| s.amount);
-    let amount = previous.max(amount);
-    let mut o = BuffOptions::new(duration.unwrap_or(2.5));
-    o.source = Some(source);
-    o.params = BuffParams {
-        shield_id: Some(id.clone()),
-        ..BuffParams::default()
-    };
-    o.definition = Some(BuffDefOverride {
-        fx_key: Some(buff_id.to_owned()),
-        ..BuffDefOverride::default()
-    });
-    if add_buff(world, target, buff_id, o).is_none() {
-        return 0.0;
-    }
-    apply_shield(
-        world,
-        ShieldOpts {
-            source: Some(source),
-            target,
-            amount,
-            duration: Some(duration.unwrap_or(2.5)),
-            id: Some(id),
-        },
-    );
-    amount - previous
+    let mut o = ShieldOptions::new(source, target, amount);
+    o.duration = duration;
+    o.buff_id = Some(buff_id.to_owned());
+    apply_spell_shield(world, o)
 }
 
 fn step(world: &mut World, systems: &mut [System]) {
