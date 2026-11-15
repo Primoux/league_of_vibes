@@ -9,6 +9,7 @@
 //! `abilities/mod.rs`). Rien d'autre à modifier : les systèmes, le moteur et les passifs parcourent
 //! ce tableau.
 
+pub mod grondak;
 pub mod touilleur;
 
 use crate::abilities::registry::Kit;
@@ -18,5 +19,6 @@ use crate::abilities::registry::Kit;
 // n'ajoute qu'une ligne (rustfmt replierait la liste sur une ligne tant qu'elle est courte).
 #[rustfmt::skip]
 pub static KITS: &[&Kit] = &[
+    &grondak::KIT,
     &touilleur::KIT,
 ];
