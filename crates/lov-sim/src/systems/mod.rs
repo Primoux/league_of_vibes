@@ -3,6 +3,7 @@
 pub mod buffs;
 pub mod combat;
 pub mod input;
+pub mod leveling;
 pub mod minions;
 pub mod movement;
 pub mod structures;
