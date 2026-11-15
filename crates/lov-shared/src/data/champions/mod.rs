@@ -5,6 +5,7 @@
 //! le test `tests/champions.rs` couvre automatiquement tout champion enregistré.
 
 mod _helpers;
+pub mod corvin;
 pub mod grondak;
 
 use crate::schema::ChampionDef;
@@ -17,6 +18,7 @@ use std::sync::LazyLock;
 pub static CHAMPIONS: LazyLock<Vec<&'static ChampionDef>> = LazyLock::new(|| {
     vec![
         &*grondak::CHAMPION,
+        &*corvin::CHAMPION,
     ]
 });
 
