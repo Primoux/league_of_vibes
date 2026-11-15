@@ -10,6 +10,7 @@ pub mod leveling;
 pub mod minions;
 pub mod movement;
 pub mod objectives;
+pub mod registry;
 pub mod structures;
 pub mod summoners;
 pub mod vision;
