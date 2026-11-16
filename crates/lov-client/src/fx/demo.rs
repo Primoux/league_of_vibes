@@ -1,14 +1,20 @@
 //! Scène de démonstration des FX, sans serveur : `LOV_FXLAB=1 cargo run -p lov-client`.
 //!
 //! Équivalent minimal de la page `?fxlab` du client web pour le socle : une grille d'émetteurs, un par style
-//! de particules standard, qui rejouent leur salve en boucle autour du centre de la caméra.
+//! de particules standard, qui rejouent leur salve en boucle autour du centre de la caméra ; devant, une
+//! rangée de décals au sol (télégraphies, onde de choc) ; derrière, deux rubans de traînée en orbite.
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 3 s.
+
+use std::f32::consts::TAU;
 
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 
 use super::particles::system::Blend;
 use super::particles::{EmitOptions, EmitShape, ParticleSystem, StdStyles};
+use super::shaders::{
+    DecalMaterial, DecalMesh, DecalShape, GroundDecal, Ribbon, RibbonMaterial, RibbonMode,
+};
 use crate::render::camera::CameraRig;
 
 /// `LOV_FXLAB` défini (et non vide) : lancer la démo.
@@ -20,7 +26,7 @@ pub struct FxDemoPlugin;
 
 impl Plugin for FxDemoPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (replay, screenshot, log_stats));
+        app.add_systems(Update, (replay, decals, ribbons, screenshot, log_stats));
     }
 }
 
@@ -303,6 +309,135 @@ fn replay(
             ..burst(40.0, [0.8, 1.2], [0.08, 0.14], [0.2, 0.6])
         },
     );
+}
+
+/// Décals de la démo : (entité, matériau) dans l'ordre de `DECALS`.
+#[derive(Default)]
+struct DemoDecals(Vec<(GroundDecal, Handle<DecalMaterial>, Entity)>);
+
+/// Rangée de décals devant la grille, animés sur la période des salves.
+fn decals(
+    mut commands: Commands,
+    time: Res<Time>,
+    rig: Res<CameraRig>,
+    mesh: Res<DecalMesh>,
+    mut materials: ResMut<Assets<DecalMaterial>>,
+    mut transforms: Query<&mut Transform>,
+    mut demo: Local<DemoDecals>,
+) {
+    let red = Vec3::new(1.0, 0.25, 0.2);
+    let blue = Vec3::new(0.35, 0.65, 1.0);
+    let gold = Vec3::new(1.0, 0.75, 0.3);
+    if demo.0.is_empty() {
+        for (i, (color, color2)) in [
+            (red, Vec3::new(1.0, 0.7, 0.3)),
+            (blue, blue),
+            (gold, gold),
+            (red, gold),
+            (Vec3::new(0.05, 0.02, 0.08), Vec3::ZERO),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let decal = GroundDecal::default();
+            let mut m = DecalMaterial::default();
+            m.set_color(color, color2);
+            let tf = Transform::from_xyz(i as f32, 0.0, 0.0);
+            let handle = materials.add(m);
+            let entity = commands.spawn(mesh.bundle(decal, handle.clone(), tf)).id();
+            demo.0.push((decal, handle, entity));
+        }
+    }
+    let t = (time.elapsed_secs() / PERIOD).fract();
+    let at = |col: f32| rig.focus + Vec3::new((col - 2.0) * SPACING, 0.0, 2.5 * SPACING);
+    for (i, (decal, handle, entity)) in demo.0.iter().enumerate() {
+        let (Some(mut m), Ok(mut tf)) = (materials.get_mut(handle), transforms.get_mut(*entity))
+        else {
+            continue;
+        };
+        let p = at(i as f32);
+        m.reset();
+        *tf = match i {
+            // 0 : télégraphie circulaire qui se remplit
+            0 => {
+                m.u.progress = t;
+                decal.circle(&mut m, p, 1.6, DecalShape::Circle)
+            }
+            // 1 : onde de choc qui grandit et s'efface
+            1 => {
+                m.u.opacity = 1.0 - t;
+                m.u.edge = 0.15;
+                decal.circle(&mut m, p, 0.3 + 1.7 * t, DecalShape::Ring)
+            }
+            // 2 : ligne (skillshot) avec motif animé
+            2 => {
+                m.u.pattern = 1.0;
+                m.u.fill = 0.3;
+                decal.rect(
+                    &mut m,
+                    p - Vec3::new(1.5, 0.0, 1.0),
+                    p + Vec3::new(1.5, 0.0, 1.0),
+                    0.8,
+                )
+            }
+            // 3 : cône qui se remplit
+            3 => {
+                m.u.progress = t;
+                decal.cone(&mut m, p - Vec3::Z * 1.5, p + Vec3::Z, 3.0, 0.5)
+            }
+            // 4 : zone sombre persistante (mélange normal)
+            _ => {
+                m.set_blend(Blend::Normal);
+                m.u.fill = 0.6;
+                m.u.pattern = 0.5;
+                decal.circle(&mut m, p, 1.4, DecalShape::Circle)
+            }
+        };
+    }
+}
+
+/// Deux rubans en orbite derrière la grille : face caméra en hauteur, à plat au sol.
+fn ribbons(
+    mut commands: Commands,
+    time: Res<Time>,
+    rig: Res<CameraRig>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<RibbonMaterial>>,
+    mut query: Query<&mut Ribbon>,
+    mut spawned: Local<Vec<Entity>>,
+) {
+    if spawned.is_empty() {
+        for (mode, color) in [
+            (RibbonMode::Billboard, Vec3::new(1.0, 0.5, 0.15)),
+            (RibbonMode::Flat, Vec3::new(0.35, 0.65, 1.0)),
+        ] {
+            let mut ribbon = Ribbon::new(32);
+            ribbon.mode = mode;
+            ribbon.width = 0.5;
+            ribbon.life = 0.5;
+            let mesh = meshes.add(ribbon.mesh());
+            let material = materials.add(RibbonMaterial::new(color, None));
+            spawned.push(commands.spawn(ribbon.bundle(mesh, material)).id());
+        }
+        return;
+    }
+    let a = time.elapsed_secs() * 3.0;
+    for (k, entity) in spawned.iter().enumerate() {
+        let Ok(mut ribbon) = query.get_mut(*entity) else {
+            continue;
+        };
+        let (side, y) = if k == 0 { (-1.0, 1.5) } else { (1.0, 0.0) };
+        let center = rig.focus + Vec3::new(side * 2.5 * SPACING / 2.0, y, -2.5 * SPACING);
+        // le ruban au sol s'interrompt une partie du cycle : il s'efface puis repart à neuf (comme un
+        // ruban rendu au pool par le runtime)
+        if k == 1 && (a / TAU).fract() > 0.6 {
+            if ribbon.alive() == 0 {
+                ribbon.reset();
+            }
+            continue;
+        }
+        ribbon.push(center + Vec3::new(a.cos(), 0.0, a.sin()) * 2.0);
+    }
 }
 
 fn screenshot(mut commands: Commands, time: Res<Time>, mut done: Local<bool>) {
