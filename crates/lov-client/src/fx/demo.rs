@@ -2,8 +2,9 @@
 //!
 //! Équivalent minimal de la page `?fxlab` du client web pour le socle : une grille d'émetteurs, un par style
 //! de particules standard, qui rejouent leur salve en boucle autour du centre de la caméra ; devant, une
-//! rangée de décals au sol (télégraphies, onde de choc) ; derrière, deux rubans de traînée en orbite.
-//! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 3 s.
+//! rangée de décals au sol (télégraphies, onde de choc) ; derrière, les matériaux FX (bouclier fresnel, givre,
+//! eau, modèle qui se dissout) et deux rubans de traînée en orbite.
+//! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 3 s (`LOV_SCREENSHOT_AT=4.5` pour choisir l'instant).
 
 use std::f32::consts::TAU;
 
@@ -13,7 +14,8 @@ use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 use super::particles::system::Blend;
 use super::particles::{EmitOptions, EmitShape, ParticleSystem, StdStyles};
 use super::shaders::{
-    DecalMaterial, DecalMesh, DecalShape, GroundDecal, Ribbon, RibbonMaterial, RibbonMode,
+    DecalMaterial, DecalMesh, DecalShape, DissolveMaterial, FresnelMaterial, GroundDecal,
+    IceMaterial, Ribbon, RibbonMaterial, RibbonMode, WaterMaterial, dissolvable, set_dissolve,
 };
 use crate::render::camera::CameraRig;
 
@@ -26,7 +28,10 @@ pub struct FxDemoPlugin;
 
 impl Plugin for FxDemoPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (replay, decals, ribbons, screenshot, log_stats));
+        app.add_systems(
+            Update,
+            (replay, decals, ribbons, materials, screenshot, log_stats),
+        );
     }
 }
 
@@ -427,7 +432,7 @@ fn ribbons(
             continue;
         };
         let (side, y) = if k == 0 { (-1.0, 1.5) } else { (1.0, 0.0) };
-        let center = rig.focus + Vec3::new(side * 2.5 * SPACING / 2.0, y, -2.5 * SPACING);
+        let center = rig.focus + Vec3::new(side * 2.5 * SPACING / 2.0, y, -2.75 * SPACING);
         // le ruban au sol s'interrompt une partie du cycle : il s'efface puis repart à neuf (comme un
         // ruban rendu au pool par le runtime)
         if k == 1 && (a / TAU).fract() > 0.6 {
@@ -440,8 +445,91 @@ fn ribbons(
     }
 }
 
+/// Une pièce dissolvable de la démo, qui se défait et se reforme en boucle.
+#[derive(Component)]
+struct DemoDissolve;
+
+/// Rangée de matériaux FX entre la grille et les rubans, posée une fois autour du centre de la caméra.
+#[allow(clippy::too_many_arguments)] // un `ResMut<Assets<…>>` par matériau, comme toute scène Bevy
+fn materials(
+    mut commands: Commands,
+    time: Res<Time>,
+    rig: Res<CameraRig>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut fresnel: ResMut<Assets<FresnelMaterial>>,
+    mut ice: ResMut<Assets<IceMaterial>>,
+    mut water: ResMut<Assets<WaterMaterial>>,
+    mut dissolve: ResMut<Assets<DissolveMaterial>>,
+    pieces: Query<&MeshMaterial3d<DissolveMaterial>, With<DemoDissolve>>,
+    mut done: Local<bool>,
+) {
+    if !*done {
+        *done = true;
+        let at =
+            |col: f32, y: f32| rig.focus + Vec3::new((col - 2.0) * SPACING, y, -1.75 * SPACING);
+        // 0 : bouclier fresnel à bandes
+        let mut shield = FresnelMaterial::new(Vec3::new(0.35, 0.65, 1.0) * 1.5);
+        shield.u.bands = 0.6;
+        commands.spawn((
+            Mesh3d(meshes.add(Sphere::new(1.2).mesh().uv(32, 16))),
+            MeshMaterial3d(fresnel.add(shield)),
+            Transform::from_translation(at(0.0, 1.2)),
+        ));
+        // 1 : éclats de givre (sphère grossière : facettes visibles)
+        let shard = meshes.add(Sphere::new(0.5).mesh().uv(6, 4));
+        let frost = ice.add(IceMaterial::default());
+        for (dx, s, tilt) in [(-0.6, 1.0, 0.3), (0.5, 1.4, -0.4), (0.1, 0.8, 1.2)] {
+            commands.spawn((
+                Mesh3d(shard.clone()),
+                MeshMaterial3d(frost.clone()),
+                Transform::from_translation(at(1.0, 0.5 * s) + Vec3::X * dx)
+                    .with_scale(Vec3::new(0.6, 1.6, 0.6) * s)
+                    .with_rotation(Quat::from_rotation_z(tilt * 0.3)),
+            ));
+        }
+        // 2 : flaque d'eau
+        commands.spawn((
+            Mesh3d(meshes.add(Plane3d::default().mesh().size(3.0, 3.0))),
+            MeshMaterial3d(water.add(WaterMaterial::default())),
+            Transform::from_translation(at(2.0, 0.04)),
+        ));
+        // 3 : colonne qui se dissout (avec son ombre)
+        commands.spawn((
+            DemoDissolve,
+            Mesh3d(meshes.add(Capsule3d::new(0.5, 1.2))),
+            MeshMaterial3d(dissolve.add(dissolvable(StandardMaterial {
+                base_color: Color::srgb(0.75, 0.7, 0.65),
+                ..default()
+            }))),
+            Transform::from_translation(at(3.0, 1.1)),
+        ));
+        // 4 : dôme fresnel doré, plein (base forte)
+        let mut dome = FresnelMaterial::new(Vec3::new(1.0, 0.75, 0.3));
+        dome.u.base = 0.15;
+        dome.u.power = 1.5;
+        commands.spawn((
+            Mesh3d(meshes.add(Sphere::new(1.0).mesh().uv(32, 16))),
+            MeshMaterial3d(fresnel.add(dome)),
+            Transform::from_translation(at(4.0, 0.0)),
+        ));
+        return;
+    }
+    // dissolution en dents de scie sur deux périodes, avec une pause intacte
+    let t = (time.elapsed_secs() / (2.0 * PERIOD)).fract();
+    let amount = ((t - 0.2) / 0.7).clamp(0.0, 1.0);
+    for handle in &pieces {
+        if let Some(mut m) = dissolve.get_mut(&handle.0) {
+            set_dissolve(&mut m, amount);
+        }
+    }
+}
+
 fn screenshot(mut commands: Commands, time: Res<Time>, mut done: Local<bool>) {
-    if *done || time.elapsed_secs() < 3.0 {
+    let at = std::env::var("LOV_SCREENSHOT_AT")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+        .unwrap_or(3.0);
+    if *done || time.elapsed_secs() < at {
         return;
     }
     *done = true;
