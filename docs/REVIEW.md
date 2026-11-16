@@ -14,7 +14,7 @@ Ne refais pas à la main ce qui est déjà mécanique. La CI bloque déjà :
 | `check` | typecheck, tests, build client, 8 bots WebSocket en charge |
 | `areas` | la PR reste dans l'area de son titre ; aucun contrat touché hors PR `contract:` ; une PR `champion` ne couvre qu'un champion |
 | `size` | avertit au-delà de ~800 lignes |
-| `rust` | `cargo fmt`, `clippy -D warnings`, `cargo test` sur `crates/` (~3 min, le plus lent) |
+| `rust` | `cargo fmt`, `clippy -D warnings`, `cargo test` sur `crates/`, 8 bots contre le serveur Rust (~3 min, le plus lent) |
 
 **CI rouge → changements demandés, on ne merge pas.** Point final, pas de discussion à avoir.
 
@@ -37,7 +37,8 @@ exact que tu merges.
    `lov-sim` = changement demandé).
 5. **Propriété intellectuelle** (`AGENTS.md §6`) : aucun nom, visuel, son ni texte de Riot ; assets générés
    ou CC0 listés dans `ASSETS.md` ; textes du jeu en français.
-6. **Issue liée** : la PR référence une issue (`Closes #n`), et l'issue était bien assignée à son auteur —
+6. **Issue liée** : la PR référence une issue (`Closes #n`, ou `Refs #n` si elle n'en livre qu'une partie,
+   comme un kit de champion sans modèle ni FX), et l'issue était bien assignée à son auteur —
    sinon deux personnes ont pu travailler sur les mêmes fichiers.
 
 ## Boucle de travail
