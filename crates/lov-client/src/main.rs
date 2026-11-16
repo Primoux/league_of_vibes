@@ -14,6 +14,7 @@ use bevy::dev_tools::fps_overlay::FpsOverlayPlugin;
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 
+mod fx;
 mod input;
 mod net;
 mod render;
