@@ -547,11 +547,12 @@ fn log_stats(time: Res<Time>, ps: Res<ParticleSystem>, mut next: Local<f32>) {
     }
     *next = time.elapsed_secs() + 5.0;
     info!(
-        "fx : {} / {} particules additives, {} / {} normales, {} emises",
+        "fx : {} / {} particules additives, {} / {} normales, {} blocs dessines, {} emises",
         ps.batch(Blend::Add).used(),
         ps.batch(Blend::Add).capacity(),
         ps.batch(Blend::Normal).used(),
         ps.batch(Blend::Normal).capacity(),
+        ps.batch(Blend::Add).live_chunks() + ps.batch(Blend::Normal).live_chunks(),
         ps.emitted
     );
 }

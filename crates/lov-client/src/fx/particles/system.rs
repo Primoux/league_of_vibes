@@ -8,11 +8,14 @@
 //! Deux lots : additif (lumières, étincelles, magie) et alpha classique (fumée, poussière, débris).
 //!
 //! Portage de `packages/client/src/fx/particles/ParticleSystem.ts`. Écarts avec le client web :
-//! - les attributs vivent dans un tampon de stockage (`ShaderBuffer`) lu par numéro de sommet, au lieu
-//!   d'attributs instanciés. Bevy renvoie le tampon entier quand il change : sur une frame qui émet, c'est
-//!   jusqu'à 1,3 Mo pour le lot additif, au lieu des seules plages écrites (que `RingAllocator` suit toujours) ;
-//! - le maillage dessine toujours la capacité entière (les emplacements morts sortent du champ dans le
-//!   vertex shader) ; un lot entièrement mort est masqué, comme dans le client web.
+//! - les attributs vivent dans des tampons de stockage (`ShaderBuffer`) lus par numéro de sommet, au lieu
+//!   d'attributs instanciés ;
+//! - chaque lot est découpé en blocs de `CHUNK` emplacements (un tampon, un matériau, une entité par bloc).
+//!   Bevy renvoie un tampon entier quand il change : seuls les blocs touchés par les plages écrites (suivies
+//!   par `RingAllocator`) repartent au GPU, et un bloc sans particule vivante est masqué, donc le vertex
+//!   shader ne traite que les blocs utiles (le client web dessine la capacité entière du lot) ;
+//! - l'horloge du shader est `globals.time` de Bevy (`ParticleSystem::time` la suit) : aucun matériau n'est
+//!   modifié à chaque frame. Quand elle reboucle (toutes les heures), les particules en vol disparaissent.
 
 use std::f32::consts::TAU;
 
@@ -39,6 +42,8 @@ const MAX_STYLES: usize = 128;
 /// Nombre de `vec4` par particule dans le tampon (voir `Particle` dans `particles.wesl`).
 const VEC4S: usize = 5;
 const FLOATS: usize = VEC4S * 4;
+/// Emplacements par bloc de rendu (voir l'en-tête).
+pub const CHUNK: usize = 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Blend {
@@ -151,17 +156,25 @@ impl Default for EmitOptions {
     }
 }
 
-/// Un lot de particules partageant un mode de mélange (données CPU, miroir du tampon GPU).
+/// Bloc de rendu : `chunk` emplacements consécutifs du lot, avec leur tampon GPU et leur entité.
+struct Chunk {
+    /// Instant où la dernière particule écrite dans le bloc meurt : au-delà, le bloc est vide.
+    end_time: f32,
+    live: bool,
+    /// À renvoyer au GPU.
+    dirty: bool,
+    buffer: Handle<ShaderBuffer>,
+    entity: Option<Entity>,
+}
+
+/// Un lot de particules partageant un mode de mélange (données CPU, miroir des tampons GPU).
 pub struct ParticleBatch {
     ring: RingAllocator,
     data: Vec<f32>,
     used: usize,
-    /// Instant où la dernière particule écrite meurt : au-delà, le lot est vide.
-    end_time: f32,
-    visible: bool,
-    buffer: Handle<ShaderBuffer>,
-    material: Handle<ParticleMaterial>,
-    entity: Option<Entity>,
+    /// Taille d'un bloc (`CHUNK`, ou la capacité si elle est plus petite).
+    chunk: usize,
+    chunks: Vec<Chunk>,
 }
 
 impl ParticleBatch {
@@ -172,16 +185,32 @@ impl ParticleBatch {
             p[3] = 1e9;
             p[7] = 1.0;
         }
+        let chunk = CHUNK.min(capacity);
+        assert!(
+            capacity.is_multiple_of(chunk),
+            "capacité de particules non multiple de {CHUNK}"
+        );
+        let chunks = (0..capacity / chunk)
+            .map(|_| Chunk {
+                end_time: -1.0,
+                live: false,
+                dirty: false,
+                buffer: Handle::default(),
+                entity: None,
+            })
+            .collect();
         Self {
             ring: RingAllocator::new(capacity),
             data,
             used: 0,
-            end_time: -1.0,
-            visible: false,
-            buffer: Handle::default(),
-            material: Handle::default(),
-            entity: None,
+            chunk,
+            chunks,
         }
+    }
+
+    /// Nombre de blocs dessinés (contenant au moins une particule vivante).
+    pub fn live_chunks(&self) -> usize {
+        self.chunks.iter().filter(|c| c.live).count()
     }
 
     pub fn capacity(&self) -> usize {
@@ -199,23 +228,31 @@ impl ParticleBatch {
         if self.used < self.ring.capacity() {
             self.used += 1;
         }
-        if birth + life > self.end_time {
-            self.end_time = birth + life;
-        }
-        self.visible = true;
+        let c = &mut self.chunks[i / self.chunk];
+        c.end_time = c.end_time.max(birth + life);
+        c.live = true;
         self.data[i * FLOATS..(i + 1) * FLOATS].copy_from_slice(&p);
     }
 
-    /// Renvoie `true` si le tampon GPU doit être téléversé. Quand tout est mort, le lot est masqué et repart
-    /// de zéro : le vertex shader ne retraite pas des milliers d'instances mortes après un combat.
-    fn flush(&mut self, time: f32) -> bool {
-        if self.used > 0 && time > self.end_time {
+    /// Marque à renvoyer les blocs touchés par les plages écrites et masque ceux dont tout est mort. Quand tout
+    /// le lot est mort, il repart de zéro. `wrapped` : l'horloge a rebouclé, tout ce qui volait disparaît.
+    fn flush(&mut self, time: f32, wrapped: bool) {
+        let ranges = self.ring.flush();
+        for k in 0..ranges {
+            let (start, count) = (self.ring.range_start[k], self.ring.range_count[k]);
+            for c in start / self.chunk..=(start + count - 1) / self.chunk {
+                self.chunks[c].dirty = true;
+            }
+        }
+        for c in &mut self.chunks {
+            if c.live && (wrapped || time > c.end_time) {
+                c.live = false;
+            }
+        }
+        if self.used > 0 && self.chunks.iter().all(|c| !c.live) {
             self.used = 0;
             self.ring.reset();
-            self.visible = false;
-            return false;
         }
-        self.ring.flush() > 0
     }
 }
 
@@ -387,7 +424,7 @@ const SHADER: &str = "embedded://lov_client/fx/particles/particles.wesl";
 
 #[derive(Asset, TypePath, AsBindGroup, Clone)]
 pub struct ParticleMaterial {
-    /// x : horloge, y : 1 = additif.
+    /// x : —, y : 1 = additif.
     #[uniform(0)]
     params: Vec4,
     #[storage(1, read_only)]
@@ -517,46 +554,51 @@ pub fn spawn_particles(
     ps.curves_dirty = false;
     for blend in [Blend::Normal, Blend::Add] {
         let batch = ps.batch_mut(blend);
-        batch.buffer = buffers.add(ShaderBuffer::new(
-            batch.data.clone(),
-            RenderAssetUsages::default(),
-        ));
-        batch.material = materials.add(ParticleMaterial {
-            params: Vec4::new(0.0, if blend == Blend::Add { 1.0 } else { 0.0 }, 0.0, 0.0),
-            particles: batch.buffer.clone(),
-            curves: curves.clone(),
-            atlas: atlas.clone(),
-            blend,
-        });
+        let chunk = batch.chunk;
+        // un maillage et un matériau par bloc, mais le maillage est le même pour tous les blocs du lot
+        let mesh = meshes.add(quads(chunk));
         let name = match blend {
             Blend::Add => "fx-particles-add",
             Blend::Normal => "fx-particles-normal",
         };
-        let entity = commands
-            .spawn((
-                Name::new(name),
-                Mesh3d(meshes.add(quads(batch.capacity()))),
-                MeshMaterial3d(batch.material.clone()),
-                Transform::IDENTITY,
-                Visibility::Hidden,
-                NoFrustumCulling,
-            ))
-            .id();
-        batch.entity = Some(entity);
+        for (k, c) in batch.chunks.iter_mut().enumerate() {
+            c.buffer = buffers.add(ShaderBuffer::new(
+                batch.data[k * chunk * FLOATS..(k + 1) * chunk * FLOATS].to_vec(),
+                RenderAssetUsages::default(),
+            ));
+            let material = materials.add(ParticleMaterial {
+                params: Vec4::new(0.0, if blend == Blend::Add { 1.0 } else { 0.0 }, 0.0, 0.0),
+                particles: c.buffer.clone(),
+                curves: curves.clone(),
+                atlas: atlas.clone(),
+                blend,
+            });
+            let entity = commands
+                .spawn((
+                    Name::new(format!("{name}-{k}")),
+                    Mesh3d(mesh.clone()),
+                    MeshMaterial3d(material),
+                    Transform::IDENTITY,
+                    Visibility::Hidden,
+                    NoFrustumCulling,
+                ))
+                .id();
+            c.entity = Some(entity);
+        }
     }
 }
 
-/// Avance l'horloge et envoie au GPU ce qui a changé (`ParticleSystem.update` du client web).
+/// Suit l'horloge du shader et envoie au GPU ce qui a changé (`ParticleSystem.update` du client web).
 pub fn update_particles(
     time: Res<Time>,
     mut ps: ResMut<ParticleSystem>,
-    mut materials: ResMut<Assets<ParticleMaterial>>,
     mut buffers: ResMut<Assets<ShaderBuffer>>,
     mut images: ResMut<Assets<Image>>,
     mut visibility: Query<&mut Visibility>,
 ) {
-    ps.time += time.delta_secs();
-    let now = ps.time;
+    let now = time.elapsed_secs_wrapped();
+    let wrapped = now < ps.time;
+    ps.time = now;
     if ps.curves_dirty {
         ps.curves_dirty = false;
         if let Some(mut image) = images.get_mut(&ps.curves) {
@@ -565,23 +607,23 @@ pub fn update_particles(
     }
     for blend in [Blend::Add, Blend::Normal] {
         let batch = ps.batch_mut(blend);
-        if batch.flush(now)
-            && let Some(mut buffer) = buffers.get_mut(&batch.buffer)
-        {
-            buffer.clear();
-            buffer.extend_from_slice(&batch.data);
-        }
-        if let Some(mut vis) = batch.entity.and_then(|e| visibility.get_mut(e).ok()) {
-            vis.set_if_neq(if batch.visible {
-                Visibility::Visible
-            } else {
-                Visibility::Hidden
-            });
-        }
-        if batch.visible
-            && let Some(mut material) = materials.get_mut(&batch.material)
-        {
-            material.params.x = now;
+        batch.flush(now, wrapped);
+        let chunk = batch.chunk;
+        for (k, c) in batch.chunks.iter_mut().enumerate() {
+            if c.dirty
+                && let Some(mut buffer) = buffers.get_mut(&c.buffer)
+            {
+                c.dirty = false;
+                buffer.clear();
+                buffer.extend_from_slice(&batch.data[k * chunk * FLOATS..(k + 1) * chunk * FLOATS]);
+            }
+            if let Some(mut vis) = c.entity.and_then(|e| visibility.get_mut(e).ok()) {
+                vis.set_if_neq(if c.live {
+                    Visibility::Visible
+                } else {
+                    Visibility::Hidden
+                });
+            }
         }
     }
 }
@@ -694,11 +736,50 @@ mod tests {
                 ..default()
             },
         );
-        assert!(ps.add.flush(0.1), "écritures à téléverser");
-        assert!(!ps.add.flush(0.2), "rien de neuf");
-        assert!(ps.add.visible);
-        assert!(!ps.add.flush(0.6));
-        assert!(!ps.add.visible);
-        assert_eq!(ps.add.used(), 0);
+        let b = &mut ps.add;
+        b.flush(0.1, false);
+        assert!(b.chunks[0].dirty, "écritures à téléverser");
+        b.chunks[0].dirty = false;
+        b.flush(0.2, false);
+        assert!(!b.chunks[0].dirty, "rien de neuf");
+        assert_eq!(b.live_chunks(), 1);
+        b.flush(0.6, false);
+        assert!(!b.chunks[0].dirty);
+        assert_eq!(b.live_chunks(), 0);
+        assert_eq!(b.used(), 0);
+    }
+
+    #[test]
+    fn seuls_les_blocs_ecrits_sont_renvoyes_et_dessines() {
+        let mut ps = ParticleSystem::new(4 * CHUNK, Rng::new(3));
+        let s = ps.define_style(ParticleStyleDef::new(Tex::Dot));
+        let burst = |count: f32, life: f32| EmitOptions {
+            count,
+            life: life.into(),
+            ..default()
+        };
+        // 1,5 bloc écrit : blocs 0 et 1
+        ps.emit(s, Vec3::ZERO, &burst((CHUNK + CHUNK / 2) as f32, 1.0));
+        let b = &mut ps.add;
+        b.flush(0.0, false);
+        let dirty: Vec<bool> = b.chunks.iter().map(|c| c.dirty).collect();
+        assert_eq!(dirty, [true, true, false, false]);
+        assert_eq!(b.live_chunks(), 2);
+        b.chunks.iter_mut().for_each(|c| c.dirty = false);
+        // le bloc 1 reçoit des particules qui vivent plus longtemps : le bloc 0 meurt seul
+        ps.time = 0.5;
+        ps.emit(s, Vec3::ZERO, &burst(10.0, 2.0));
+        let b = &mut ps.add;
+        b.flush(1.2, false);
+        let live: Vec<bool> = b.chunks.iter().map(|c| c.live).collect();
+        assert_eq!(live, [false, true, false, false]);
+        assert!(b.chunks[1].dirty && !b.chunks[0].dirty);
+        // tout est mort : le lot repart de zéro
+        b.flush(3.0, false);
+        assert_eq!((b.live_chunks(), b.used()), (0, 0));
+        // l'horloge qui reboucle tue ce qui volait
+        ps.emit(s, Vec3::ZERO, &burst(1.0, 5.0));
+        ps.add.flush(0.1, true);
+        assert_eq!(ps.add.live_chunks(), 0);
     }
 }

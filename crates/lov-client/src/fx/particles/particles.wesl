@@ -1,13 +1,13 @@
 // Particules GPU : portage du vertex/fragment shader de `packages/client/src/fx/particles/ParticleSystem.ts`.
 //
-// Chaque particule occupe 4 sommets d'un maillage fixe (coin du quad en xy, numéro de particule en z). Ses
+// Chaque particule occupe 4 sommets d'un maillage fixe (coin du quad en xy, numéro dans le bloc en z). Ses
 // attributs, écrits une fois à l'émission, sont lus dans un tampon de stockage ; la trajectoire est calculée
 // analytiquement depuis l'âge (p0 + v·k(t) − ½g·t²), couleur/alpha/taille sont lues dans la texture de courbes.
 
-import bevy_pbr::render::mesh_view_bindings::view;
+import bevy_pbr::render::mesh_view_bindings::{globals, view};
 
 struct Params {
-    // x : horloge des particules (s), y : 1 = mélange additif
+    // x : —, y : 1 = mélange additif
     time: vec4<f32>,
 }
 
@@ -48,7 +48,8 @@ fn curve_at(row: i32, t: f32) -> vec4<f32> {
 fn vertex(v: Vertex) -> VertexOutput {
     var out: VertexOutput;
     let p = particles[u32(v.position.z)];
-    let age = params.time.x - p.p0_birth.w;
+    // même horloge que `ParticleSystem::time`
+    let age = globals.time - p.p0_birth.w;
     let t = age / p.vel_life.w;
     if t < 0.0 || t > 1.0 {
         out.clip = vec4<f32>(2.0, 2.0, 2.0, 1.0);
