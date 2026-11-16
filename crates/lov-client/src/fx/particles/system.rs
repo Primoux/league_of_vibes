@@ -33,6 +33,7 @@ use super::atlas::{self, Tex};
 use crate::fx::core::curves::{self, CURVE_RES, ColorStop, Curve, presets};
 use crate::fx::core::ring::RingAllocator;
 use crate::fx::core::rng::{Range, Rng};
+use crate::fx::render_order;
 
 const MAX_STYLES: usize = 128;
 /// Nombre de `vec4` par particule dans le tampon (voir `Particle` dans `particles.wesl`).
@@ -418,8 +419,8 @@ impl Material for ParticleMaterial {
     /// Ordre de dessin du client web : lot normal (10) puis lot additif (11).
     fn depth_bias(&self) -> f32 {
         match self.blend {
-            Blend::Add => 1.0,
-            Blend::Normal => 0.0,
+            Blend::Add => render_order(11.0),
+            Blend::Normal => render_order(10.0),
         }
     }
 
