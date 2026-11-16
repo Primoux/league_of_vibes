@@ -10,6 +10,7 @@ use bevy::prelude::*;
 pub mod core;
 pub mod demo;
 pub mod particles;
+pub mod post;
 pub mod shaders;
 
 /// Socle FX : à ajouter une fois au client.
@@ -17,7 +18,11 @@ pub struct FxPlugin;
 
 impl Plugin for FxPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((particles::ParticlesPlugin, shaders::ShadersPlugin));
+        app.add_plugins((
+            particles::ParticlesPlugin,
+            shaders::ShadersPlugin,
+            post::PostFxPlugin,
+        ));
     }
 }
 
