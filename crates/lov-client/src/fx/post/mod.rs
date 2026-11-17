@@ -2,6 +2,8 @@
 //!
 //! Portage de `packages/client/src/fx/post/PostFx.ts`, en s'appuyant sur Bevy là où il fait déjà le travail :
 //! - **HDR + MSAA ×4** : `Hdr` sur la caméra (MSAA ×4 est le défaut de Bevy) ;
+//! - **filet anti-NaN** : passe plein écran `Sanitize` juste avant le bloom (NaN/Inf → noir, HDR plafonné à 64),
+//!   sans quoi le flou étalerait un pixel invalide en blocs noirs ;
 //! - **bloom** : `Bloom` de Bevy en mode additif, seuil 0,92 (seuls les FX en couleurs HDR brillent, la scène
 //!   éclairée normalement reste en dessous). Le flou de Bevy n'est pas celui d'`UnrealBloomPass` : la force est
 //!   réglée à l'œil pour un rendu proche ;
@@ -9,11 +11,14 @@
 //!   three.js, avec son exposition effective (`toneMappingExposure` 1,05 ÷ 0,6) en `ColorGrading` ;
 //! - **étalonnage** : passe plein écran `Grade` après le tone mapping, mêmes formules que le client web
 //!   (saturation, teinte des ombres, gain des hautes lumières, contraste, vignette) ; filet anti-NaN ;
-//! - **qualité basse** : ni bloom ni étalonnage (tone mapping conservé, comme le rendu direct du client web).
+//! - **qualité basse** : ni HDR, ni bloom, ni étalonnage : rendu direct, tone mapping conservé, comme le
+//!   client web.
 //!
-//! La caméra appartient à l'area `render` : on n'y touche pas, `apply_post` ajoute ces composants à toute
-//! `Camera3d` et les remet à jour quand `PostFxSettings` change. La distorsion de chaleur arrive dans une PR
-//! suivante (elle demande un second rendu de la scène).
+//! La caméra appartient à l'area `render`, qui l'inscrit au post-traitement avec le marqueur `PostFxCamera`
+//! (les autres caméras, minimap ou portraits, n'y passent pas). À son arrivée, `apply_post` règle le tone
+//! mapping et l'exposition (une seule fois : la caméra peut ensuite les changer) ; quand `PostFxSettings`
+//! change, il ne touche qu'au HDR, au bloom et aux passes plein écran. La distorsion de chaleur arrive dans
+//! une PR suivante (elle demande un second rendu de la scène).
 
 use bevy::camera::Hdr;
 use bevy::core_pipeline::fullscreen_material::{FullscreenMaterial, FullscreenMaterialPlugin};
@@ -21,15 +26,16 @@ use bevy::core_pipeline::schedule::Core3dSystems;
 use bevy::core_pipeline::tonemapping::{Tonemapping, tonemapping};
 use bevy::ecs::schedule::ScheduleConfigs;
 use bevy::ecs::system::BoxedSystem;
-use bevy::post_process::bloom::{Bloom, BloomCompositeMode, BloomPrefilter};
+use bevy::post_process::bloom::{Bloom, BloomPrefilter, bloom};
 use bevy::prelude::*;
 use bevy::render::RenderApp;
 use bevy::render::extract_component::ExtractComponent;
 use bevy::render::render_resource::ShaderType;
-use bevy::render::view::{ColorGrading, ColorGradingGlobal};
+use bevy::render::view::ColorGrading;
 use bevy::shader::ShaderRef;
 
 const GRADE_SHADER: &str = "embedded://lov_client/fx/post/grade.wesl";
+const SANITIZE_SHADER: &str = "embedded://lov_client/fx/post/sanitize.wesl";
 
 /// `toneMappingExposure` du client web (1,05) et le facteur interne (÷ 0,6) de `ACESFilmicToneMapping`.
 const EXPOSURE: f32 = 1.05 / 0.6;
@@ -87,7 +93,39 @@ impl FullscreenMaterial for Grade {
     }
 }
 
-/// Réglages du post-traitement, appliqués à toutes les caméras 3D.
+/// Marqueur posé par l'area `render` sur la caméra de jeu : seule cette caméra reçoit le post-traitement.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub struct PostFxCamera;
+
+/// Filet anti-NaN/Inf avant le bloom (passe plein écran, active avec le HDR).
+#[derive(Component, ExtractComponent, Clone, Copy, Debug, PartialEq, ShaderType)]
+#[extract_app(RenderApp)]
+pub struct Sanitize {
+    /// Plafond du HDR, comme `min(c, 64)` du client web.
+    pub max_hdr: f32,
+}
+
+impl Default for Sanitize {
+    fn default() -> Self {
+        Self { max_hdr: 64.0 }
+    }
+}
+
+impl FullscreenMaterial for Sanitize {
+    fn fragment_shader() -> ShaderRef {
+        SANITIZE_SHADER.into()
+    }
+
+    /// Avant le bloom, qui lit l'image HDR et en étalerait les NaN.
+    fn schedule_configs(system: ScheduleConfigs<BoxedSystem>) -> ScheduleConfigs<BoxedSystem> {
+        system
+            .in_set(Core3dSystems::PostProcess)
+            .before(bloom)
+            .before(tonemapping)
+    }
+}
+
+/// Réglages du post-traitement des caméras `PostFxCamera`.
 #[derive(Resource, Clone, Debug, PartialEq)]
 pub struct PostFxSettings {
     pub quality: FxQuality,
@@ -110,6 +148,11 @@ impl Default for PostFxSettings {
 }
 
 impl PostFxSettings {
+    /// HDR (et donc filet anti-NaN) seulement en qualité haute : la basse rend directement à l'écran.
+    pub fn hdr(&self) -> bool {
+        self.quality == FxQuality::High
+    }
+
     /// Bloom de Bevy correspondant aux réglages, `None` s'il est coupé (qualité basse ou force nulle).
     pub fn bloom(&self) -> Option<Bloom> {
         (self.quality == FxQuality::High && self.bloom > 0.0).then_some(Bloom {
@@ -118,7 +161,6 @@ impl PostFxSettings {
                 threshold: self.threshold,
                 threshold_softness: 0.1,
             },
-            composite_mode: BloomCompositeMode::Additive,
             ..Bloom::OLD_SCHOOL
         })
     }
@@ -134,47 +176,53 @@ pub struct PostFxPlugin;
 impl Plugin for PostFxPlugin {
     fn build(&self, app: &mut App) {
         bevy::asset::embedded_asset!(app, "grade.wesl");
-        app.add_plugins(FullscreenMaterialPlugin::<Grade>::default())
-            .init_resource::<PostFxSettings>()
-            .add_systems(PostUpdate, apply_post);
+        bevy::asset::embedded_asset!(app, "sanitize.wesl");
+        app.add_plugins((
+            FullscreenMaterialPlugin::<Sanitize>::default(),
+            FullscreenMaterialPlugin::<Grade>::default(),
+        ))
+        .init_resource::<PostFxSettings>()
+        .add_systems(PostUpdate, apply_post);
     }
 }
 
-/// Pose (ou retire) les composants de post-traitement sur les caméras 3D nouvelles, ou sur toutes quand les
-/// réglages changent.
+/// Règle tone mapping et exposition des caméras qui arrivent (une fois), puis pose ou retire HDR, filet,
+/// bloom et étalonnage selon la qualité : sur les nouvelles caméras, ou sur toutes quand les réglages changent.
 fn apply_post(
     mut commands: Commands,
     settings: Res<PostFxSettings>,
-    all: Query<Entity, With<Camera3d>>,
-    added: Query<Entity, Added<Camera3d>>,
+    mut added: Query<(Entity, &mut ColorGrading), Added<PostFxCamera>>,
+    all: Query<Entity, With<PostFxCamera>>,
 ) {
-    let cameras: Vec<Entity> = if settings.is_changed() {
-        all.iter().collect()
-    } else {
-        added.iter().collect()
-    };
-    for entity in cameras {
-        let mut e = commands.entity(entity);
-        e.insert((
-            Hdr,
-            Tonemapping::AcesFitted,
-            ColorGrading {
-                global: ColorGradingGlobal {
-                    exposure: EXPOSURE.log2(),
-                    ..default()
-                },
-                ..default()
-            },
-        ));
-        match settings.bloom() {
-            Some(bloom) => e.insert(bloom),
-            None => e.remove::<Bloom>(),
-        };
-        match settings.grade() {
-            Some(grade) => e.insert(grade),
-            None => e.remove::<Grade>(),
-        };
+    for (entity, mut grading) in &mut added {
+        grading.global.exposure = EXPOSURE.log2();
+        commands.entity(entity).insert(Tonemapping::AcesFitted);
+        if !settings.is_changed() {
+            apply_quality(&mut commands, entity, &settings);
+        }
     }
+    if settings.is_changed() {
+        for entity in &all {
+            apply_quality(&mut commands, entity, &settings);
+        }
+    }
+}
+
+fn apply_quality(commands: &mut Commands, entity: Entity, settings: &PostFxSettings) {
+    let mut e = commands.entity(entity);
+    if settings.hdr() {
+        e.insert_if_new((Hdr, Sanitize::default()));
+    } else {
+        e.remove::<(Hdr, Sanitize)>();
+    }
+    match settings.bloom() {
+        Some(bloom) => e.insert(bloom),
+        None => e.remove::<Bloom>(),
+    };
+    match settings.grade() {
+        Some(grade) => e.insert(grade),
+        None => e.remove::<Grade>(),
+    };
 }
 
 #[cfg(test)]
@@ -186,18 +234,80 @@ mod tests {
         let mut s = PostFxSettings::default();
         let bloom = s.bloom().expect("bloom en qualité haute");
         assert_eq!(bloom.prefilter.threshold, 0.92);
-        assert_eq!(bloom.composite_mode, BloomCompositeMode::Additive);
+        assert_eq!(bloom.intensity, 0.15);
         assert_eq!(s.grade(), Some(Grade::DEFAULT));
+        assert!(s.hdr());
         s.bloom = 0.0;
         assert!(s.bloom().is_none(), "force nulle : passes sautées");
         s.bloom = 0.15;
         s.quality = FxQuality::Low;
-        assert!(s.bloom().is_none() && s.grade().is_none());
+        assert!(s.bloom().is_none() && s.grade().is_none() && !s.hdr());
+    }
+
+    fn app() -> App {
+        let mut app = App::new();
+        app.init_resource::<PostFxSettings>()
+            .add_systems(Update, apply_post);
+        app
     }
 
     #[test]
-    fn exposition_de_three() {
+    fn camera_marquee_recoit_le_post_traitement() {
+        let mut app = app();
+        let cam = app
+            .world_mut()
+            .spawn((PostFxCamera, Tonemapping::None, ColorGrading::default()))
+            .id();
+        let autre = app
+            .world_mut()
+            .spawn((Tonemapping::None, ColorGrading::default()))
+            .id();
+        app.update();
+
+        let w = app.world();
         // 2^EV = 1,75 : l'exposition effective d'ACESFilmicToneMapping avec toneMappingExposure 1,05
-        assert!((2f32.powf(EXPOSURE.log2()) - 1.75).abs() < 1e-5);
+        let ev = w.get::<ColorGrading>(cam).unwrap().global.exposure;
+        assert!((2f32.powf(ev) - 1.75).abs() < 1e-5);
+        assert_eq!(w.get::<Tonemapping>(cam), Some(&Tonemapping::AcesFitted));
+        assert!(w.get::<Hdr>(cam).is_some() && w.get::<Sanitize>(cam).is_some());
+        assert!(w.get::<Bloom>(cam).is_some() && w.get::<Grade>(cam).is_some());
+
+        assert_eq!(w.get::<Tonemapping>(autre), Some(&Tonemapping::None));
+        assert_eq!(w.get::<ColorGrading>(autre).unwrap().global.exposure, 0.0);
+        assert!(w.get::<Hdr>(autre).is_none() && w.get::<Bloom>(autre).is_none());
+    }
+
+    #[test]
+    fn qualite_basse_rend_sans_hdr_et_garde_les_reglages_de_la_camera() {
+        let mut app = app();
+        let cam = app
+            .world_mut()
+            .spawn((PostFxCamera, Tonemapping::None, ColorGrading::default()))
+            .id();
+        app.update();
+
+        // La caméra (area render) change ses réglages après coup : un changement de qualité les garde.
+        let mut grading = app.world_mut().get_mut::<ColorGrading>(cam).unwrap();
+        grading.global.post_saturation = 0.5;
+        app.world_mut()
+            .entity_mut(cam)
+            .insert(Tonemapping::TonyMcMapface);
+        app.world_mut().resource_mut::<PostFxSettings>().quality = FxQuality::Low;
+        app.update();
+
+        let w = app.world();
+        assert!(w.get::<Hdr>(cam).is_none() && w.get::<Sanitize>(cam).is_none());
+        assert!(w.get::<Bloom>(cam).is_none() && w.get::<Grade>(cam).is_none());
+        assert_eq!(w.get::<Tonemapping>(cam), Some(&Tonemapping::TonyMcMapface));
+        assert_eq!(
+            w.get::<ColorGrading>(cam).unwrap().global.post_saturation,
+            0.5
+        );
+
+        app.world_mut().resource_mut::<PostFxSettings>().quality = FxQuality::High;
+        app.update();
+        let w = app.world();
+        assert!(w.get::<Hdr>(cam).is_some() && w.get::<Sanitize>(cam).is_some());
+        assert!(w.get::<Bloom>(cam).is_some() && w.get::<Grade>(cam).is_some());
     }
 }

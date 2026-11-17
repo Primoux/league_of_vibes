@@ -1,8 +1,8 @@
 // Étalonnage de sortie : portage du `GradedOutputPass` de `packages/client/src/fx/post/PostFx.ts`.
 //
 // Après le tone mapping, en linéaire (la conversion sRGB vient ensuite) : saturation, teinte des ombres,
-// gain des hautes lumières, contraste autour du gris moyen, vignette. Filet anti-NaN : un pixel invalide
-// sort noir au lieu de se propager.
+// gain des hautes lumières, contraste autour du gris moyen, vignette. Filet anti-NaN/Inf : un pixel invalide
+// sort noir (le filet principal, avant le bloom, est `sanitize.wesl`).
 
 import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput;
 
@@ -21,11 +21,9 @@ struct Grade {
 @fragment
 fn fragment(in: FullscreenVertexOutput) -> @location(0) vec4<f32> {
     let src = textureSample(screen, screen_sampler, in.uv);
-    var c = max(src.rgb, vec3<f32>(0.0));
-    // NaN : seule valeur différente d'elle-même
-    if any(c != c) {
-        c = vec3<f32>(0.0);
-    }
+    // NaN/Inf testés sur les bits (exposant à 0xff), avant tout `max` : `c != c` peut être replié à faux.
+    let e = bitcast<vec3<u32>>(src.rgb) & vec3<u32>(0x7f800000u);
+    var c = select(max(src.rgb, vec3<f32>(0.0)), vec3<f32>(0.0), any(e == vec3<u32>(0x7f800000u)));
     let l = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
     c = mix(vec3<f32>(l), c, g.saturation);
     c += g.lift * (1.0 - smoothstep(0.0, 0.3, l));
