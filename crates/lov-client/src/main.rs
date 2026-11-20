@@ -7,6 +7,7 @@
 //! Lancement : `SKIP_DRAFT=1 DEV_LOBBY=1 npm run dev:server`, puis `cargo run -p lov-client --release`.
 //! `LOV_URL` change l'adresse du serveur (défaut `ws://localhost:3000/ws`).
 //! `LOV_FXLAB=1` lance la démo des FX sans serveur.
+//! `LOV_VIEWLAB=1` lance la démo des vues d'entités (tous les modèles, toutes les animations) sans serveur.
 //! `LOV_STRESS=<n>` lance une scène de charge de n unités sans serveur (mesure de FPS).
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture 4 s après l'entrée en jeu, pour vérifier le rendu
 //! sans regarder la fenêtre (CI, IA).
@@ -46,6 +47,9 @@ fn main() {
     // `LOV_STRESS=<n>` : scène de charge hors ligne, sans connexion au serveur.
     match stress {
         Some(units) => app.add_plugins((net::OfflinePlugin, render::stress::StressPlugin(units))),
+        None if render::viewlab::enabled() => {
+            app.add_plugins((net::OfflinePlugin, render::viewlab::ViewLabPlugin))
+        }
         None if fx::demo::enabled() => {
             app.add_plugins((net::OfflinePlugin, fx::demo::FxDemoPlugin))
         }

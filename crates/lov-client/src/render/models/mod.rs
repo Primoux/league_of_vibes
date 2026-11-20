@@ -1,7 +1,6 @@
 //! Modèles low-poly procéduraux des unités non-champions : sbires, monstres, structures, balises.
 //!
-//! Portage de `packages/client/src/render/models/`. Ce module pose le socle (géométries three.js, matériaux,
-//! assemblage, rig animé) ; les modèles et les vues arrivent dans les PR suivantes de #109. Chaque fabrique renvoie un `Built` : l'arbre du
+//! Portage de `packages/client/src/render/models/`. Chaque fabrique renvoie un `Built` : l'arbre du
 //! modèle et la description de son rig, que la vue fait apparaître et anime (`rig::RigView`).
 //!
 //! Écart : le `MeshBatcher` du client web (fusion des maillages statiques pour réduire les draw calls)
@@ -13,9 +12,12 @@ use bevy::prelude::*;
 
 pub mod geometry;
 pub mod kit;
+pub mod minions;
+pub mod monsters;
 pub mod rig;
+pub mod structures;
 
-pub use kit::{Model, ModelMaterial};
+pub use kit::{Kit, MatOpts, Model, ModelMaterial};
 pub use rig::{Rig, RigView};
 
 /// Modèle construit, prêt à apparaître.

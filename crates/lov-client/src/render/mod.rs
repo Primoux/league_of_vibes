@@ -10,13 +10,13 @@ pub mod camera;
 #[allow(dead_code)]
 pub mod champions;
 pub mod entities;
+pub mod healthbars;
 pub mod map;
-// Socle des modèles : utilisé par les vues d'entités, qui arrivent dans la PR suivante de #109 ; jusque-là,
-// seuls les tests l'appellent.
-#[allow(dead_code)]
 pub mod models;
 pub mod perf;
 pub mod stress;
+pub mod viewlab;
+pub mod views;
 
 /// 1 unité de jeu = 0,01 unité 3D (`RENDER_SCALE` de `lov-shared`).
 pub const RENDER_SCALE: f32 = constants::RENDER_SCALE as f32;
