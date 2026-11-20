@@ -12,17 +12,19 @@ pub mod nyx;
 pub mod sable;
 pub mod tharox;
 pub mod vrenna;
+pub mod zephyr;
 
 /// Modèles dédiés, par identifiant de champion (`MODELS` de `index.ts`).
 pub const MODELS: &[(&str, ChampionModelDef)] = &[
     ("corvin", corvin::MODEL),
     ("grondak", grondak::MODEL),
+    ("ilyra", ilyra::MODEL),
     ("kaelen", kaelen::MODEL),
     ("nyx", nyx::MODEL),
     ("sable", sable::MODEL),
     ("tharox", tharox::MODEL),
     ("vrenna", vrenna::MODEL),
-    ("ilyra", ilyra::MODEL),
+    ("zephyr", zephyr::MODEL),
 ];
 
 #[cfg(test)]
