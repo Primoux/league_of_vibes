@@ -5,9 +5,11 @@
 use super::model::ChampionModelDef;
 
 pub mod kaelen;
+pub mod vrenna;
 
 /// Modèles dédiés, par identifiant de champion (`MODELS` de `index.ts`).
-pub const MODELS: &[(&str, ChampionModelDef)] = &[("kaelen", kaelen::MODEL)];
+pub const MODELS: &[(&str, ChampionModelDef)] =
+    &[("kaelen", kaelen::MODEL), ("vrenna", vrenna::MODEL)];
 
 #[cfg(test)]
 pub(crate) mod testing {
