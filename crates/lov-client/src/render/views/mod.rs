@@ -16,7 +16,7 @@ use lov_shared::types::{
 
 use super::champions::model::{ModelColors, build_model, spawn_model};
 use super::champions::view::ChampionView;
-use super::champions::{ChampionAssets, model_for};
+use super::champions::{ChampionAssets, melenchon, model_for};
 use super::models::geometry::{cone, dodecahedron, torus};
 use super::models::{Built, Kit, MatOpts, Model, RigView, minions, monsters, structures};
 
@@ -243,7 +243,19 @@ pub fn spawn_default_view(
         .then_some(snap.subtype.as_deref())
         .flatten()
         .and_then(|id| Some((id, ModelColors::of(id, snap.team)?)));
-    if let Some((id, colors)) = champion {
+    if let Some((melenchon::ID, _)) = champion {
+        // caricature sur mesure, hors du squelette commun
+        let m = melenchon::spawn_melenchon(
+            commands,
+            kit.meshes(),
+            &mut champs.materials,
+            view,
+            snap.id,
+            snap.team,
+            false,
+        );
+        commands.entity(view).insert(m);
+    } else if let Some((id, colors)) = champion {
         // champion connu : modèle articulé et animé
         let def = model_for(id, colors.class);
         let built = build_model(&def, &colors);
