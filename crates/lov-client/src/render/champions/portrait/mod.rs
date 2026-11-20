@@ -4,6 +4,7 @@
 //! Portage de `packages/client/src/render/champions/portrait/` (area `render-champions`, issue #110).
 
 pub mod anatomy;
+pub mod creatures;
 pub mod geometry;
 pub mod humanoids;
 pub mod three;
@@ -17,6 +18,7 @@ pub type PortraitBuild = ModelBuild;
 pub fn portrait_build(id: &str) -> Option<PortraitBuild> {
     humanoids::PORTRAITS
         .iter()
+        .chain(creatures::PORTRAITS)
         .find(|(name, _)| *name == id)
         .map(|(_, build)| *build)
 }
@@ -181,7 +183,10 @@ mod tests {
 
     #[test]
     fn les_portraits_remplacent_la_geometrie_seulement() {
-        for id in ["kaelen", "vrenna", "ilyra", "zephyr", "sable"] {
+        for id in [
+            "kaelen", "vrenna", "ilyra", "zephyr", "sable", "corvin", "nyx", "solenne", "master67",
+            "grondak", "tharox",
+        ] {
             let (_, built) = view(id);
             assert!(built.sculpted, "{id} : surfaces sculptées");
             assert!(super::portrait_build(id).is_some());
@@ -199,9 +204,6 @@ mod tests {
     #[test]
     fn les_dagues_metalliques_de_nyx_suivent_l_invisibilite() {
         let (mut v, built) = view("nyx");
-        if super::portrait_build("nyx").is_none() {
-            return; // portrait de Nyx : PR suivante
-        }
         assert!(built.metal.iter().any(Option::is_some), "dagues en métal");
         let mut s = snap("nyx");
         s.buffs = Some(vec![BuffSnapshot {
