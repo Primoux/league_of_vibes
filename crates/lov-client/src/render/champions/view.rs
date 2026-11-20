@@ -21,6 +21,7 @@ use lov_shared::types::{AbilitySlot, EntityId, EntitySnapshot, GameEvent};
 use super::anim::clips::generic_clips;
 use super::anim::pose::j::*;
 use super::anim::pose::{Animator, ClipCtx, DEFAULT_CTX, JOINT_COUNT, POSE_SIZE, Pose};
+use super::melenchon::{self, MelenchonView};
 use super::model::{ChampionModelDef, SpawnedModel};
 use crate::net::ServerEvent;
 use crate::render::views::EntityView;
@@ -438,7 +439,11 @@ pub fn animate_champions(
 }
 
 /// Route les événements du serveur vers les vues (`route` de `index.ts`).
-pub fn route_events(mut events: MessageReader<ServerEvent>, mut views: Query<&mut ChampionView>) {
+pub fn route_events(
+    mut events: MessageReader<ServerEvent>,
+    mut views: Query<&mut ChampionView>,
+    mut melenchons: Query<&mut MelenchonView>,
+) {
     for ServerEvent(ev) in events.read() {
         let target = match ev {
             GameEvent::AutoAttack { source, .. } | GameEvent::AbilityCast { source, .. } => *source,
@@ -446,6 +451,11 @@ pub fn route_events(mut events: MessageReader<ServerEvent>, mut views: Query<&mu
             GameEvent::RecallStart { target } | GameEvent::RecallEnd { target, .. } => *target,
             _ => continue,
         };
+        for mut m in &mut melenchons {
+            if m.id == target {
+                melenchon::route(&mut m, ev);
+            }
+        }
         for mut v in &mut views {
             if v.id != target {
                 continue;

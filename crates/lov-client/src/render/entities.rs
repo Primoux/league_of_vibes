@@ -17,6 +17,7 @@ use lov_shared::types::{
     TeamOrNeutral,
 };
 
+use super::champions::melenchon::animate_melenchon;
 use super::champions::view::{animate_champions, route_events};
 use super::champions::{ChampionAssets, ChampionsPlugin};
 use super::healthbars::{BarWorld, HealthBarsPlugin, update_bars};
@@ -75,6 +76,7 @@ impl Plugin for EntitiesPlugin {
                     animate_views,
                     route_events,
                     animate_champions,
+                    animate_melenchon,
                     update_health_bars,
                 )
                     .chain(),

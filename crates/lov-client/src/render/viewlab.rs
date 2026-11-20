@@ -12,7 +12,7 @@ use bevy::prelude::*;
 use lov_shared::data::champions::CHAMPIONS;
 use lov_shared::protocol::{Score, ServerMsg, Snapshot, TeamScore};
 use lov_shared::types::{
-    ChampSnapshot, DragonElement, EntityId, EntityKind, EntitySnapshot, TeamOrNeutral,
+    BuffSnapshot, ChampSnapshot, DragonElement, EntityId, EntityKind, EntitySnapshot, TeamOrNeutral,
 };
 
 use super::entities::DragonElementState;
@@ -221,6 +221,15 @@ impl Lab {
         for e in self.entities.values_mut() {
             e.dead = (anim == "death").then_some(true);
             e.anim = Some(anim.to_owned());
+            // l'ultime de Mélenchon est un buff serveur : l'atelier le pose pendant son R
+            let ult = anim == "cast_R" && e.subtype.as_deref() == Some("melenchon");
+            e.buffs = ult.then(|| {
+                vec![BuffSnapshot {
+                    id: "melenchon_r".into(),
+                    remaining: f64::from(PHASE),
+                    stacks: None,
+                }]
+            });
         }
         let now = now_ms();
         let team = || TeamScore {

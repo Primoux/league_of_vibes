@@ -13,6 +13,7 @@ use lov_shared::schema::ChampionClass;
 pub mod anim;
 pub mod builder;
 pub mod generic;
+pub mod melenchon;
 pub mod model;
 pub mod outline;
 pub mod portrait;
