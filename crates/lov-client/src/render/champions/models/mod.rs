@@ -8,6 +8,7 @@ pub mod corvin;
 pub mod grondak;
 pub mod ilyra;
 pub mod kaelen;
+pub mod master67;
 pub mod nyx;
 pub mod sable;
 pub mod solenne;
@@ -23,10 +24,11 @@ pub const MODELS: &[(&str, ChampionModelDef)] = &[
     ("kaelen", kaelen::MODEL),
     ("nyx", nyx::MODEL),
     ("sable", sable::MODEL),
+    ("solenne", solenne::MODEL),
     ("tharox", tharox::MODEL),
     ("vrenna", vrenna::MODEL),
     ("zephyr", zephyr::MODEL),
-    ("solenne", solenne::MODEL),
+    ("master67", master67::MODEL),
 ];
 
 #[cfg(test)]
