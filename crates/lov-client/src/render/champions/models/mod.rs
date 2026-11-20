@@ -5,6 +5,7 @@
 use super::model::ChampionModelDef;
 
 pub mod corvin;
+pub mod grondak;
 pub mod kaelen;
 pub mod nyx;
 pub mod sable;
@@ -17,8 +18,9 @@ pub const MODELS: &[(&str, ChampionModelDef)] = &[
     ("kaelen", kaelen::MODEL),
     ("nyx", nyx::MODEL),
     ("sable", sable::MODEL),
-    ("vrenna", vrenna::MODEL),
     ("tharox", tharox::MODEL),
+    ("vrenna", vrenna::MODEL),
+    ("grondak", grondak::MODEL),
 ];
 
 #[cfg(test)]
