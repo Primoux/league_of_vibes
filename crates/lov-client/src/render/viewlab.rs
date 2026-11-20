@@ -7,7 +7,9 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 use lov_shared::protocol::{Score, ServerMsg, Snapshot, TeamScore};
-use lov_shared::types::{DragonElement, EntityId, EntityKind, EntitySnapshot, TeamOrNeutral};
+use lov_shared::types::{
+    ChampSnapshot, DragonElement, EntityId, EntityKind, EntitySnapshot, TeamOrNeutral,
+};
 
 use super::entities::DragonElementState;
 use super::map::MAP_SIZE;
@@ -107,18 +109,28 @@ fn snapshot(
         x: f64::from(pos.x),
         y: f64::from(pos.y),
         facing: -0.6,
-        hp: 1.0,
-        max_hp: 1.0,
-        mana: None,
-        max_mana: None,
-        shield: None,
+        // PV variés d'un modèle à l'autre : barres, graduations et bouclier visibles
+        hp: 1000.0 * (0.35 + 0.6 * ((id * 37 % 11) as f64 / 10.0)),
+        max_hp: 1000.0,
+        mana: (kind == EntityKind::Champion).then_some(120.0),
+        max_mana: (kind == EntityKind::Champion).then_some(300.0),
+        shield: (kind == EntityKind::Champion).then_some(150.0),
         dead: None,
         subtype: sub.map(str::to_owned),
         owner_id: None,
-        level: None,
+        level: (kind == EntityKind::Champion).then_some(id + 3),
         anim: None,
         buffs: None,
-        champ: None,
+        champ: (kind == EntityKind::Champion).then(|| ChampSnapshot {
+            player_id: format!("demo{id}"),
+            name: "Joueur demo".into(),
+            kills: 0,
+            deaths: 0,
+            assists: 0,
+            cs: 0,
+            items: vec![],
+            respawn_in: None,
+        }),
     }
 }
 

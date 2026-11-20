@@ -17,6 +17,7 @@ use lov_shared::types::{
     TeamOrNeutral,
 };
 
+use super::healthbars::{BarWorld, HealthBarsPlugin, update_bars};
 use super::models::{Kit, ModelsPlugin, RigView, structures};
 use super::views::{EntityView, animate_views, phase_of, spawn_default_view};
 use super::{from_shared, to_world};
@@ -59,13 +60,20 @@ pub struct EntitiesPlugin;
 
 impl Plugin for EntitiesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(ModelsPlugin)
+        app.add_plugins((ModelsPlugin, HealthBarsPlugin))
             .init_resource::<ViewIndex>()
             .init_resource::<DragonElementState>()
             .add_systems(Startup, (load_assets, spawn_static_structures))
             .add_systems(
                 Update,
-                (track_dragon_element, sync_views, place_views, animate_views).chain(),
+                (
+                    track_dragon_element,
+                    sync_views,
+                    place_views,
+                    animate_views,
+                    update_health_bars,
+                )
+                    .chain(),
             );
     }
 }
@@ -250,4 +258,16 @@ fn place_views(
             *t = target(pose, if projectile { 0.9 } else { 0.0 });
         }
     }
+}
+
+/// Barres de vie des vues du serveur (les structures statiques de la carte n'en ont pas).
+fn update_health_bars(mut w: BarWorld, state: Res<GameState>, index: Res<ViewIndex>) {
+    let my_team = state.game.as_ref().map(|g| g.team);
+    update_bars(
+        &mut w,
+        state.entities(),
+        index.0.iter().map(|(id, slot)| (id, slot.view)),
+        state.my_entity,
+        my_team,
+    );
 }

@@ -6,6 +6,7 @@ use lov_shared::types::Vec2 as SharedVec2;
 
 pub mod camera;
 pub mod entities;
+pub mod healthbars;
 pub mod map;
 pub mod models;
 pub mod perf;
