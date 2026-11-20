@@ -187,8 +187,8 @@ fn death(t: f32, p: &mut Pose, _: &ClipCtx) {
     set_offset(p, -0.25 * f, -0.22 * buckle * (1.0 - f) + 0.04 * f, 0.0);
 }
 
-/// Rappel : genou à terre, mains jointes.
-fn recall(t: f32, p: &mut Pose, _: &ClipCtx) {
+/// Rappel : genou à terre, mains jointes (public : certains modèles le reprennent en le corrigeant).
+pub fn recall(t: f32, p: &mut Pose, _: &ClipCtx) {
     let k = ease_out(t / 0.5);
     let b = (t / 1.5 * TAU).sin() * 0.03;
     set_rot(p, LEG_L, 0.0, 0.0, 1.2 * k);
@@ -204,8 +204,8 @@ fn recall(t: f32, p: &mut Pose, _: &ClipCtx) {
     set_offset(p, 0.0, -0.42 * k, 0.0);
 }
 
-/// Étourdi : vacille.
-fn stunned(t: f32, p: &mut Pose, _: &ClipCtx) {
+/// Étourdi : vacille (public : certains modèles le reprennent en le corrigeant).
+pub fn stunned(t: f32, p: &mut Pose, _: &ClipCtx) {
     rest(p, 0.3);
     let s = (t / 1.2 * TAU).sin();
     set_rot(p, BODY, s * 0.08, 0.0, 0.1);

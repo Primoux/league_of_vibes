@@ -246,6 +246,7 @@ pub fn generic_for(class: ChampionClass) -> ChampionModelDef {
         scale,
         build,
         carry: Some(carry),
+        extras: None,
         drop_angle: Some(drop_angle),
     }
 }
