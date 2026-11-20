@@ -7,6 +7,10 @@ use lov_shared::types::Vec2 as SharedVec2;
 pub mod camera;
 pub mod entities;
 pub mod map;
+// Socle des modèles : utilisé par les vues d'entités, qui arrivent dans la PR suivante de #109 ; jusque-là,
+// seuls les tests l'appellent.
+#[allow(dead_code)]
+pub mod models;
 pub mod perf;
 pub mod stress;
 
