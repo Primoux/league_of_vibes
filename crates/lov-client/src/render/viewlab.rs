@@ -2,10 +2,14 @@
 //! (sbires des deux équipes, monstres, drakes des six éléments, structures, balise, champion) et les fait
 //! passer en boucle par les animations idle → run → attack → death. Remplace, côté client, les tests
 //! visuels : on y vérifie silhouettes, couleurs et animations d'un coup d'œil.
+//!
+//! `LOV_VIEWLAB=champions` (l'atelier `?modellab` du client web) aligne plutôt tous les champions, caméra
+//! rapprochée, et ajoute les incantations Q, W, E, R au cycle.
 
 use std::collections::HashMap;
 
 use bevy::prelude::*;
+use lov_shared::data::champions::CHAMPIONS;
 use lov_shared::protocol::{Score, ServerMsg, Snapshot, TeamScore};
 use lov_shared::types::{
     ChampSnapshot, DragonElement, EntityId, EntityKind, EntitySnapshot, TeamOrNeutral,
@@ -18,7 +22,13 @@ use crate::net::{GameState, now_ms};
 const TICK: f32 = 1.0 / 30.0;
 /// Durée de chaque animation du cycle, en secondes.
 const PHASE: f32 = 2.5;
-const ANIMS: [&str; 4] = ["idle", "run", "attack", "death"];
+const ANIMS: &[&str] = &["idle", "run", "attack", "death"];
+const CHAMPION_ANIMS: &[&str] = &[
+    "idle", "run", "attack", "cast_Q", "cast_W", "cast_E", "cast_R", "death",
+];
+/// Écart entre deux champions de l'atelier, et distance de sa caméra.
+const CHAMPION_STEP: f32 = 115.0;
+const CHAMPION_DISTANCE: f32 = 20.0;
 /// Écart entre deux modèles (unités de jeu) : petits modèles, puis monstres épiques et structures.
 const STEP: f32 = 300.0;
 const BIG_STEP: f32 = 620.0;
@@ -36,6 +46,11 @@ const ELEMENTS: [DragonElement; 6] = [
 
 pub fn enabled() -> bool {
     std::env::var_os("LOV_VIEWLAB").is_some()
+}
+
+/// Atelier des champions (`LOV_VIEWLAB=champions`).
+fn champions_only() -> bool {
+    std::env::var("LOV_VIEWLAB").is_ok_and(|v| v == "champions")
 }
 
 /// Rangées de la démo : (genre, sous-type, équipe).
@@ -88,6 +103,8 @@ fn rows() -> Vec<Vec<(EntityKind, Option<&'static str>, TeamOrNeutral)>> {
 #[derive(Resource, Default)]
 struct Lab {
     entities: HashMap<EntityId, EntitySnapshot>,
+    /// Cycle d'animations.
+    anims: &'static [&'static str],
     tick: u64,
     clock: f32,
     accumulator: f32,
@@ -138,7 +155,10 @@ const DRAKE_ID: EntityId = 999;
 
 impl Lab {
     fn new() -> Self {
-        let mut lab = Self::default();
+        let mut lab = Self {
+            anims: ANIMS,
+            ..default()
+        };
         let center = Vec2::splat(MAP_SIZE / 2.0);
         let rows = rows();
         let mut id = 1;
@@ -168,10 +188,31 @@ impl Lab {
         lab
     }
 
+    /// Atelier : tous les champions sur une rangée, au centre de la carte.
+    fn champions() -> Self {
+        let mut lab = Self {
+            anims: CHAMPION_ANIMS,
+            ..default()
+        };
+        let center = Vec2::splat(MAP_SIZE / 2.0);
+        let ids: Vec<&str> = CHAMPIONS.iter().map(|c| c.id.as_str()).collect();
+        for (i, champ) in ids.iter().enumerate() {
+            let x = (i as f32 - (ids.len() - 1) as f32 / 2.0) * CHAMPION_STEP;
+            let id = i as EntityId + 1;
+            let pos = center + Vec2::new(x, 0.0);
+            let team = TeamOrNeutral::Blue;
+            lab.entities.insert(
+                id,
+                snapshot(id, EntityKind::Champion, Some(champ), team, pos),
+            );
+        }
+        lab
+    }
+
     /// Animation courante du cycle et indice du cycle.
     fn anim(&self) -> (&'static str, usize) {
         let k = (self.clock / PHASE) as usize;
-        (ANIMS[k % ANIMS.len()], k / ANIMS.len())
+        (self.anims[k % self.anims.len()], k / self.anims.len())
     }
 
     fn publish(&mut self, state: &mut GameState) {
@@ -221,9 +262,17 @@ impl Plugin for ViewLabPlugin {
             |mut commands: Commands,
              mut state: ResMut<GameState>,
              mut rig: ResMut<super::camera::CameraRig>| {
-                let mut lab = Lab::new();
-                state.my_entity = Some(16); // le krug, au centre de la grille : la caméra se centre sur la démo
-                state.status = "DEMO DES VUES (LOV_VIEWLAB)".into();
+                let mut lab = if champions_only() {
+                    rig.distance = CHAMPION_DISTANCE;
+                    // champion du milieu de la rangée : la caméra se centre sur l'atelier
+                    state.my_entity = Some((CHAMPIONS.len() as EntityId).div_ceil(2));
+                    state.status = "ATELIER DES CHAMPIONS (LOV_VIEWLAB=champions)".into();
+                    Lab::champions()
+                } else {
+                    state.my_entity = Some(16); // le krug, au centre de la grille : la caméra se centre sur la démo
+                    state.status = "DEMO DES VUES (LOV_VIEWLAB)".into();
+                    Lab::new()
+                };
                 rig.locked = true; // vue fixe : le défilement au bord de l'écran ne l'emporte pas
                 lab.publish(&mut state);
                 commands.insert_resource(lab);
@@ -280,5 +329,18 @@ mod tests {
         assert_eq!(lab.anim(), ("death", 0));
         lab.clock = PHASE * 4.1;
         assert_eq!(lab.anim(), ("idle", 1));
+    }
+
+    #[test]
+    fn atelier_de_tous_les_champions() {
+        let mut lab = Lab::champions();
+        assert_eq!(lab.entities.len(), CHAMPIONS.len());
+        assert!(
+            lab.entities
+                .values()
+                .all(|e| e.kind == EntityKind::Champion)
+        );
+        lab.clock = PHASE * 6.5;
+        assert_eq!(lab.anim(), ("cast_R", 0));
     }
 }
