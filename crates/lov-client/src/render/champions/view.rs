@@ -23,6 +23,7 @@ use super::anim::pose::j::*;
 use super::anim::pose::{Animator, ClipCtx, DEFAULT_CTX, JOINT_COUNT, POSE_SIZE, Pose};
 use super::melenchon::{self, MelenchonView};
 use super::model::{ChampionModelDef, SpawnedModel};
+use super::touilleur::Channel;
 use crate::net::ServerEvent;
 use crate::render::views::EntityView;
 
@@ -78,6 +79,8 @@ pub struct ChampionView {
     flinch_amt: f32,
     carry_w: f32,
     max_hp: f32,
+    /// Canal suivi d'après un buff serveur (vue du Touilleur).
+    pub channel: Option<Channel>,
 }
 
 impl ChampionView {
@@ -115,6 +118,7 @@ impl ChampionView {
             flinch_amt: 0.0,
             carry_w: 1.0,
             max_hp: 1.0,
+            channel: None,
         }
     }
 
@@ -180,6 +184,10 @@ impl ChampionView {
         pos: Vec3,
         facing: f32,
     ) -> Frame {
+        if let Some(mut channel) = self.channel {
+            channel.update(&mut self.animator, snap);
+            self.channel = Some(channel);
+        }
         if anim != self.played {
             self.played = anim.to_owned();
             self.play_anim(anim);

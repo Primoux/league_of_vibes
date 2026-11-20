@@ -18,6 +18,7 @@ pub mod model;
 pub mod outline;
 pub mod portrait;
 pub mod rig;
+pub mod touilleur;
 pub mod view;
 
 use model::ChampionModelDef;
