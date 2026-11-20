@@ -5,6 +5,10 @@ use lov_shared::constants;
 use lov_shared::types::Vec2 as SharedVec2;
 
 pub mod camera;
+// Animation des champions : branchée au rendu par la vue des champions, dans une PR suivante de #110 ;
+// jusque-là, seuls les tests l'appellent.
+#[allow(dead_code)]
+pub mod champions;
 pub mod entities;
 pub mod map;
 pub mod perf;
