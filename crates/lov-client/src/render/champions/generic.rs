@@ -97,7 +97,7 @@ fn weapon(b: &mut ModelBuilder, c: &ModelColors) {
     }
 }
 
-fn build(b: &mut ModelBuilder, c: &ModelColors) {
+fn build(b: &mut ModelBuilder, c: &ModelColors, _rig: &RigSpec) {
     let skin = css(SKIN);
     let heavy = matches!(c.class, ChampionClass::Tank | ChampionClass::Fighter);
     // bassin + ceinture d'équipe

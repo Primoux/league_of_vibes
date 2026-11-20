@@ -239,13 +239,13 @@ pub fn spawn_default_view(
             Visibility::default(),
         ))
         .id();
-    let colors = (snap.kind == EntityKind::Champion)
+    let champion = (snap.kind == EntityKind::Champion)
         .then_some(snap.subtype.as_deref())
         .flatten()
-        .and_then(|id| ModelColors::of(id, snap.team));
-    if let Some(colors) = colors {
+        .and_then(|id| Some((id, ModelColors::of(id, snap.team)?)));
+    if let Some((id, colors)) = champion {
         // champion connu : modèle articulé et animé
-        let def = model_for(colors.class);
+        let def = model_for(id, colors.class);
         let built = build_model(&def, &colors);
         let outline = champs.outline.0.clone();
         let model = spawn_model(

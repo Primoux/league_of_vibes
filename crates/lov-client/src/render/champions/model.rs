@@ -59,6 +59,9 @@ pub fn glow_color(c: LinearRgba) -> LinearRgba {
     LinearRgba::rgb(c.red * k, c.green * k, c.blue * k)
 }
 
+/// Construction d'un modèle : pièces ajoutées au builder, selon les couleurs et le squelette.
+pub type ModelBuild = fn(&mut ModelBuilder, &ModelColors, &RigSpec);
+
 /// Modèle d'un champion : squelette, clips propres, construction.
 #[derive(Clone, Copy, Debug)]
 pub struct ChampionModelDef {
@@ -71,7 +74,8 @@ pub struct ChampionModelDef {
     pub clips: &'static [(&'static str, Clip)],
     /// Échelle globale du modèle.
     pub scale: f32,
-    pub build: fn(&mut ModelBuilder, &ModelColors),
+    /// Construction des pièces ; reçoit le squelette du modèle (`this.rig` du client web).
+    pub build: ModelBuild,
     /// Port d'arme : angle (rad, autour de z, dans le repère du corps) que garde l'accessoire tenu pendant
     /// la locomotion. 0 = vertical (bâton), négatif = incliné vers l'avant. `None` = suit le bras.
     pub carry: Option<f32>,
@@ -101,7 +105,7 @@ pub struct SpawnedModel {
 /// Construit le modèle de `def` aux couleurs `colors`.
 pub fn build_model(def: &ChampionModelDef, colors: &ModelColors) -> BuiltModel {
     let mut b = ModelBuilder::new();
-    (def.build)(&mut b, colors);
+    (def.build)(&mut b, colors, &def.rig);
     b.build(&def.rig, true)
 }
 

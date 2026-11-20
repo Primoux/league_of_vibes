@@ -2,8 +2,9 @@
 //!
 //! Portage de `packages/client/src/render/champions/` (area `render-champions`, issue #110).
 //!
-//! Écart provisoire : tous les champions prennent le modèle générique de leur classe (`modelFor` sans
-//! modèle dédié). Les modèles dédiés et les portraits arrivent avec les tranches de champions.
+//! `model_for` suit l'ordre du client web : portrait, sur la base du modèle dédié du champion, sinon du
+//! modèle générique de sa classe. Les modèles dédiés (squelette, clips, port d'arme) arrivent avec les
+//! tranches de champions (`models/<nom>.rs`, area `champion`), chacune en ajoutant sa ligne à `MODELS`.
 
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -42,9 +43,16 @@ pub struct ChampionAssets<'w> {
     pub outline: Res<'w, OutlineHandle>,
 }
 
-/// `modelFor` : modèle d'un champion selon sa classe.
-pub fn model_for(class: ChampionClass) -> ChampionModelDef {
-    generic::generic_for(class)
+/// Modèles dédiés, par identifiant de champion (registre partagé : une ligne par champion).
+const MODELS: &[(&str, ChampionModelDef)] = &[];
+
+/// `modelFor` : portrait > modèle dédié > modèle générique de la classe.
+pub fn model_for(champion: &str, class: ChampionClass) -> ChampionModelDef {
+    let base = MODELS
+        .iter()
+        .find(|(id, _)| *id == champion)
+        .map_or_else(|| generic::generic_for(class), |(_, model)| *model);
+    portrait::portrait_model(champion, base)
 }
 
 /// Matériau de contour, shader et animation des champions.
