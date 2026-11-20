@@ -8,15 +8,17 @@ pub mod corvin;
 pub mod kaelen;
 pub mod nyx;
 pub mod sable;
+pub mod tharox;
 pub mod vrenna;
 
 /// Modèles dédiés, par identifiant de champion (`MODELS` de `index.ts`).
 pub const MODELS: &[(&str, ChampionModelDef)] = &[
     ("corvin", corvin::MODEL),
     ("kaelen", kaelen::MODEL),
+    ("nyx", nyx::MODEL),
     ("sable", sable::MODEL),
     ("vrenna", vrenna::MODEL),
-    ("nyx", nyx::MODEL),
+    ("tharox", tharox::MODEL),
 ];
 
 #[cfg(test)]
