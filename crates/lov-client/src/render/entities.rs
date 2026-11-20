@@ -1,43 +1,72 @@
-//! Vues d'entités. PROTOTYPE : une forme simple par type d'entité, colorée par équipe, sans modèle,
-//! sans animation ni barre de vie. La position est celle de `GameState::pose` : interpolée à
-//! `INTERP_DELAY_MS` pour les autres entités, prédite pour le champion local.
+//! Vues d'entités : création, placement, animation et retrait des vues de `GameState`.
+//!
+//! Portage de la partie « vues » de `packages/client/src/render/GameRenderer.ts` (`applySnapshot`,
+//! `createView`, `removeSlot`, structures statiques, placement par frame). La position est celle de
+//! `GameState::pose` : interpolée à `INTERP_DELAY_MS` pour les autres entités, prédite pour le champion
+//! local. La hauteur du terrain n'est pas encore portée (area `render-map`) : les vues sont posées à 0.
+//!
+//! Écart provisoire : les projectiles gardent une petite sphère, tant que les FX de monde qui les dessinent
+//! dans le client web (`fx/world`) ne sont pas portés.
 
 use std::collections::HashMap;
 
 use bevy::prelude::*;
+use lov_shared::map::{INHIBITORS, NEXUS, TOWERS};
+use lov_shared::types::{
+    DragonElement, EntityId, EntityKind, EntitySnapshot, GameEvent, MonsterType, Team,
+    TeamOrNeutral,
+};
 
-use super::to_world;
-use crate::net::{GameState, Pose};
-use lov_shared::types::{EntityId, EntityKind, TeamOrNeutral};
+use super::models::{Kit, ModelsPlugin, RigView, structures};
+use super::views::{EntityView, animate_views, phase_of, spawn_default_view};
+use super::{from_shared, to_world};
+use crate::net::{GameState, Pose, ServerEvent};
 
-#[derive(Component)]
-struct EntityView;
+/// Distance (unités de jeu) sous laquelle une entité serveur masque la structure statique de la carte.
+const STATIC_HIDE_RADIUS: f64 = 200.0;
 
-#[derive(Resource, Default)]
-struct ViewIndex(HashMap<EntityId, Entity>);
-
-struct Shape {
-    mesh: Handle<Mesh>,
-    /// Hauteur du centre de la forme au-dessus du sol.
-    lift: f32,
+/// Vue d'une entité du serveur.
+struct Slot {
+    view: Entity,
+    anim: String,
 }
 
+#[derive(Resource, Default)]
+struct ViewIndex(HashMap<EntityId, Slot>);
+
+/// Élément du prochain drake (mis à jour depuis l'événement `objectiveSpawn`).
+#[derive(Resource, Default)]
+pub struct DragonElementState(pub Option<DragonElement>);
+
+/// Structure issue de `map.rs`, visible tant que le serveur n'envoie pas l'entité correspondante.
+#[derive(Component)]
+struct StaticStructure {
+    x: f64,
+    y: f64,
+}
+
+/// Projectile sans FX (voir l'écart en tête de fichier).
+#[derive(Component)]
+struct ProjectilePlaceholder;
+
 #[derive(Resource)]
-struct ViewAssets {
-    shapes: HashMap<EntityKind, Shape>,
-    blue: Handle<StandardMaterial>,
-    red: Handle<StandardMaterial>,
-    neutral: Handle<StandardMaterial>,
-    me: Handle<StandardMaterial>,
+struct ProjectileAssets {
+    mesh: Handle<Mesh>,
+    material: Handle<StandardMaterial>,
 }
 
 pub struct EntitiesPlugin;
 
 impl Plugin for EntitiesPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ViewIndex>()
-            .add_systems(Startup, load_assets)
-            .add_systems(Update, sync_views);
+        app.add_plugins(ModelsPlugin)
+            .init_resource::<ViewIndex>()
+            .init_resource::<DragonElementState>()
+            .add_systems(Startup, (load_assets, spawn_static_structures))
+            .add_systems(
+                Update,
+                (track_dragon_element, sync_views, place_views, animate_views).chain(),
+            );
     }
 }
 
@@ -46,94 +75,179 @@ fn load_assets(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mut shape = |mesh: Mesh, lift: f32| Shape {
-        mesh: meshes.add(mesh),
-        lift,
-    };
-    let shapes = HashMap::from([
-        (
-            EntityKind::Champion,
-            shape(Capsule3d::new(0.42, 0.9).into(), 0.87),
-        ),
-        (EntityKind::Minion, shape(Sphere::new(0.3).into(), 0.3)),
-        (
-            EntityKind::Tower,
-            shape(Cylinder::new(0.7, 3.4).into(), 1.7),
-        ),
-        (
-            EntityKind::Inhibitor,
-            shape(Cuboid::new(1.6, 1.2, 1.6).into(), 0.6),
-        ),
-        (EntityKind::Nexus, shape(Sphere::new(1.6).into(), 1.6)),
-        (EntityKind::Monster, shape(Sphere::new(0.6).into(), 0.6)),
-        (
-            EntityKind::Ward,
-            shape(Cylinder::new(0.12, 0.7).into(), 0.35),
-        ),
-        (EntityKind::Projectile, shape(Sphere::new(0.14).into(), 0.9)),
-    ]);
-    commands.insert_resource(ViewAssets {
-        shapes,
-        blue: materials.add(Color::srgb(0.25, 0.5, 1.0)),
-        red: materials.add(Color::srgb(1.0, 0.3, 0.28)),
-        neutral: materials.add(Color::srgb(0.85, 0.75, 0.4)),
-        me: materials.add(Color::srgb(1.0, 1.0, 1.0)),
+    commands.insert_resource(ProjectileAssets {
+        mesh: meshes.add(Sphere::new(0.14)),
+        material: materials.add(Color::srgb(1.0, 0.9, 0.6)),
     });
 }
 
-fn target(p: Pose, lift: f32) -> Transform {
-    Transform::from_translation(to_world(Vec2::new(p.x as f32, p.y as f32), lift))
-        .with_rotation(Quat::from_rotation_y(p.facing as f32))
+fn spawn_static_structures(mut commands: Commands, mut kit: Kit) {
+    let team = |t: Team| match t {
+        Team::Blue => TeamOrNeutral::Blue,
+        Team::Red => TeamOrNeutral::Red,
+    };
+    let spawn = |commands: &mut Commands, x: f64, y: f64, built: super::models::Built| {
+        let view = commands
+            .spawn((
+                StaticStructure { x, y },
+                EntityView {
+                    anim: "idle".into(),
+                    dead: false,
+                    drake: None,
+                },
+                Transform::from_translation(to_world(Vec2::new(x as f32, y as f32), 0.0)),
+                Visibility::default(),
+            ))
+            .id();
+        let rig = built.spawn(commands, view, phase_of(view.index_u32()));
+        commands.entity(view).insert(rig);
+    };
+    for t in TOWERS.iter() {
+        let built = structures::tower(&mut kit, team(t.team), Some(t.tier));
+        spawn(&mut commands, t.pos.x, t.pos.y, built);
+    }
+    for i in INHIBITORS.iter() {
+        let built = structures::inhibitor(&mut kit, team(i.team));
+        spawn(&mut commands, i.pos.x, i.pos.y, built);
+    }
+    for t in [Team::Blue, Team::Red] {
+        let pos = NEXUS.get(t);
+        let built = structures::nexus(&mut kit, team(t));
+        spawn(&mut commands, pos.x, pos.y, built);
+    }
 }
 
-fn sync_views(
-    mut commands: Commands,
-    state: Res<GameState>,
-    assets: Res<ViewAssets>,
-    mut index: ResMut<ViewIndex>,
-    mut views: Query<&mut Transform, With<EntityView>>,
+/// Métadonnées d'apparition, lues AVANT la création des vues (un drake prend son élément).
+fn track_dragon_element(
+    mut events: MessageReader<ServerEvent>,
+    mut element: ResMut<DragonElementState>,
 ) {
-    for (id, e) in state.entities() {
-        let dead = e.dead.unwrap_or(false);
-        // Les zones (blizzard, piège…) n'ont pas encore de vue.
-        let Some(shape) = assets.shapes.get(&e.kind).filter(|_| !dead) else {
-            if let Some(view) = index.0.remove(id) {
-                commands.entity(view).despawn();
-            }
-            continue;
-        };
-        let Some(pose) = state.pose(*id) else {
-            continue;
-        };
-        let goal = target(pose, shape.lift);
-        if let Some(mut transform) = index.0.get(id).and_then(|view| views.get_mut(*view).ok()) {
-            *transform = goal;
-        } else if !index.0.contains_key(id) {
-            let material = if state.my_entity == Some(*id) {
-                &assets.me
-            } else {
-                match e.team {
-                    TeamOrNeutral::Blue => &assets.blue,
-                    TeamOrNeutral::Red => &assets.red,
-                    TeamOrNeutral::Neutral => &assets.neutral,
-                }
-            };
-            let view = commands
-                .spawn((
-                    EntityView,
-                    Mesh3d(shape.mesh.clone()),
-                    MeshMaterial3d(material.clone()),
-                    goal,
-                ))
-                .id();
-            index.0.insert(*id, view);
+    for ServerEvent(ev) in events.read() {
+        if let GameEvent::ObjectiveSpawn {
+            monster: MonsterType::Dragon,
+            element: e,
+            ..
+        } = ev
+        {
+            element.0 = *e;
         }
     }
-    index.0.retain(|id, view| {
+}
+
+fn is_structure(kind: EntityKind) -> bool {
+    matches!(
+        kind,
+        EntityKind::Tower | EntityKind::Inhibitor | EntityKind::Nexus
+    )
+}
+
+/// Crée les vues des nouvelles entités, transmet l'animation, retire les vues des entités disparues.
+fn sync_views(
+    mut commands: Commands,
+    mut kit: Kit,
+    (state, element, projectile): (
+        Res<GameState>,
+        Res<DragonElementState>,
+        Res<ProjectileAssets>,
+    ),
+    mut index: ResMut<ViewIndex>,
+    mut views: Query<&mut EntityView, Without<StaticStructure>>,
+    mut statics: Query<(&StaticStructure, &mut Visibility)>,
+) {
+    for (id, e) in state.entities() {
+        // drake construit avec un élément périmé : on reconstruit sa vue
+        let stale = index.0.get(id).is_some_and(|slot| {
+            e.subtype.as_deref() == Some("dragon")
+                && views.get(slot.view).is_ok_and(|v| v.drake != element.0)
+        });
+        if stale && let Some(slot) = index.0.remove(id) {
+            commands.entity(slot.view).despawn();
+        }
+        if !index.0.contains_key(id) {
+            let view = if e.kind == EntityKind::Projectile {
+                commands
+                    .spawn((
+                        ProjectilePlaceholder,
+                        Mesh3d(projectile.mesh.clone()),
+                        MeshMaterial3d(projectile.material.clone()),
+                        Transform::default(),
+                    ))
+                    .id()
+            } else if let Some(view) = spawn_default_view(&mut commands, &mut kit, e, element.0) {
+                view
+            } else {
+                continue;
+            };
+            index.0.insert(
+                *id,
+                Slot {
+                    view,
+                    anim: String::new(),
+                },
+            );
+            if is_structure(e.kind) {
+                hide_static_near(e, &mut statics);
+            }
+        }
+        let anim = if e.dead == Some(true) {
+            "death"
+        } else {
+            e.anim.as_deref().unwrap_or("idle")
+        };
+        let Some(slot) = index.0.get_mut(id) else {
+            continue;
+        };
+        if anim != slot.anim {
+            slot.anim = anim.to_owned();
+        }
+        if let Ok(mut view) = views.get_mut(slot.view) {
+            if view.anim != slot.anim {
+                view.anim.clone_from(&slot.anim);
+            }
+            view.dead = e.dead == Some(true);
+        }
+    }
+    // entités disparues (snapshot delta ou complet : le buffer fait foi)
+    index.0.retain(|id, slot| {
         let known = state.entities().contains_key(id);
         if !known {
-            commands.entity(*view).despawn();
+            commands.entity(slot.view).despawn();
         }
         known
     });
+}
+
+fn hide_static_near(e: &EntitySnapshot, statics: &mut Query<(&StaticStructure, &mut Visibility)>) {
+    for (s, mut vis) in statics.iter_mut() {
+        if (s.x - e.x).abs() < STATIC_HIDE_RADIUS && (s.y - e.y).abs() < STATIC_HIDE_RADIUS {
+            *vis = Visibility::Hidden;
+        }
+    }
+}
+
+fn target(p: Pose, lift: f32) -> Transform {
+    Transform::from_translation(to_world(
+        from_shared(lov_shared::types::Vec2 { x: p.x, y: p.y }),
+        lift,
+    ))
+    .with_rotation(Quat::from_rotation_y(p.facing as f32))
+}
+
+/// Place chaque vue à la position interpolée de son entité, au sol, tournée vers `facing`.
+fn place_views(
+    state: Res<GameState>,
+    index: Res<ViewIndex>,
+    mut transforms: Query<(&mut Transform, Has<ProjectilePlaceholder>), Without<RigView>>,
+    mut rig_views: Query<&mut Transform, With<RigView>>,
+) {
+    for (id, slot) in &index.0 {
+        let Some(pose) = state.pose(*id) else {
+            continue;
+        };
+        if let Ok(mut t) = rig_views.get_mut(slot.view) {
+            *t = target(pose, 0.0);
+        } else if let Ok((mut t, projectile)) = transforms.get_mut(slot.view) {
+            *t = target(pose, if projectile { 0.9 } else { 0.0 });
+        }
+    }
 }
