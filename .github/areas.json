@@ -124,6 +124,7 @@
         "packages/client/index.html",
         "crates/lov-client/src/main.rs",
         "crates/lov-client/src/render/*.rs",
+        "crates/lov-client/src/render/*.wesl",
         "crates/lov-client/src/render/views/**",
         "crates/lov-client/src/render/models/**"
       ]
@@ -142,6 +143,7 @@
         "packages/client/src/render/champions/anim/**",
         "packages/client/src/render/champions/portrait/**",
         "crates/lov-client/src/render/champions/*.rs",
+        "crates/lov-client/src/render/champions/*.wesl",
         "crates/lov-client/src/render/champions/anim/**",
         "crates/lov-client/src/render/champions/portrait/**"
       ]
