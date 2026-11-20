@@ -16,7 +16,7 @@ use lov_shared::types::{
 
 use super::champions::model::{ModelColors, build_model, spawn_model};
 use super::champions::view::ChampionView;
-use super::champions::{ChampionAssets, melenchon, model_for};
+use super::champions::{ChampionAssets, melenchon, model_for, touilleur};
 use super::models::geometry::{cone, dodecahedron, torus};
 use super::models::{Built, Kit, MatOpts, Model, RigView, minions, monsters, structures};
 
@@ -269,9 +269,11 @@ pub fn spawn_default_view(
             built,
         );
         commands.entity(model.skeleton.root).insert(ChildOf(view));
-        commands
-            .entity(view)
-            .insert(ChampionView::new(snap.id, &def, model));
+        let mut champion = ChampionView::new(snap.id, &def, model);
+        if id == touilleur::ID {
+            champion.channel = Some(touilleur::Channel::default());
+        }
+        commands.entity(view).insert(champion);
     } else if snap.kind == EntityKind::Champion {
         let body = champion_placeholder(kit, snap);
         spawn_simple(commands, view, &body, 1.8);
