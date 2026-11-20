@@ -167,6 +167,11 @@ impl Kit<'_> {
         h
     }
 
+    /// Banque des maillages (modèles construits hors du cache, comme les champions).
+    pub fn meshes(&mut self) -> &mut Assets<Mesh> {
+        &mut self.meshes
+    }
+
     /// Matériau mat aux réglages par défaut.
     pub fn mat(&mut self, color: u32) -> Handle<ModelMaterial> {
         self.material(color, MatOpts::default())

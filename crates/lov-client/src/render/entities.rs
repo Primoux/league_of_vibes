@@ -17,6 +17,8 @@ use lov_shared::types::{
     TeamOrNeutral,
 };
 
+use super::champions::view::{animate_champions, route_events};
+use super::champions::{ChampionAssets, ChampionsPlugin};
 use super::healthbars::{BarWorld, HealthBarsPlugin, update_bars};
 use super::models::{Kit, ModelsPlugin, RigView, structures};
 use super::views::{EntityView, animate_views, phase_of, spawn_default_view};
@@ -60,7 +62,7 @@ pub struct EntitiesPlugin;
 
 impl Plugin for EntitiesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((ModelsPlugin, HealthBarsPlugin))
+        app.add_plugins((ModelsPlugin, HealthBarsPlugin, ChampionsPlugin))
             .init_resource::<ViewIndex>()
             .init_resource::<DragonElementState>()
             .add_systems(Startup, (load_assets, spawn_static_structures))
@@ -71,6 +73,8 @@ impl Plugin for EntitiesPlugin {
                     sync_views,
                     place_views,
                     animate_views,
+                    route_events,
+                    animate_champions,
                     update_health_bars,
                 )
                     .chain(),
@@ -152,7 +156,7 @@ fn is_structure(kind: EntityKind) -> bool {
 /// Crée les vues des nouvelles entités, transmet l'animation, retire les vues des entités disparues.
 fn sync_views(
     mut commands: Commands,
-    mut kit: Kit,
+    (mut kit, mut champs): (Kit, ChampionAssets),
     (state, element, projectile): (
         Res<GameState>,
         Res<DragonElementState>,
@@ -181,7 +185,9 @@ fn sync_views(
                         Transform::default(),
                     ))
                     .id()
-            } else if let Some(view) = spawn_default_view(&mut commands, &mut kit, e, element.0) {
+            } else if let Some(view) =
+                spawn_default_view(&mut commands, &mut kit, &mut champs, e, element.0)
+            {
                 view
             } else {
                 continue;

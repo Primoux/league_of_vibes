@@ -14,6 +14,9 @@ use lov_shared::types::{
     DragonElement, EntityId, EntityKind, EntitySnapshot, TeamOrNeutral, TowerTier,
 };
 
+use super::champions::model::{ModelColors, build_model, spawn_model};
+use super::champions::view::ChampionView;
+use super::champions::{ChampionAssets, model_for};
 use super::models::geometry::{cone, dodecahedron, torus};
 use super::models::{Built, Kit, MatOpts, Model, RigView, minions, monsters, structures};
 
@@ -206,6 +209,7 @@ pub fn built_for(
 pub fn spawn_default_view(
     commands: &mut Commands,
     kit: &mut Kit,
+    champs: &mut ChampionAssets,
     snap: &EntitySnapshot,
     drake: Option<DragonElement>,
 ) -> Option<Entity> {
@@ -235,7 +239,28 @@ pub fn spawn_default_view(
             Visibility::default(),
         ))
         .id();
-    if snap.kind == EntityKind::Champion {
+    let colors = (snap.kind == EntityKind::Champion)
+        .then_some(snap.subtype.as_deref())
+        .flatten()
+        .and_then(|id| ModelColors::of(id, snap.team));
+    if let Some(colors) = colors {
+        // champion connu : modèle articulé et animé
+        let def = model_for(colors.class);
+        let built = build_model(&def, &colors);
+        let outline = champs.outline.0.clone();
+        let model = spawn_model(
+            commands,
+            kit.meshes(),
+            &mut champs.materials,
+            &outline,
+            &def,
+            built,
+        );
+        commands.entity(model.skeleton.root).insert(ChildOf(view));
+        commands
+            .entity(view)
+            .insert(ChampionView::new(snap.id, &def, model));
+    } else if snap.kind == EntityKind::Champion {
         let body = champion_placeholder(kit, snap);
         spawn_simple(commands, view, &body, 1.8);
     } else if let Some(built) = built_for(kit, snap, drake) {
