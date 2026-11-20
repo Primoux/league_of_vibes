@@ -14,6 +14,7 @@ pub mod builder;
 pub mod generic;
 pub mod model;
 pub mod outline;
+pub mod portrait;
 pub mod rig;
 pub mod view;
 
