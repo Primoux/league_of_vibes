@@ -13,6 +13,7 @@ use bevy::prelude::*;
 pub mod geometry;
 pub mod kit;
 pub mod minions;
+pub mod monsters;
 pub mod rig;
 pub mod structures;
 

@@ -15,7 +15,7 @@ use lov_shared::types::{
 };
 
 use super::models::geometry::{cone, dodecahedron, torus};
-use super::models::{Built, Kit, MatOpts, Model, RigView, minions, structures};
+use super::models::{Built, Kit, MatOpts, Model, RigView, minions, monsters, structures};
 
 /// Couleur d'équipe des formes simples (`TEAM_COLOR`).
 pub fn team_color(team: TeamOrNeutral) -> u32 {
@@ -187,7 +187,7 @@ fn tower_tier(subtype: Option<&str>) -> Option<TowerTier> {
 pub fn built_for(
     kit: &mut Kit,
     snap: &EntitySnapshot,
-    _drake: Option<DragonElement>,
+    drake: Option<DragonElement>,
 ) -> Option<Built> {
     let sub = snap.subtype.as_deref();
     match snap.kind {
@@ -195,8 +195,8 @@ pub fn built_for(
         EntityKind::Tower => Some(structures::tower(kit, snap.team, tower_tier(sub))),
         EntityKind::Inhibitor => Some(structures::inhibitor(kit, snap.team)),
         EntityKind::Nexus => Some(structures::nexus(kit, snap.team)),
+        EntityKind::Monster => monsters::monster(kit, sub, drake),
         EntityKind::Ward => Some(structures::ward(kit, snap.team)),
-        // modèles des monstres : PR suivante de #109 (en attendant, la vue simple « caillou »)
         _ => None,
     }
 }

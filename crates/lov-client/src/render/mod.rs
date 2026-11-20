@@ -10,6 +10,7 @@ pub mod map;
 pub mod models;
 pub mod perf;
 pub mod stress;
+pub mod viewlab;
 pub mod views;
 
 /// 1 unité de jeu = 0,01 unité 3D (`RENDER_SCALE` de `lov-shared`).

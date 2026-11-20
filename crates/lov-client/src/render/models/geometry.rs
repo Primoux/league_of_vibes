@@ -414,8 +414,6 @@ fn polyhedron(vertices: &[f32], faces: &[u32], r: f32, detail: u32) -> Geo {
 }
 
 /// Géométrie libre (triangles bruts), comme une `BufferGeometry` remplie à la main.
-// Sert aux ailes des drakes, qui arrivent avec les monstres dans la PR suivante de #109.
-#[allow(dead_code)]
 pub fn triangles(points: &[Vec3]) -> Geo {
     Geo {
         positions: points.to_vec(),
