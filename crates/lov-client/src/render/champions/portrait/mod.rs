@@ -91,6 +91,7 @@ mod tests {
             meshes: vec![],
             outlines: vec![],
             glows: vec![],
+            extras: vec![],
         };
         (ChampionView::new(200, &def, model), built)
     }

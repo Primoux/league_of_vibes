@@ -68,6 +68,7 @@ mod tests {
             meshes: vec![],
             outlines: vec![],
             glows: vec![],
+            extras: vec![],
         };
         let mut v = ChampionView::new(303, &def, model);
         v.channel = Some(Channel::default());

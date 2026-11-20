@@ -266,6 +266,7 @@ pub fn spawn_default_view(
             &mut champs.materials,
             &outline,
             &def,
+            &colors,
             built,
         );
         commands.entity(model.skeleton.root).insert(ChildOf(view));

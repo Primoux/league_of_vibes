@@ -46,7 +46,7 @@ fn staff(s: &mut Sculpt, color: &str, trim: &str) {
     }
 }
 
-fn kaelen(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
+pub fn kaelen(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let glow = white_glow();
     let outfit = Outfit {
@@ -255,7 +255,7 @@ fn kaelen(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     s.gem(j::PROP, glow, [0.13, 0.01, 0.0], [0.045, 0.048, 0.048]);
 }
 
-fn vrenna(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
+pub fn vrenna(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let outfit = Outfit {
         cloth: "#803638",
@@ -396,7 +396,7 @@ fn vrenna(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     );
 }
 
-fn ilyra(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
+pub fn ilyra(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let outfit = Outfit {
         cloth: "#234c78",
@@ -496,7 +496,7 @@ fn ilyra(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     s.gem(j::PROP, c.glow, [0.0, 1.12, 0.0], [0.095, 0.22, 0.09]);
 }
 
-fn zephyr(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
+pub fn zephyr(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let outfit = Outfit {
         cloth: "#5d3486",
@@ -572,7 +572,7 @@ fn zephyr(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     s.gem(j::SPINE, c.glow, [0.19, 0.36, 0.0], [0.035, 0.095, 0.06]);
 }
 
-fn sable(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
+pub fn sable(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let outfit = Outfit {
         cloth: "#71432d",
@@ -705,7 +705,7 @@ fn sable(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     );
 }
 
-fn corvin(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
+pub fn corvin(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let outfit = Outfit {
         cloth: "#303343",
@@ -824,7 +824,7 @@ fn corvin(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     s.b.glow(j::FORE_L, &string, c.glow, PartOpts::at(0.025, -0.325, 0.0));
 }
 
-fn nyx(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
+pub fn nyx(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let outfit = Outfit {
         cloth: "#26233b",
@@ -904,7 +904,7 @@ fn nyx(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     }
 }
 
-fn solenne(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
+pub fn solenne(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let glow = white_glow();
     let outfit = Outfit {
@@ -1003,7 +1003,7 @@ fn solenne(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     sun(s, j::PROP, "#ddbd76", [0.0, 1.03, 0.0], 0.13, glow, true);
 }
 
-fn master67(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
+pub fn master67(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let outfit = Outfit {
         cloth: "#7653d2",

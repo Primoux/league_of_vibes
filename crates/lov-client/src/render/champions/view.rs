@@ -22,7 +22,7 @@ use super::anim::clips::generic_clips;
 use super::anim::pose::j::*;
 use super::anim::pose::{Animator, ClipCtx, DEFAULT_CTX, JOINT_COUNT, POSE_SIZE, Pose};
 use super::melenchon::{self, MelenchonView};
-use super::model::{ChampionModelDef, SpawnedModel};
+use super::model::{ChampionModelDef, Extras, ExtrasOut, ExtrasState, SpawnedModel};
 use super::touilleur::Channel;
 use crate::net::ServerEvent;
 use crate::render::views::EntityView;
@@ -49,6 +49,10 @@ pub struct Frame {
     pub outlines_visible: bool,
     /// Modèle translucide (invisibilité, visible des alliés seulement).
     pub translucent: bool,
+    /// Pièces des extras : transformation et visibilité.
+    pub extras: Vec<(Transform, bool)>,
+    /// Teinte du lot lumineux posée par les extras.
+    pub glow_tint: Option<f32>,
 }
 
 #[derive(Component, Clone, Debug)]
@@ -81,10 +85,13 @@ pub struct ChampionView {
     max_hp: f32,
     /// Canal suivi d'après un buff serveur (vue du Touilleur).
     pub channel: Option<Channel>,
+    extras: Option<Extras>,
+    extra_parts: Vec<(Transform, bool)>,
 }
 
 impl ChampionView {
     pub fn new(id: EntityId, def: &ChampionModelDef, model: SpawnedModel) -> Self {
+        let parts = model.extras.len();
         let mut clips = generic_clips();
         clips.extend(def.clips.iter().copied());
         let ctx = ClipCtx {
@@ -119,6 +126,8 @@ impl ChampionView {
             carry_w: 1.0,
             max_hp: 1.0,
             channel: None,
+            extras: def.extras,
+            extra_parts: vec![(Transform::default(), false); parts],
         }
     }
 
@@ -249,13 +258,31 @@ impl ChampionView {
         let (model_visible, outlines_visible) = self.tick_death(dt);
         let pose = *self.animator.update(dt);
         self.layer(&pose, dt);
+        let mut joints = self.model.skeleton.transforms(&self.final_pose);
+        let mut glow_tint = None;
+        if let Some(extras) = self.extras {
+            let state = ExtrasState {
+                time: self.time,
+                dead: self.dead,
+                moving: self.moving,
+                anim: self.animator.current(),
+            };
+            let mut out = ExtrasOut {
+                parts: &mut self.extra_parts,
+                glow: &mut glow_tint,
+                joints: &mut joints,
+            };
+            (extras.update)(&state, &mut out);
+        }
         Frame {
-            joints: self.model.skeleton.transforms(&self.final_pose),
+            joints,
             model_yaw,
             model_lift: lift,
             model_visible,
             outlines_visible: outlines_visible && !self.invisible,
             translucent: self.invisible,
+            extras: self.extra_parts.clone(),
+            glow_tint,
         }
     }
 
@@ -428,6 +455,21 @@ pub fn animate_champions(
                 v.set_if_neq(shown(f.outlines_visible));
             }
         }
+        for (e, (t, on)) in m.extras.iter().zip(&f.extras) {
+            if let Ok(mut tr) = transforms.get_mut(*e) {
+                *tr = *t;
+            }
+            if let Ok(mut v) = visibility.get_mut(*e) {
+                v.set_if_neq(shown(*on));
+            }
+        }
+        // extras : teinte du lot lumineux (l'alpha reste celui de l'invisibilité)
+        if let Some(k) = f.glow_tint
+            && let Some(mut mat) = materials.get_mut(&m.materials.glow)
+        {
+            let a = mat.base_color.alpha();
+            mat.base_color = Color::LinearRgba(LinearRgba::new(k, k, k, a));
+        }
         // invisibilité : modèle translucide (le matériau est propre à ce champion)
         if f.translucent != was_translucent {
             let mats = &m.materials;
@@ -510,6 +552,7 @@ mod tests {
             meshes: vec![],
             outlines: vec![],
             glows: vec![],
+            extras: vec![],
         };
         ChampionView::new(1, &def, model)
     }
@@ -639,6 +682,38 @@ mod tests {
         v.flinch(100.0);
         let after = v.step(&s, "idle", 0.016, Vec3::ZERO, 0.0).joints[SPINE].rotation;
         assert!(before.angle_between(after) > 0.2, "buste rejeté en arrière");
+    }
+
+    #[test]
+    fn extras_animes_apres_la_pose() {
+        fn parts(
+            _: &crate::render::champions::model::ModelColors,
+        ) -> Vec<crate::render::champions::model::ExtraPart> {
+            vec![]
+        }
+        fn update(s: &ExtrasState, out: &mut ExtrasOut) {
+            out.parts[0] = (Transform::from_xyz(s.time, 0.0, 0.0), !s.dead);
+            *out.glow = Some(0.5);
+            out.joints[PROP].rotation = Quat::IDENTITY;
+        }
+        let mut def = generic_for(ChampionClass::Fighter);
+        def.extras = Some(Extras { parts, update });
+        let mut model = view().model;
+        model.extras = vec![Entity::PLACEHOLDER];
+        let mut v = ChampionView::new(1, &def, model);
+        let s = snap();
+        v.step(&s, "idle", 0.25, Vec3::ZERO, 0.0);
+        let f = v.step(&s, "idle", 0.25, Vec3::ZERO, 0.0);
+        assert_eq!(f.extras, vec![(Transform::from_xyz(0.5, 0.0, 0.0), true)]);
+        assert_eq!(f.glow_tint, Some(0.5));
+        assert_eq!(
+            f.joints[PROP].rotation,
+            Quat::IDENTITY,
+            "articulation retouchée"
+        );
+        // sans extras : rien
+        let f = view().step(&s, "idle", 0.25, Vec3::ZERO, 0.0);
+        assert!(f.extras.is_empty() && f.glow_tint.is_none());
     }
 
     #[test]

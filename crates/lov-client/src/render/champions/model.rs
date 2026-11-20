@@ -10,10 +10,11 @@ use lov_shared::data::champions::get_champion;
 use lov_shared::schema::ChampionClass;
 use lov_shared::types::TeamOrNeutral;
 
-use super::anim::pose::Clip;
+use super::anim::pose::{Clip, JOINT_COUNT};
 use super::builder::{BuiltModel, JointMeshes, ModelBuilder, css};
 use super::outline::OutlineMaterial;
 use super::rig::{RigSpec, Skeleton};
+use crate::render::models::geometry::Geo;
 
 /// Couleur d'équipe des champions (`TEAM_HEX`).
 pub fn team_hex(team: TeamOrNeutral) -> &'static str {
@@ -59,6 +60,46 @@ pub fn glow_color(c: LinearRgba) -> LinearRgba {
     LinearRgba::rgb(c.red * k, c.green * k, c.blue * k)
 }
 
+/// Ce que les extras d'un modèle (cristaux en orbite, pulsations…) peuvent lire (`ExtrasState`).
+#[derive(Clone, Copy, Debug)]
+pub struct ExtrasState<'a> {
+    pub time: f32,
+    pub dead: bool,
+    pub moving: bool,
+    /// Clip courant.
+    pub anim: &'a str,
+}
+
+/// Pièce ajoutée par les extras (éclat, auréole) : non éclairée, sans contour ni ombre, portée par une
+/// articulation. Elle naît à l'origine de l'articulation, masquée, jusqu'à la première frame.
+#[derive(Clone, Debug)]
+pub struct ExtraPart {
+    pub joint: usize,
+    pub geo: Geo,
+    /// Couleur (HDR permise, pour le bloom).
+    pub color: LinearRgba,
+    /// Opacité (< 1 : translucide).
+    pub opacity: f32,
+}
+
+/// Ce que les extras écrivent à chaque frame.
+#[derive(Debug)]
+pub struct ExtrasOut<'a> {
+    /// Transformation et visibilité de chaque pièce, dans l'ordre de `parts`.
+    pub parts: &'a mut [(Transform, bool)],
+    /// Teinte du lot lumineux (multiplie ses couleurs de sommets), si elle change.
+    pub glow: &'a mut Option<f32>,
+    /// Articulations posées pour cette frame (pour en retoucher une).
+    pub joints: &'a mut [Transform; JOINT_COUNT],
+}
+
+/// Extras d'un modèle (`extras(rig, built, c)` du client web) : pièces créées une fois, puis animées.
+#[derive(Clone, Copy, Debug)]
+pub struct Extras {
+    pub parts: fn(&ModelColors) -> Vec<ExtraPart>,
+    pub update: fn(&ExtrasState, &mut ExtrasOut),
+}
+
 /// Construction d'un modèle : pièces ajoutées au builder, selon les couleurs et le squelette.
 pub type ModelBuild = fn(&mut ModelBuilder, &ModelColors, &RigSpec);
 
@@ -79,6 +120,8 @@ pub struct ChampionModelDef {
     /// Port d'arme : angle (rad, autour de z, dans le repère du corps) que garde l'accessoire tenu pendant
     /// la locomotion. 0 = vertical (bâton), négatif = incliné vers l'avant. `None` = suit le bras.
     pub carry: Option<f32>,
+    /// Pièces et animations propres au modèle.
+    pub extras: Option<Extras>,
     /// Angle de l'accessoire au sol à la mort (0 pour une lame le long de +x, −π/2 pour un bâton le long de
     /// +y).
     pub drop_angle: Option<f32>,
@@ -100,6 +143,8 @@ pub struct SpawnedModel {
     pub meshes: Vec<Entity>,
     pub outlines: Vec<Entity>,
     pub glows: Vec<Entity>,
+    /// Pièces des extras, dans l'ordre de `Extras::parts`.
+    pub extras: Vec<Entity>,
 }
 
 /// Construit le modèle de `def` aux couleurs `colors`.
@@ -116,6 +161,7 @@ pub fn spawn_model(
     materials: &mut Assets<StandardMaterial>,
     outline: &Handle<OutlineMaterial>,
     def: &ChampionModelDef,
+    colors: &ModelColors,
     built: BuiltModel,
 ) -> SpawnedModel {
     let skeleton = Skeleton::spawn(commands, &def.rig);
@@ -148,6 +194,7 @@ pub fn spawn_model(
         meshes: Vec::new(),
         outlines: Vec::new(),
         glows: Vec::new(),
+        extras: Vec::new(),
     };
     let joints = out.skeleton.joints;
     let mut lot = |commands: &mut Commands, lot: JointMeshes, kind: Lot| -> Vec<Entity> {
@@ -177,6 +224,29 @@ pub fn spawn_model(
     out.outlines
         .extend(lot(commands, built.outline_metal, Lot::Outline));
     out.glows = lot(commands, built.glow, Lot::Glow(&mats.glow));
+    // `MeshBasicMaterial({ toneMapped: false })` : non éclairées, sans ombre
+    for part in def.extras.map(|e| (e.parts)(colors)).unwrap_or_default() {
+        let c = part.color;
+        let material = materials.add(StandardMaterial {
+            base_color: Color::LinearRgba(LinearRgba::new(c.red, c.green, c.blue, part.opacity)),
+            unlit: true,
+            alpha_mode: if part.opacity < 1.0 {
+                AlphaMode::Blend
+            } else {
+                AlphaMode::Opaque
+            },
+            ..default()
+        });
+        let e = commands.spawn((
+            Mesh3d(meshes.add(part.geo.to_flat_mesh())),
+            MeshMaterial3d(material),
+            Transform::default(),
+            Visibility::Hidden,
+            NotShadowCaster,
+            ChildOf(joints[part.joint]),
+        ));
+        out.extras.push(e.id());
+    }
     out
 }
 

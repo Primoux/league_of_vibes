@@ -25,7 +25,7 @@ fn rock(
     s.part(joint, &geo::rock(r, seed, detail), color, o, false);
 }
 
-fn grondak(b: &mut ModelBuilder, c: &ModelColors, _rig: &RigSpec) {
+pub fn grondak(b: &mut ModelBuilder, c: &ModelColors, _rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let (stone, dark, edge) = ("#827361", "#484842", "#a28e72");
     s.form(
@@ -279,7 +279,7 @@ fn grondak(b: &mut ModelBuilder, c: &ModelColors, _rig: &RigSpec) {
     }
 }
 
-fn tharox(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
+pub fn tharox(b: &mut ModelBuilder, c: &ModelColors, rig: &RigSpec) {
     let s = &mut Sculpt::new(b);
     let (fur, tan, ivory, armor) = ("#593a2c", "#ae8458", "#dfcfaa", "#655e5a");
     s.form(
