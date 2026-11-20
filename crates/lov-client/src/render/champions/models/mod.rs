@@ -6,6 +6,7 @@ use super::model::ChampionModelDef;
 
 pub mod corvin;
 pub mod grondak;
+pub mod ilyra;
 pub mod kaelen;
 pub mod nyx;
 pub mod sable;
@@ -15,12 +16,13 @@ pub mod vrenna;
 /// Modèles dédiés, par identifiant de champion (`MODELS` de `index.ts`).
 pub const MODELS: &[(&str, ChampionModelDef)] = &[
     ("corvin", corvin::MODEL),
+    ("grondak", grondak::MODEL),
     ("kaelen", kaelen::MODEL),
     ("nyx", nyx::MODEL),
     ("sable", sable::MODEL),
     ("tharox", tharox::MODEL),
     ("vrenna", vrenna::MODEL),
-    ("grondak", grondak::MODEL),
+    ("ilyra", ilyra::MODEL),
 ];
 
 #[cfg(test)]
