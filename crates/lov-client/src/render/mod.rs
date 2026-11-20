@@ -10,6 +10,7 @@ pub mod camera;
 #[allow(dead_code)]
 pub mod champions;
 pub mod entities;
+pub mod healthbars;
 pub mod map;
 pub mod models;
 pub mod perf;
