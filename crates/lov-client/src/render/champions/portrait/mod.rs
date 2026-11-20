@@ -192,14 +192,23 @@ mod tests {
             assert!(built.sculpted, "{id} : surfaces sculptées");
             assert!(super::portrait_build(id).is_some());
         }
-        // sans portrait : modèle de base inchangé
-        let Some(c) = ModelColors::of("touilleur", TeamOrNeutral::Blue) else {
-            panic!("touilleur connu");
-        };
-        let base = crate::render::champions::generic::generic_for(c.class);
-        let def = model_for("touilleur", c.class);
-        assert_eq!(def.rig, base.rig);
-        assert!(!build_model(&def, &c).sculpted);
+        // sans portrait : modèle de base inchangé (dédié s'il existe, sinon générique)
+        assert!(super::portrait_build("touilleur").is_none());
+        for (id, class) in [
+            ("touilleur", lov_shared::schema::ChampionClass::Fighter),
+            ("inconnu", lov_shared::schema::ChampionClass::Tank),
+        ] {
+            let base = crate::render::champions::models::MODELS
+                .iter()
+                .find(|(name, _)| *name == id)
+                .map_or_else(
+                    || crate::render::champions::generic::generic_for(class),
+                    |(_, m)| *m,
+                );
+            let def = model_for(id, class);
+            assert_eq!(def.rig, base.rig, "{id}");
+            assert_eq!(def.scale, base.scale, "{id}");
+        }
     }
 
     #[test]

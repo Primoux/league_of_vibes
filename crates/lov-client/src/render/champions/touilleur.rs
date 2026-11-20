@@ -2,8 +2,7 @@
 //! purification ou interruption.
 //!
 //! Portage de `packages/client/src/render/champions/TouilleurView.ts`. Le modèle du Touilleur (index en
-//! moulinet porté par l'os `prop`) appartient à sa tranche de champion (`models/touilleur.rs`) ; en
-//! attendant, il prend le modèle générique de sa classe.
+//! moulinet porté par l'os `prop`) est celui de sa tranche de champion (`models/touilleur.rs`).
 
 use lov_shared::types::EntitySnapshot;
 
@@ -36,7 +35,7 @@ impl Channel {
 }
 
 /// Portage de `packages/client/test/touilleur-model.test.ts` (fin du canal ; le moulinet de l'index
-/// et le budget du modèle arrivent avec la tranche du Touilleur).
+/// et le budget du modèle sont testés avec `models/touilleur.rs`).
 #[cfg(test)]
 mod tests {
     use bevy::prelude::*;
