@@ -6,6 +6,7 @@ use bevy::prelude::*;
 
 use super::map::MAP_SIZE;
 use super::{RENDER_SCALE, from_shared, to_world};
+use crate::fx::post::PostFxCamera;
 use crate::net::GameState;
 use lov_shared::map::NEXUS;
 
@@ -42,6 +43,7 @@ fn spawn_camera(mut commands: Commands) {
     // Focale longue et caméra éloignée : peu de déformation sur les bords, comme une vue de MOBA.
     commands.spawn((
         Camera3d::default(),
+        PostFxCamera,
         Projection::Perspective(PerspectiveProjection {
             fov: 0.42,
             ..default()

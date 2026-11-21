@@ -4,6 +4,7 @@
 //! de particules standard, qui rejouent leur salve en boucle autour du centre de la caméra ; devant, une
 //! rangée de décals au sol (télégraphies, onde de choc) ; derrière, les matériaux FX (bouclier fresnel, givre,
 //! eau, modèle qui se dissout) et deux rubans de traînée en orbite.
+//! `F9` bascule le post-traitement (qualité haute / basse) ; `LOV_POST=low` démarre en qualité basse.
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 3 s (`LOV_SCREENSHOT_AT=4.5` pour choisir l'instant).
 
 use std::f32::consts::TAU;
@@ -13,6 +14,7 @@ use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 
 use super::particles::system::Blend;
 use super::particles::{EmitOptions, EmitShape, ParticleSystem, StdStyles};
+use super::post::{FxQuality, PostFxSettings};
 use super::shaders::{
     DecalMaterial, DecalMesh, DecalShape, DissolveMaterial, FresnelMaterial, GroundDecal,
     IceMaterial, Ribbon, RibbonMaterial, RibbonMode, WaterMaterial, dissolvable, set_dissolve,
@@ -28,9 +30,23 @@ pub struct FxDemoPlugin;
 
 impl Plugin for FxDemoPlugin {
     fn build(&self, app: &mut App) {
+        if std::env::var("LOV_POST").as_deref() == Ok("low") {
+            app.insert_resource(PostFxSettings {
+                quality: FxQuality::Low,
+                ..default()
+            });
+        }
         app.add_systems(
             Update,
-            (replay, decals, ribbons, materials, screenshot, log_stats),
+            (
+                replay,
+                decals,
+                ribbons,
+                materials,
+                toggle_post,
+                screenshot,
+                log_stats,
+            ),
         );
     }
 }
@@ -521,6 +537,17 @@ fn materials(
         if let Some(mut m) = dissolve.get_mut(&handle.0) {
             set_dissolve(&mut m, amount);
         }
+    }
+}
+
+/// `F9` : bascule entre qualité haute (bloom, étalonnage) et basse, pour comparer.
+fn toggle_post(keys: Res<ButtonInput<KeyCode>>, mut settings: ResMut<PostFxSettings>) {
+    if keys.just_pressed(KeyCode::F9) {
+        settings.quality = match settings.quality {
+            FxQuality::High => FxQuality::Low,
+            FxQuality::Low => FxQuality::High,
+        };
+        info!("post-traitement : {:?}", settings.quality);
     }
 }
 
