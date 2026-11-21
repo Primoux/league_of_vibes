@@ -10,6 +10,7 @@ pub mod ilyra;
 pub mod kaelen;
 pub mod nyx;
 pub mod sable;
+pub mod solenne;
 pub mod tharox;
 pub mod vrenna;
 pub mod zephyr;
@@ -25,6 +26,7 @@ pub const MODELS: &[(&str, ChampionModelDef)] = &[
     ("tharox", tharox::MODEL),
     ("vrenna", vrenna::MODEL),
     ("zephyr", zephyr::MODEL),
+    ("solenne", solenne::MODEL),
 ];
 
 #[cfg(test)]
