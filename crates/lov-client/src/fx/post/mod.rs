@@ -11,6 +11,8 @@
 //!   three.js, avec son exposition effective (`toneMappingExposure` 1,05 ÷ 0,6) en `ColorGrading` ;
 //! - **étalonnage** : passe plein écran `Grade` après le tone mapping, mêmes formules que le client web
 //!   (saturation, teinte des ombres, gain des hautes lumières, contraste, vignette) ; filet anti-NaN ;
+//! - **tramage** : en fin de passe `Grade`, après vignette et contraste (celui de Bevy, coupé, passerait avant
+//!   et laisserait des bandes dans les dégradés) ; en qualité basse, c'est de nouveau celui de Bevy ;
 //! - **qualité basse** : ni HDR, ni bloom, ni étalonnage : rendu direct, tone mapping conservé, comme le
 //!   client web.
 //!
@@ -23,7 +25,7 @@
 use bevy::camera::Hdr;
 use bevy::core_pipeline::fullscreen_material::{FullscreenMaterial, FullscreenMaterialPlugin};
 use bevy::core_pipeline::schedule::Core3dSystems;
-use bevy::core_pipeline::tonemapping::{Tonemapping, tonemapping};
+use bevy::core_pipeline::tonemapping::{DebandDither, Tonemapping, tonemapping};
 use bevy::ecs::schedule::ScheduleConfigs;
 use bevy::ecs::system::BoxedSystem;
 use bevy::post_process::bloom::{Bloom, BloomPrefilter, bloom};
@@ -219,9 +221,10 @@ fn apply_quality(commands: &mut Commands, entity: Entity, settings: &PostFxSetti
         Some(bloom) => e.insert(bloom),
         None => e.remove::<Bloom>(),
     };
+    // Le tramage suit l'étalonnage : fait en fin de passe `Grade` quand elle tourne, sinon par Bevy.
     match settings.grade() {
-        Some(grade) => e.insert(grade),
-        None => e.remove::<Grade>(),
+        Some(grade) => e.insert((grade, DebandDither::Disabled)),
+        None => e.remove::<Grade>().insert(DebandDither::Enabled),
     };
 }
 
@@ -271,6 +274,7 @@ mod tests {
         assert_eq!(w.get::<Tonemapping>(cam), Some(&Tonemapping::AcesFitted));
         assert!(w.get::<Hdr>(cam).is_some() && w.get::<Sanitize>(cam).is_some());
         assert!(w.get::<Bloom>(cam).is_some() && w.get::<Grade>(cam).is_some());
+        assert_eq!(w.get::<DebandDither>(cam), Some(&DebandDither::Disabled));
 
         assert_eq!(w.get::<Tonemapping>(autre), Some(&Tonemapping::None));
         assert_eq!(w.get::<ColorGrading>(autre).unwrap().global.exposure, 0.0);
@@ -300,6 +304,11 @@ mod tests {
         assert!(w.get::<Bloom>(cam).is_none() && w.get::<Grade>(cam).is_none());
         assert_eq!(w.get::<Tonemapping>(cam), Some(&Tonemapping::TonyMcMapface));
         assert_eq!(
+            w.get::<DebandDither>(cam),
+            Some(&DebandDither::Enabled),
+            "sans passe Grade, le tramage revient à Bevy"
+        );
+        assert_eq!(
             w.get::<ColorGrading>(cam).unwrap().global.post_saturation,
             0.5
         );
@@ -309,5 +318,6 @@ mod tests {
         let w = app.world();
         assert!(w.get::<Hdr>(cam).is_some() && w.get::<Sanitize>(cam).is_some());
         assert!(w.get::<Bloom>(cam).is_some() && w.get::<Grade>(cam).is_some());
+        assert_eq!(w.get::<DebandDither>(cam), Some(&DebandDither::Disabled));
     }
 }
