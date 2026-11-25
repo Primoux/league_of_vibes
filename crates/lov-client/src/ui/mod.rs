@@ -82,6 +82,10 @@ pub mod theme {
     pub const GOLD: Color = hex(0xd9b25f);
     pub const GOLD_HI: Color = hex(0xf6dc94);
     pub const GOLD_LO: Color = hex(0x7d6331);
+    pub const TEAL: Color = hex(0x3ee6c8);
+    pub const BLUE: Color = hex(0x4ea2ff);
+    pub const RED: Color = hex(0xff5a5a);
+    pub const GREEN: Color = hex(0x4fdc7c);
     pub const DANGER: Color = hex(0xff6b6b);
 }
 
