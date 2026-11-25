@@ -4,18 +4,13 @@
 //! - `noise` : texture de bruit tuilable partagée par les shaders du décor ;
 //! - `masks` + `terrain` : sol avec relief, peint par shader (herbe, voies, sable, dallage, caustiques) ;
 //! - `water` : rivière animée (vagues, reflets, écume des berges) ;
-//! - `cliffs` + `vegetation` + `vgeo` : murs en falaises, arbres et rochers (placement identique au
-//!   client web, `rng`).
+//! - `cliffs` + `vegetation` + `vgeo` : murs en falaises, arbres, rochers, brousses animées par le vent,
+//!   touffes et fleurs (placement identique au client web, `rng`).
 //!
 //! Murs et brousses viennent de `lov_shared::map` (`WALLS`, `BRUSHES`).
 
-use bevy::asset::RenderAssetUsages;
-use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 use lov_shared::constants;
-use lov_shared::map::BRUSHES;
-
-use super::{from_shared, to_world};
 
 mod cliffs;
 pub mod geometry;
@@ -51,51 +46,19 @@ impl Plugin for MapPlugin {
                     terrain::spawn_terrain,
                     water::spawn_river,
                     vegetation::spawn_vegetation,
-                    spawn_brush_tops,
                 ),
             )
                 .chain(),
-        );
+        )
+        .add_systems(Update, vegetation::fade_brushes);
     }
-}
-
-/// Brousses en aplats verts (prototype), en attendant le portage des herbes hautes (`buildBrushes`).
-fn spawn_brush_tops(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let mut positions: Vec<[f32; 3]> = Vec::new();
-    let mut indices: Vec<u32> = Vec::new();
-    for p in BRUSHES.iter() {
-        let base = positions.len() as u32;
-        positions.extend(p.iter().map(|v| to_world(from_shared(*v), 0.03).to_array()));
-        for i in 1..p.len() as u32 - 1 {
-            indices.extend([base, base + i, base + i + 1]);
-        }
-    }
-    let normals = vec![[0.0, 1.0, 0.0]; positions.len()];
-    let mesh = Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::default(),
-    )
-    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
-    .with_inserted_indices(Indices::U32(indices));
-    commands.spawn((
-        Mesh3d(meshes.add(mesh)),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.16, 0.5, 0.2),
-            perceptual_roughness: 0.95,
-            ..default()
-        })),
-    ));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lov_shared::map::WALLS;
+    use crate::render::from_shared;
+    use lov_shared::map::{BRUSHES, WALLS};
 
     type Polygon = Vec<Vec2>;
 

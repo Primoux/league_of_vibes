@@ -1,6 +1,6 @@
 //! Outils de géométrie et géométries du décor : portage de la première moitié de
 //! `packages/client/src/render/map/vegetation.ts` (`hash3`, `facet`, `paint`, `mergeGeometries`, arbres,
-//! rochers).
+//! rochers, touffes, fleurs).
 //!
 //! Les couleurs sont des couleurs de sommets linéaires (`THREE.Color` en gestion des couleurs) ; les
 //! calculs de bruit lisent les positions `f32`, comme le client web lit ses `Float32Array`.
@@ -262,6 +262,85 @@ pub fn rock() -> VGeo {
         let c = base * (0.6 + 0.5 * smooth(-0.2, 0.2, y)) as f32;
         if ny > 0.55 { c.lerp(moss, 0.65) } else { c }
     })
+}
+
+// ---------------------------------------------------------------- brins d'herbe et fleurs
+
+/// Touffe de brins courbés (2 triangles par brin) ; couleurs de sommets racine sombre → pointe claire.
+/// Normales vers le haut : l'herbe est éclairée comme le sol, sans facettes noires selon l'orientation.
+pub fn blade_tuft(n: u32, h: f64, spread: f64, w: f64, root: Rgb, tip: Rgb) -> VGeo {
+    let mut g = VGeo::default();
+    let mut push = |x: f64, y: f64, z: f64, t: f64| {
+        g.pos.push(Vec3::new(x as f32, y as f32, z as f32));
+        g.col.push(lerp(root, tip, t));
+        g.nrm.push(Vec3::Y);
+    };
+    for i in 0..n {
+        let fi = f64::from(i);
+        let a = fi / f64::from(n) * std::f64::consts::TAU + fi * 1.7;
+        let bh = h * (0.75 + f64::from((i * 7) % 5) * 0.08);
+        let (ox, oz) = (a.cos() * spread, a.sin() * spread);
+        // plan du brin perpendiculaire à sa direction d'inclinaison
+        let (px, pz) = (-a.sin() * w, a.cos() * w);
+        let lean = 0.35 + f64::from(i % 3) * 0.12;
+        let mx = ox + a.cos() * bh * lean * 0.45;
+        let mz = oz + a.sin() * bh * lean * 0.45;
+        let tx = ox + a.cos() * bh * lean;
+        let tz = oz + a.sin() * bh * lean;
+        // base → milieu (quad), milieu → pointe (triangle)
+        push(ox - px, 0.0, oz - pz, 0.0);
+        push(ox + px, 0.0, oz + pz, 0.0);
+        push(mx + px * 0.6, bh * 0.55, mz + pz * 0.6, 0.55);
+        push(ox - px, 0.0, oz - pz, 0.0);
+        push(mx + px * 0.6, bh * 0.55, mz + pz * 0.6, 0.55);
+        push(mx - px * 0.6, bh * 0.55, mz - pz * 0.6, 0.55);
+        push(mx - px * 0.6, bh * 0.55, mz - pz * 0.6, 0.55);
+        push(mx + px * 0.6, bh * 0.55, mz + pz * 0.6, 0.55);
+        push(tx, bh, tz, 1.0);
+    }
+    g
+}
+
+/// Fleur : disque à 5 pétales (blanc, teinté par l'instance), cœur jaune, tige.
+pub fn flower() -> VGeo {
+    let mut g = VGeo::default();
+    let h = 0.1f32;
+    let p = |a: f32, r: f32, y: f32| Vec3::new(a.cos() * r, y, a.sin() * r);
+    for i in 0..5 {
+        let a0 = i as f32 / 5.0 * std::f32::consts::TAU;
+        let a1 = a0 + std::f32::consts::TAU / 5.0;
+        let am = (a0 + a1) / 2.0;
+        g.pos.extend([
+            Vec3::new(0.0, h, 0.0),
+            p(a1, 0.03, h),
+            p(am, 0.075, h + 0.01),
+        ]);
+        g.pos.extend([
+            Vec3::new(0.0, h, 0.0),
+            p(am, 0.075, h + 0.01),
+            p(a0, 0.03, h),
+        ]);
+        for _ in 0..2 {
+            g.col.extend([
+                Vec3::new(1.0, 0.75, 0.15),
+                Vec3::splat(0.95),
+                Vec3::splat(0.9),
+            ]);
+        }
+    }
+    // tige
+    g.pos.extend([
+        Vec3::new(-0.006, 0.0, 0.0),
+        Vec3::new(0.006, 0.0, 0.0),
+        Vec3::new(0.0, h, 0.0),
+    ]);
+    g.col.extend([
+        Vec3::new(0.1, 0.25, 0.08),
+        Vec3::new(0.1, 0.25, 0.08),
+        Vec3::new(0.15, 0.35, 0.1),
+    ]);
+    g.nrm = vec![Vec3::Y; g.pos.len()];
+    g
 }
 
 #[cfg(test)]
