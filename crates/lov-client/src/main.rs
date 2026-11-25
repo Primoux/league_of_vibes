@@ -7,6 +7,7 @@
 //! Lancement : `SKIP_DRAFT=1 DEV_LOBBY=1 npm run dev:server`, puis `cargo run -p lov-client --release`.
 //! `LOV_URL` change l'adresse du serveur (défaut `ws://localhost:3000/ws`).
 //! `LOV_FXLAB=1` lance la démo des FX sans serveur.
+//! `LOV_AUDIOLAB=1` lance la démo du moteur audio (galerie de sons synthétisés) sans serveur.
 //! `LOV_VIEWLAB=1` lance la démo des vues d'entités (tous les modèles, toutes les animations) sans serveur.
 //! `LOV_STRESS=<n>` lance une scène de charge de n unités sans serveur (mesure de FPS).
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture 4 s après l'entrée en jeu, pour vérifier le rendu
@@ -16,6 +17,7 @@ use bevy::dev_tools::fps_overlay::FpsOverlayPlugin;
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 
+mod audio;
 mod fx;
 mod input;
 mod net;
@@ -40,6 +42,7 @@ fn main() {
         render::camera::CameraPlugin,
         input::InputPlugin,
         fx::FxPlugin,
+        audio::SoundPlugin,
     ))
     .insert_resource(ClearColor(Color::srgb(0.03, 0.04, 0.06)))
     .add_systems(Startup, spawn_status)
@@ -52,6 +55,9 @@ fn main() {
         }
         None if fx::demo::enabled() => {
             app.add_plugins((net::OfflinePlugin, fx::demo::FxDemoPlugin))
+        }
+        None if audio::demo::enabled() => {
+            app.add_plugins((net::OfflinePlugin, audio::demo::AudioLabPlugin))
         }
         None => app.add_plugins(net::NetPlugin),
     };
