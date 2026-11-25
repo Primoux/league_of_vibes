@@ -25,6 +25,7 @@ use super::rift::RiftBackground;
 use super::stage::{ChampionStage, StageView};
 use super::{screen_root, team_color, team_name};
 use crate::net::{Connection, GameState};
+use crate::ui::icons::{Artworks, ChampionPortrait, PortraitKind};
 use crate::ui::logic::format::{class_label, role_label};
 use crate::ui::theme::{GOLD, GOLD_HI, MUTED, PANEL, TEAL, TEXT, css, hexa};
 use crate::ui::{ButtonLook, Screen, UiFonts, button, remaining};
@@ -218,6 +219,7 @@ fn rebuild(
     mut ui: ResMut<DraftUi>,
     mut shown: ResMut<Shown>,
     roots: Query<Entity, With<DraftRoot>>,
+    art: Res<Artworks>,
 ) {
     let Some(draft) = state.draft.clone() else {
         return;
@@ -248,7 +250,15 @@ fn rebuild(
         commands.entity(e).despawn();
     }
     let (draft, names, me, _) = &sig;
-    spawn(&mut commands, &fonts, draft, names, me.as_deref(), &ui);
+    spawn(
+        &mut commands,
+        &fonts,
+        &art,
+        draft,
+        names,
+        me.as_deref(),
+        &ui,
+    );
     shown.0 = Some(sig);
 }
 
@@ -262,6 +272,7 @@ fn name_of<'a>(names: &'a [(String, String)], id: &str) -> &'a str {
 fn spawn(
     commands: &mut Commands,
     f: &UiFonts,
+    art: &Artworks,
     draft: &DraftState,
     names: &[(String, String)],
     me: Option<&str>,
@@ -436,6 +447,21 @@ fn spawn(
                     ))
                     .with_children(|stage| match champ {
                         Some(c) => {
+                            // illustration peinte en fond d'ambiance derrière la scène
+                            if let Some(image) = art.faded(&c.id) {
+                                stage.spawn((
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        right: px(0),
+                                        top: percent(-7.5),
+                                        height: percent(115),
+                                        aspect_ratio: Some(1.0),
+                                        ..default()
+                                    },
+                                    ImageNode::new(image).with_color(hexa(0xffffff, 0.32)),
+                                    Pickable::IGNORE,
+                                ));
+                            }
                             if let Some(e) = ui.stage {
                                 stage.spawn((
                                     StageView(e),
@@ -645,24 +671,32 @@ fn team_panel(
                         BorderColor::all(border),
                     ))
                     .with_children(|row| {
-                        row.spawn((
-                            Node {
-                                width: px(52),
-                                height: px(52),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                border_radius: BorderRadius::all(px(6)),
-                                ..default()
-                            },
-                            BackgroundColor(color.with_alpha(if p.locked { 1.0 } else { 0.45 })),
-                        ))
-                        .with_child((
-                            Text::new(c.map_or("?".into(), |c| {
-                                c.name.chars().take(1).collect::<String>()
-                            })),
-                            f.display(26.0, 900),
-                            TextColor(Color::WHITE),
-                        ));
+                        let square = Node {
+                            width: px(52),
+                            height: px(52),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border_radius: BorderRadius::all(px(6)),
+                            ..default()
+                        };
+                        match c {
+                            // survol d'un allié : portrait éteint tant qu'il n'est pas verrouillé
+                            Some(c) => {
+                                row.spawn(
+                                    ChampionPortrait::new(&c.id, PortraitKind::Square)
+                                        .gray(!p.locked)
+                                        .with(square),
+                                );
+                            }
+                            None => {
+                                row.spawn((square, BackgroundColor(color.with_alpha(0.45))))
+                                    .with_child((
+                                        Text::new("?"),
+                                        f.display(26.0, 900),
+                                        TextColor(Color::WHITE),
+                                    ));
+                            }
+                        }
                         row.spawn(Node {
                             flex_direction: FlexDirection::Column,
                             flex_grow: 1.0,
@@ -750,20 +784,22 @@ fn gallery_tile(
         Act::Tile(c.id.clone()),
     ));
     tile.with_children(|t| {
-        let initial: String = c.name.chars().take(1).collect();
         let tint = if blocked {
             hexa(0xffffff, 0.3)
         } else {
             Color::WHITE
         };
         t.spawn((
-            Text::new(initial),
-            f.display(34.0, 900),
-            TextColor(tint),
-            Node {
-                flex_grow: 1.0,
-                ..default()
-            },
+            ChampionPortrait::new(&c.id, PortraitKind::Square)
+                .gray(blocked)
+                .with(Node {
+                    position_type: PositionType::Absolute,
+                    width: percent(100),
+                    height: percent(100),
+                    border_radius: BorderRadius::all(px(5)),
+                    ..default()
+                }),
+            Pickable::IGNORE,
         ));
         t.spawn((
             Text::new(c.name.clone()),
