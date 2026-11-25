@@ -1,13 +1,16 @@
 //! Écrans hors partie : portage de `packages/client/src/ui/screens/` (area `ui-screens`).
 //!
-//! Accueil dans cette PR ; salon, draft, chargement et fin de partie dans les suivantes, puis la scène
-//! 3D des champions et les portraits (`stage/`).
+//! Accueil et salon ; draft, chargement et fin de partie dans les suivantes, puis la scène 3D des
+//! champions et les portraits (`stage/`).
 
 use bevy::prelude::*;
+use lov_shared::types::Team;
 
 use super::Screen;
+use super::theme::{BLUE, RED};
 
 pub mod home;
+pub mod lobby;
 
 /// Racine plein écran d'un écran, détruite en sortie d'état. Fond : dégradé radial sombre de
 /// `.lov-screen` (`#17112e` → `#04050c`). `layout` : disposition des enfants (taille et position sont
@@ -35,10 +38,26 @@ pub fn screen_root(screen: Screen, layout: Node) -> impl Bundle {
     )
 }
 
+/// Couleur d'une équipe.
+pub fn team_color(team: Team) -> Color {
+    match team {
+        Team::Blue => BLUE,
+        Team::Red => RED,
+    }
+}
+
+/// Nom d'une équipe.
+pub fn team_name(team: Team) -> &'static str {
+    match team {
+        Team::Blue => "Équipe bleue",
+        Team::Red => "Équipe rouge",
+    }
+}
+
 pub struct ScreensPlugin;
 
 impl Plugin for ScreensPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((home::HomePlugin,));
+        app.add_plugins((home::HomePlugin, lobby::LobbyPlugin));
     }
 }
