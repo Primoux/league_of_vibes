@@ -361,3 +361,69 @@ fn les_positions_affichees_sont_interpolees() {
     state.advance(0.0, 1125.0, &mut due);
     close(state.pose(1).unwrap().x, 50.0);
 }
+
+// ---------------------------------------------------------------- connexion à la demande, pilote automatique
+
+/// App minimale avec le pompage réseau, une connexion dont on tient les deux bouts.
+fn pumped_app(
+    autoplay: bool,
+) -> (
+    bevy::prelude::App,
+    std::sync::mpsc::Sender<lov_shared::protocol::ServerMsg>,
+    std::sync::mpsc::Receiver<lov_shared::protocol::ClientMsg>,
+) {
+    use bevy::prelude::*;
+    let (outgoing, sent) = std::sync::mpsc::channel();
+    let (to_game, incoming) = std::sync::mpsc::channel();
+    let mut app = App::new();
+    app.insert_resource(super::Connection::new(outgoing, incoming))
+        .insert_resource(super::Autoplay(autoplay))
+        .init_resource::<GameState>()
+        .add_systems(Update, super::pump_network);
+    (app, to_game, sent)
+}
+
+fn welcome() -> lov_shared::protocol::ServerMsg {
+    lov_shared::protocol::ServerMsg::Welcome {
+        player_id: "p1".into(),
+        reconnect_token: "jeton".into(),
+        version: lov_shared::protocol::PROTOCOL_VERSION,
+    }
+}
+
+#[test]
+fn sans_pilote_automatique_le_client_ne_cree_pas_de_salle_tout_seul() {
+    let (mut app, server, sent) = pumped_app(false);
+    server.send(welcome()).unwrap();
+    app.update();
+    assert!(sent.try_recv().is_err());
+    let state = app.world().resource::<GameState>();
+    assert!(state.connected);
+    assert_eq!(state.player_id.as_deref(), Some("p1"));
+}
+
+#[test]
+fn le_pilote_automatique_cree_une_salle_de_dev() {
+    let (mut app, server, sent) = pumped_app(true);
+    server.send(welcome()).unwrap();
+    app.update();
+    assert!(matches!(
+        sent.try_recv(),
+        Ok(lov_shared::protocol::ClientMsg::CreateRoom {
+            dev_mode: Some(true)
+        })
+    ));
+}
+
+#[test]
+fn la_connexion_ne_part_qu_au_premier_connect() {
+    // port 9 (discard) : la tentative échoue en arrière-plan, sans effet sur le test
+    let conn = super::Connection::deferred("ws://127.0.0.1:9/ws".into());
+    assert!(!conn.started());
+    conn.send(lov_shared::protocol::ClientMsg::LeaveRoom);
+    conn.connect("Alice");
+    assert!(conn.started());
+    // un second appel ne relance rien
+    conn.connect("Bob");
+    assert!(conn.started());
+}

@@ -10,8 +10,9 @@
 //! - Les événements de jeu sont publiés en [`ServerEvent`] (le `fxBus` du client web) quand le rendu
 //!   interpolé atteint leur snapshot, pour que les FX coïncident avec les positions affichées.
 //!
-//! En attendant les écrans (lobby, draft), le client crée une salle de dev, la lance et choisit un
-//! champion libre tout seul.
+//! La connexion part à la demande (`Connection::connect`, au clic sur « Jouer » des écrans), comme
+//! `net.connect(name)` du client web. Sans écrans, ou avec `LOV_AUTOPLAY=1`, un pilote automatique
+//! ([`Autoplay`]) se connecte au lancement, crée une salle de dev, la lance et choisit un champion libre.
 
 pub mod clock;
 pub mod prediction;
@@ -62,6 +63,24 @@ pub fn now_ms() -> f64 {
 #[derive(Message, Debug, Clone)]
 pub struct ServerEvent(pub GameEvent);
 
+/// Pilote automatique : connexion au lancement (`LOV_NAME`), salle de dev créée et lancée, premier
+/// champion libre verrouillé. Actif tant qu'aucun écran ne le coupe ; `LOV_AUTOPLAY=1` le force.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Autoplay(pub bool);
+
+impl Default for Autoplay {
+    fn default() -> Self {
+        Self(true)
+    }
+}
+
+/// Ce qu'il faut au fil réseau pour démarrer, gardé jusqu'à `connect`.
+struct Pending {
+    url: String,
+    from_game: Receiver<ClientMsg>,
+    to_game: Sender<ServerMsg>,
+}
+
 /// Canal vers le fil réseau, en messages typés.
 #[derive(Resource)]
 pub struct Connection {
@@ -69,6 +88,8 @@ pub struct Connection {
     incoming: Mutex<Receiver<ServerMsg>>,
     /// Ordres qui comptent pour la prédiction, relus par `pump_network`.
     local_orders: Mutex<Vec<ClientMsg>>,
+    /// Fil réseau pas encore lancé (`None` une fois connecté, ou hors ligne).
+    pending: Mutex<Option<Pending>>,
 }
 
 impl Connection {
@@ -77,7 +98,44 @@ impl Connection {
             outgoing,
             incoming: Mutex::new(incoming),
             local_orders: Mutex::new(Vec::new()),
+            pending: Mutex::new(None),
         }
+    }
+
+    /// Connexion vers `url`, lancée au premier `connect`.
+    fn deferred(url: String) -> Self {
+        let (outgoing, from_game) = mpsc::channel();
+        let (to_game, incoming) = mpsc::channel();
+        let conn = Self::new(outgoing, incoming);
+        if let Ok(mut pending) = conn.pending.lock() {
+            *pending = Some(Pending {
+                url,
+                from_game,
+                to_game,
+            });
+        }
+        conn
+    }
+
+    /// Lance le fil réseau sous le nom `name` (`hello`) ; sans effet s'il tourne déjà. Les messages
+    /// envoyés avant restent en file et partent après le `hello`.
+    pub fn connect(&self, name: &str) {
+        let Some(Pending {
+            url,
+            from_game,
+            to_game,
+        }) = self.pending.lock().ok().and_then(|mut p| p.take())
+        else {
+            return;
+        };
+        let name = name.to_owned();
+        thread::spawn(move || network_thread(&url, &name, &from_game, &to_game));
+    }
+
+    /// Le fil réseau a été lancé (ou la connexion est hors ligne).
+    #[cfg(test)]
+    pub fn started(&self) -> bool {
+        self.pending.lock().is_ok_and(|p| p.is_none())
     }
 
     /// Connexion de test : renvoie aussi le récepteur des messages envoyés.
@@ -334,16 +392,11 @@ pub struct NetPlugin;
 impl Plugin for NetPlugin {
     fn build(&self, app: &mut App) {
         let url = std::env::var("LOV_URL").unwrap_or_else(|_| DEFAULT_URL.to_string());
-        let name = std::env::var("LOV_NAME").unwrap_or_else(|_| "Natif".to_string());
-        let (outgoing, from_game) = mpsc::channel();
-        let (to_game, incoming) = mpsc::channel();
-        thread::spawn(move || network_thread(&url, &name, &from_game, &to_game));
-        app.insert_resource(Connection::new(outgoing, incoming))
-            .insert_resource(GameState {
-                status: "Connexion…".into(),
-                ..default()
-            })
+        app.insert_resource(Connection::deferred(url))
+            .init_resource::<Autoplay>()
+            .init_resource::<GameState>()
             .add_message::<ServerEvent>()
+            .add_systems(PostStartup, autoplay_connect)
             .add_systems(PreUpdate, (pump_network, update_poses).chain())
             .add_systems(Update, trace_events);
     }
@@ -358,6 +411,7 @@ impl Plugin for OfflinePlugin {
         let (outgoing, _) = mpsc::channel();
         let (_, incoming) = mpsc::channel();
         app.insert_resource(Connection::new(outgoing, incoming))
+            .insert_resource(Autoplay(false))
             .init_resource::<GameState>()
             .add_message::<ServerEvent>();
     }
@@ -491,7 +545,16 @@ fn send_msg(socket: &mut Socket, msg: &ClientMsg) -> bool {
 // Systèmes
 // ------------------------------------------------------------------------------------------------
 
-fn pump_network(conn: Res<Connection>, mut state: ResMut<GameState>) {
+/// Pilote automatique : connexion au lancement sous `LOV_NAME`.
+fn autoplay_connect(autoplay: Res<Autoplay>, conn: Res<Connection>, mut state: ResMut<GameState>) {
+    if autoplay.0 {
+        let name = std::env::var("LOV_NAME").unwrap_or_else(|_| "Natif".to_string());
+        conn.connect(&name);
+        state.status = "Connexion…".into();
+    }
+}
+
+fn pump_network(conn: Res<Connection>, autoplay: Res<Autoplay>, mut state: ResMut<GameState>) {
     if let Ok(mut orders) = conn.local_orders.lock() {
         for msg in orders.drain(..) {
             state.local_order(&msg);
@@ -503,9 +566,13 @@ fn pump_network(conn: Res<Connection>, mut state: ResMut<GameState>) {
     };
     let now = now_ms();
     while let Ok(msg) = incoming.try_recv() {
-        let autoplay = autoplay_step(&conn, &mut state, &msg);
+        let status = if autoplay.0 {
+            autoplay_step(&conn, &mut state, &msg)
+        } else {
+            None
+        };
         state.route(msg, now);
-        if let Some(status) = autoplay {
+        if let Some(status) = status {
             state.status = status;
         }
     }
@@ -531,8 +598,8 @@ fn trace_events(mut events: MessageReader<ServerEvent>) {
     }
 }
 
-/// En attendant les écrans de lobby et de draft : crée une salle de dev, la lance, choisit un
-/// champion libre. Renvoie la ligne d'état à afficher.
+/// Pilote automatique : crée une salle de dev, la lance, choisit un champion libre. Renvoie la ligne
+/// d'état à afficher.
 fn autoplay_step(conn: &Connection, state: &mut GameState, msg: &ServerMsg) -> Option<String> {
     match msg {
         ServerMsg::Welcome { .. } => {
