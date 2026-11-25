@@ -8,6 +8,7 @@
 //! `LOV_URL` change l'adresse du serveur (défaut `ws://localhost:3000/ws`).
 //! `LOV_FXLAB=1` lance la démo des FX sans serveur.
 //! `LOV_VIEWLAB=1` lance la démo des vues d'entités (tous les modèles, toutes les animations) sans serveur.
+//! `LOV_UILAB=<écran>` affiche un écran de l'interface avec des données fictives, sans serveur.
 //! `LOV_STRESS=<n>` lance une scène de charge de n unités sans serveur (mesure de FPS).
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture 4 s après l'entrée en jeu, pour vérifier le rendu
 //! sans regarder la fenêtre (CI, IA).
@@ -20,6 +21,7 @@ mod fx;
 mod input;
 mod net;
 mod render;
+mod ui;
 
 fn main() {
     let stress = render::stress::units_from_env();
@@ -50,10 +52,13 @@ fn main() {
         None if render::viewlab::enabled() => {
             app.add_plugins((net::OfflinePlugin, render::viewlab::ViewLabPlugin))
         }
+        None if ui::lab::requested().is_some() => {
+            app.add_plugins((net::OfflinePlugin, ui::UiPlugin, ui::lab::UiLabPlugin))
+        }
         None if fx::demo::enabled() => {
             app.add_plugins((net::OfflinePlugin, fx::demo::FxDemoPlugin))
         }
-        None => app.add_plugins(net::NetPlugin),
+        None => app.add_plugins((net::NetPlugin, ui::UiPlugin)),
     };
     app.run();
 }
@@ -77,8 +82,15 @@ fn spawn_status(mut commands: Commands) {
 fn update_status(
     state: Res<net::GameState>,
     rig: Res<render::camera::CameraRig>,
-    mut text: Single<&mut Text, With<StatusText>>,
+    screen: Option<Res<State<ui::Screen>>>,
+    mut text: Single<(&mut Text, &mut Visibility), With<StatusText>>,
 ) {
+    // Ligne de debug masquée sous les écrans (accueil, salon…).
+    let (text, visibility) = &mut *text;
+    **visibility = match screen.as_deref().map(State::get) {
+        Some(s) if *s != ui::Screen::Game => Visibility::Hidden,
+        _ => Visibility::Inherited,
+    };
     // La police par défaut de Bevy n'a que l'ASCII : pas d'accents ici tant que l'area ui-core
     // n'a pas apporté une police du jeu.
     text.0 = format!(
