@@ -3,81 +3,31 @@
 //! - `geometry` : relief du terrain (`terrain_height`), distances aux voies et à la rivière ;
 //! - `noise` : texture de bruit tuilable partagée par les shaders du décor ;
 //! - `masks` + `terrain` : sol avec relief, peint par shader (herbe, voies, sable, dallage, caustiques) ;
-//! - `water` : rivière animée (vagues, reflets, écume des berges).
+//! - `water` : rivière animée (vagues, reflets, écume des berges) ;
+//! - `cliffs` + `vegetation` + `vgeo` : murs en falaises, arbres et rochers (placement identique au
+//!   client web, `rng`).
 //!
-//! Murs et brousses viennent de `lov_shared::map` (`WALLS`, `BRUSHES`) ; ils restent des prismes simples
-//! jusqu'au portage de la végétation (`vegetation.ts`).
+//! Murs et brousses viennent de `lov_shared::map` (`WALLS`, `BRUSHES`).
 
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
+use lov_shared::constants;
+use lov_shared::map::BRUSHES;
 
 use super::{from_shared, to_world};
-use lov_shared::constants;
-use lov_shared::map::{BRUSHES, WALLS};
 
+mod cliffs;
 pub mod geometry;
 mod masks;
 pub mod noise;
+mod rng;
 pub mod terrain;
+pub mod vegetation;
+mod vgeo;
 pub mod water;
 
 pub const MAP_SIZE: f32 = constants::MAP_SIZE as f32;
-const WALL_HEIGHT: f32 = 1.4;
-
-type Polygon = Vec<Vec2>;
-
-/// Polygones `lov-shared` (f64, anti-horaires) → polygones de jeu Bevy (f32).
-fn polygons(source: &[lov_shared::map::Polygon]) -> Vec<Polygon> {
-    source
-        .iter()
-        .map(|p| p.iter().copied().map(from_shared).collect())
-        .collect()
-}
-
-/// Un seul maillage pour tous les polygones : une face supérieure à `height`, et des flancs si `height > 0`.
-fn prisms(polygons: &[Polygon], height: f32, with_sides: bool) -> Mesh {
-    let mut positions: Vec<[f32; 3]> = Vec::new();
-    let mut normals: Vec<[f32; 3]> = Vec::new();
-    let mut indices: Vec<u32> = Vec::new();
-    for p in polygons {
-        let base = positions.len() as u32;
-        for v in p {
-            positions.push(to_world(*v, height).to_array());
-            normals.push([0.0, 1.0, 0.0]);
-        }
-        for i in 1..p.len() as u32 - 1 {
-            indices.extend([base, base + i, base + i + 1]);
-        }
-        if !with_sides {
-            continue;
-        }
-        for i in 0..p.len() {
-            let (a, b) = (p[i], p[(i + 1) % p.len()]);
-            let d = (b - a).normalize_or_zero();
-            // Normale sortante d'un polygone anti-horaire : (dy, -dx) en jeu, soit (dy, 0, dx) en monde.
-            let normal = [d.y, 0.0, d.x];
-            let base = positions.len() as u32;
-            for corner in [
-                to_world(a, 0.0),
-                to_world(b, 0.0),
-                to_world(b, height),
-                to_world(a, height),
-            ] {
-                positions.push(corner.to_array());
-                normals.push(normal);
-            }
-            indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
-        }
-    }
-    Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::default(),
-    )
-    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
-    .with_inserted_indices(Indices::U32(indices))
-}
 
 pub struct MapPlugin;
 
@@ -85,46 +35,77 @@ impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         bevy::asset::embedded_asset!(app, "terrain.wesl");
         bevy::asset::embedded_asset!(app, "water.wesl");
+        bevy::asset::embedded_asset!(app, "cliff.wesl");
+        bevy::asset::embedded_asset!(app, "foliage.wesl");
         app.add_plugins((
             MaterialPlugin::<terrain::TerrainMaterial>::default(),
             MaterialPlugin::<water::RiverMaterial>::default(),
+            MaterialPlugin::<cliffs::CliffMaterial>::default(),
+            MaterialPlugin::<vegetation::FoliageMaterial>::default(),
         ))
         .add_systems(
             Startup,
             (
                 noise::create_noise_texture,
-                (terrain::spawn_terrain, water::spawn_river, spawn_map),
+                (
+                    terrain::spawn_terrain,
+                    water::spawn_river,
+                    vegetation::spawn_vegetation,
+                    spawn_brush_tops,
+                ),
             )
                 .chain(),
         );
     }
 }
 
-fn spawn_map(
+/// Brousses en aplats verts (prototype), en attendant le portage des herbes hautes (`buildBrushes`).
+fn spawn_brush_tops(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let mut matte = |color: Color| {
-        materials.add(StandardMaterial {
-            base_color: color,
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    for p in BRUSHES.iter() {
+        let base = positions.len() as u32;
+        positions.extend(p.iter().map(|v| to_world(from_shared(*v), 0.03).to_array()));
+        for i in 1..p.len() as u32 - 1 {
+            indices.extend([base, base + i, base + i + 1]);
+        }
+    }
+    let normals = vec![[0.0, 1.0, 0.0]; positions.len()];
+    let mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+    .with_inserted_indices(Indices::U32(indices));
+    commands.spawn((
+        Mesh3d(meshes.add(mesh)),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.16, 0.5, 0.2),
             perceptual_roughness: 0.95,
             ..default()
-        })
-    };
-    commands.spawn((
-        Mesh3d(meshes.add(prisms(&polygons(&WALLS), WALL_HEIGHT, true))),
-        MeshMaterial3d(matte(Color::srgb(0.36, 0.37, 0.42))),
-    ));
-    commands.spawn((
-        Mesh3d(meshes.add(prisms(&polygons(&BRUSHES), 0.03, false))),
-        MeshMaterial3d(matte(Color::srgb(0.16, 0.5, 0.2))),
+        })),
     ));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lov_shared::map::WALLS;
+
+    type Polygon = Vec<Vec2>;
+
+    /// Polygones `lov-shared` (f64, anti-horaires) → polygones de jeu Bevy (f32).
+    fn polygons(source: &[lov_shared::map::Polygon]) -> Vec<Polygon> {
+        source
+            .iter()
+            .map(|p| p.iter().copied().map(from_shared).collect())
+            .collect()
+    }
 
     #[test]
     fn la_carte_a_28_murs_et_32_brousses_en_sens_anti_horaire() {
