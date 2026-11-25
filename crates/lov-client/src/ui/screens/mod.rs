@@ -1,7 +1,6 @@
 //! Écrans hors partie : portage de `packages/client/src/ui/screens/` (area `ui-screens`).
 //!
-//! Accueil, salon, draft, chargement et fin de partie ; la scène 3D des champions et les portraits
-//! (`stage/`) arrivent ensuite.
+//! Accueil, salon, draft, chargement et fin de partie, et la scène 3D des champions (`stage`).
 
 use bevy::prelude::*;
 use lov_shared::types::Team;
@@ -14,6 +13,7 @@ pub mod end;
 pub mod home;
 pub mod loading;
 pub mod lobby;
+pub mod stage;
 
 /// Racine plein écran d'un écran, détruite en sortie d'état. Fond : dégradé radial sombre de
 /// `.lov-screen` (`#17112e` → `#04050c`). `layout` : disposition des enfants (taille et position sont
@@ -67,6 +67,7 @@ impl Plugin for ScreensPlugin {
             draft::DraftPlugin,
             loading::LoadingPlugin,
             end::EndPlugin,
+            stage::StagePlugin,
         ));
     }
 }

@@ -6,8 +6,11 @@
 //! sorts d'invocateur une fois verrouillé. L'écran est reconstruit quand le draft ou la sélection
 //! locale change ; le minuteur est rafraîchi à chaque image.
 //!
-//! Écarts : la scène 3D du champion et les portraits arrivent avec `stage/` ; pas d'infobulles (le
-//! sort survolé de la fiche s'affiche en dessous, comme au clic sur le web).
+//! Le champion sélectionné tourne sur sa scène 3D (`stage`), derrière sa fiche ; il joue son ultime quand
+//! le joueur le verrouille. La scène vit avec l'écran : la reconstruire ne recrée que son image.
+//!
+//! Écarts : les portraits arrivent avec les icônes ; pas d'infobulles (le sort survolé de la fiche
+//! s'affiche en dessous, comme au clic sur le web).
 
 use bevy::prelude::*;
 use bevy::ui_widgets::Activate;
@@ -18,6 +21,7 @@ use lov_shared::protocol::{ClientMsg, DraftPick, DraftState};
 use lov_shared::schema::{ChampionDef, Targeting};
 use lov_shared::types::{AbilitySlot, Role, SummonerId, Team};
 
+use super::stage::{ChampionStage, StageView};
 use super::{screen_root, team_color, team_name};
 use crate::net::{Connection, GameState};
 use crate::ui::logic::format::{class_label, role_label};
@@ -52,6 +56,11 @@ pub struct DraftUi {
     pub focus: KitSlot,
     pub summoner_slot: usize,
     last_click: Option<(String, f32)>,
+    stage: Option<Entity>,
+    /// Incrémenté au verrouillage : le champion joue son ultime.
+    pulse: u32,
+    /// Choix du joueur verrouillé à l'image précédente (`None` : pas encore observé).
+    was_locked: Option<bool>,
 }
 
 impl Default for DraftUi {
@@ -62,6 +71,9 @@ impl Default for DraftUi {
             focus: KitSlot::P,
             summoner_slot: 0,
             last_click: None,
+            stage: None,
+            pulse: 0,
+            was_locked: None,
         }
     }
 }
@@ -421,7 +433,22 @@ fn spawn(
                         BorderColor::all(hexa(0xffffff, 0.06)),
                     ))
                     .with_children(|stage| match champ {
-                        Some(c) => champion_info(stage, f, c, ui.focus),
+                        Some(c) => {
+                            if let Some(e) = ui.stage {
+                                stage.spawn((
+                                    StageView(e),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        right: px(0),
+                                        top: px(0),
+                                        bottom: px(0),
+                                        width: percent(62),
+                                        ..default()
+                                    },
+                                ));
+                            }
+                            champion_info(stage, f, c, ui.focus);
+                        }
                         None => {
                             stage.spawn((
                                 Text::new("Choisis un champion dans la galerie"),
@@ -1116,8 +1143,42 @@ fn tick_timer(
     }
 }
 
-fn reset(mut ui: ResMut<DraftUi>) {
+fn reset(mut commands: Commands, mut ui: ResMut<DraftUi>, mut images: ResMut<Assets<Image>>) {
     *ui = DraftUi::default();
+    ui.stage = Some(ChampionStage::spawn(
+        &mut commands,
+        &mut images,
+        Screen::Draft,
+        0.25,
+    ));
+}
+
+/// Champion de la scène, éclat d'ultime au verrouillage (pas à l'arrivée sur un choix déjà verrouillé).
+fn drive_stage(
+    state: Res<GameState>,
+    mut ui: ResMut<DraftUi>,
+    mut stages: Query<&mut ChampionStage>,
+) {
+    let locked = state.draft.as_ref().is_some_and(|d| {
+        d.picks.iter().any(|p| {
+            Some(&p.player_id) == state.player_id.as_ref() && p.locked && p.champion_id.is_some()
+        })
+    });
+    if ui.was_locked != Some(locked) {
+        if ui.was_locked == Some(false) && locked {
+            ui.pulse += 1;
+        }
+        ui.was_locked = Some(locked);
+    }
+    let Some(mut stage) = ui.stage.and_then(|e| stages.get_mut(e).ok()) else {
+        return;
+    };
+    if stage.champion != ui.selected {
+        stage.champion.clone_from(&ui.selected);
+    }
+    if stage.pulse != ui.pulse {
+        stage.pulse = ui.pulse;
+    }
 }
 
 pub struct DraftPlugin;
@@ -1129,7 +1190,7 @@ impl Plugin for DraftPlugin {
             .add_systems(OnEnter(Screen::Draft), reset)
             .add_systems(
                 Update,
-                (rebuild, tick_timer)
+                (rebuild, tick_timer, drive_stage)
                     .chain()
                     .run_if(in_state(Screen::Draft)),
             )

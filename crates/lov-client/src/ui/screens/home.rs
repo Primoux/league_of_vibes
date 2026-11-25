@@ -2,10 +2,12 @@
 //!
 //! À gauche : logo, carte de jeu (onglets Créer / Rejoindre, nom d'invocateur, code de salle à 5
 //! caractères, mode entraînement). À droite : vitrine du champion mis en avant (change toutes les 7 s,
-//! en pause au survol) et galerie. La scène 3D du champion et les portraits arrivent avec `stage/`.
+//! en pause au survol) avec la scène 3D du champion (`stage`), et galerie.
 //!
 //! Écarts : le nom n'est pas encore mémorisé d'une session à l'autre (`localStorage` du web) ; il
 //! reprend `LOV_NAME` s'il est défini. Le pied de page compte les champions au lieu du « 11 » figé du web.
+
+use std::f32::consts::FRAC_PI_2;
 
 use bevy::input_focus::InputFocus;
 use bevy::picking::hover::Hovered;
@@ -16,6 +18,7 @@ use lov_shared::data::champions::CHAMPIONS;
 use lov_shared::protocol::ClientMsg;
 
 use super::screen_root;
+use super::stage::{ChampionStage, StageView};
 use crate::net::{Connection, GameState, now_ms};
 use crate::ui::logic::format::{class_label, role_label};
 use crate::ui::theme::{GOLD, GOLD_HI, GOLD_LO, MUTED, PANEL, TEXT, css, hexa};
@@ -38,8 +41,11 @@ pub struct HomeUi {
     pub mode: Mode,
     pub dev: bool,
     pub featured: usize,
+    /// Incrémenté quand le joueur choisit un champion : il joue son ultime.
+    pub pulse: u32,
     since: f32,
     busy_until: f64,
+    stage: Option<Entity>,
 }
 
 impl Default for HomeUi {
@@ -49,8 +55,10 @@ impl Default for HomeUi {
             mode: Mode::Create,
             dev: std::env::var_os("LOV_DEV").is_some(),
             featured: (now_ms() as usize / 7) % n,
+            pulse: 0,
             since: 0.0,
             busy_until: 0.0,
+            stage: None,
         }
     }
 }
@@ -116,10 +124,19 @@ enum Plate {
 #[derive(Component)]
 struct Glow;
 #[derive(Component)]
+struct PlateBox;
+#[derive(Component)]
 struct Chip(usize);
 
-fn on_enter(mut commands: Commands, fonts: Res<UiFonts>, mut ui: ResMut<HomeUi>) {
+fn on_enter(
+    mut commands: Commands,
+    fonts: Res<UiFonts>,
+    mut ui: ResMut<HomeUi>,
+    mut images: ResMut<Assets<Image>>,
+) {
     ui.since = 0.0;
+    let stage = ChampionStage::spawn(&mut commands, &mut images, Screen::Home, 0.3);
+    ui.stage = Some(stage);
     let f = &*fonts;
     let gold_button = ButtonLook::new(GOLD, GOLD_HI);
     let tab_look = ButtonLook::new(hexa(0xffffff, 0.03), hexa(0xffffff, 0.08));
@@ -341,22 +358,54 @@ fn on_enter(mut commands: Commands, fonts: Res<UiFonts>, mut ui: ResMut<HomeUi>)
                             show.spawn((
                                 Glow,
                                 Node {
-                                    width: px(380),
-                                    height: px(380),
-                                    flex_direction: FlexDirection::Column,
-                                    justify_content: JustifyContent::Center,
-                                    align_items: AlignItems::Center,
-                                    row_gap: px(6),
-                                    border_radius: BorderRadius::MAX,
+                                    width: px(640),
+                                    height: px(600),
                                     ..default()
                                 },
                                 BackgroundGradient::default(),
                             ))
-                            .with_children(|plate| {
-                                plate.spawn((Plate::Class, Text::new(""), f.text(14.0, 700), TextColor(GOLD)));
-                                plate.spawn((Plate::Name, Text::new(""), f.display(54.0, 900), TextColor(TEXT)));
-                                plate.spawn((Plate::Title, Text::new(""), f.text(17.0, 500), TextColor(MUTED)));
-                                plate.spawn((Plate::Roles, Text::new(""), f.text(14.0, 600), TextColor(GOLD_HI)));
+                            .with_children(|glow| {
+                                glow.spawn((
+                                    StageView(stage),
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        width: percent(100),
+                                        height: percent(100),
+                                        ..default()
+                                    },
+                                ));
+                                // plaque du champion, en bas à droite de la scène
+                                glow.spawn((
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        right: px(0),
+                                        bottom: px(30),
+                                        min_width: px(240),
+                                        flex_direction: FlexDirection::Column,
+                                        row_gap: px(4),
+                                        padding: UiRect::new(px(20), px(22), px(16), px(16)),
+                                        border: UiRect::left(px(3)),
+                                        border_radius: BorderRadius::right(px(10)),
+                                        ..default()
+                                    },
+                                    BackgroundGradient::from(LinearGradient {
+                                        angle: FRAC_PI_2,
+                                        stops: vec![
+                                            ColorStop::new(hexa(0x05060e, 0.85), percent(0)),
+                                            ColorStop::new(hexa(0x05060e, 0.3), percent(100)),
+                                        ],
+                                        ..default()
+                                    }),
+                                    BorderColor::all(GOLD),
+                                    PlateBox,
+                                    Pickable::IGNORE,
+                                ))
+                                .with_children(|plate| {
+                                    plate.spawn((Plate::Class, Text::new(""), f.text(12.0, 700), TextColor(GOLD)));
+                                    plate.spawn((Plate::Name, Text::new(""), f.display(48.0, 900), TextColor(TEXT)));
+                                    plate.spawn((Plate::Title, Text::new(""), f.text(16.0, 500), TextColor(MUTED)));
+                                    plate.spawn((Plate::Roles, Text::new(""), f.text(13.0, 600), TextColor(GOLD_HI)));
+                                });
                             });
                             arrow(show, f, "›", Act::Next);
                         });
@@ -547,6 +596,32 @@ fn on_activate(
                 _ => ui.featured,
             };
             ui.since = 0.0;
+            ui.pulse += 1;
+        }
+    }
+}
+
+/// Champion de la vitrine et éclat d'ultime sur la scène ; liseré de la plaque à sa couleur.
+fn drive_stage(
+    ui: Res<HomeUi>,
+    mut stages: Query<&mut ChampionStage>,
+    mut plates: Query<&mut BorderColor, With<PlateBox>>,
+) {
+    let Some(champ) = CHAMPIONS.get(ui.featured % CHAMPIONS.len().max(1)) else {
+        return;
+    };
+    if let Some(mut stage) = ui.stage.and_then(|e| stages.get_mut(e).ok()) {
+        if stage.champion.as_deref() != Some(champ.id.as_str()) {
+            stage.champion = Some(champ.id.clone());
+        }
+        if stage.pulse != ui.pulse {
+            stage.pulse = ui.pulse;
+        }
+    }
+    for mut b in &mut plates {
+        let c = BorderColor::all(css(&champ.palette.primary));
+        if *b != c {
+            *b = c;
         }
     }
 }
@@ -724,7 +799,7 @@ impl Plugin for HomePlugin {
             .add_systems(OnEnter(Screen::Home), on_enter)
             .add_systems(
                 Update,
-                (refresh, submit_on_enter).run_if(in_state(Screen::Home)),
+                (refresh, submit_on_enter, drive_stage).run_if(in_state(Screen::Home)),
             )
             .add_observer(on_activate);
     }
