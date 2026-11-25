@@ -1,6 +1,6 @@
 //! Écrans hors partie : portage de `packages/client/src/ui/screens/` (area `ui-screens`).
 //!
-//! Accueil et salon ; draft, chargement et fin de partie dans les suivantes, puis la scène 3D des
+//! Accueil, salon et draft ; chargement et fin de partie dans la suivante, puis la scène 3D des
 //! champions et les portraits (`stage/`).
 
 use bevy::prelude::*;
@@ -9,6 +9,7 @@ use lov_shared::types::Team;
 use super::Screen;
 use super::theme::{BLUE, RED};
 
+pub mod draft;
 pub mod home;
 pub mod lobby;
 
@@ -58,6 +59,6 @@ pub struct ScreensPlugin;
 
 impl Plugin for ScreensPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((home::HomePlugin, lobby::LobbyPlugin));
+        app.add_plugins((home::HomePlugin, lobby::LobbyPlugin, draft::DraftPlugin));
     }
 }

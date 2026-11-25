@@ -12,7 +12,7 @@ use bevy::prelude::*;
 use bevy::ui::InteractionDisabled;
 use bevy::ui_widgets::Button;
 
-use crate::net::{Autoplay, GameState};
+use crate::net::{Autoplay, GameState, now_ms};
 use lov_shared::protocol::RoomPhase;
 
 pub mod lab;
@@ -131,6 +131,13 @@ fn follow_state(
     if screen != *current.get() {
         next.set(screen);
     }
+}
+
+/// Secondes restantes avant `ends_at` (temps serveur, ms), via l'horloge synchronisée (`useCountdown`).
+pub fn remaining(state: &GameState, ends_at: Option<f64>) -> f64 {
+    ends_at.map_or(0.0, |end| {
+        ((end - state.clock.server_now(now_ms())) / 1000.0).max(0.0)
+    })
 }
 
 /// Couleurs d'un bouton selon son état (survol, désactivé).
