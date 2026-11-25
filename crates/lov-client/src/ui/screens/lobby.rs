@@ -11,10 +11,11 @@ use lov_shared::constants::TEAM_SIZE;
 use lov_shared::protocol::{ClientMsg, LobbyPlayer, LobbyState};
 use lov_shared::types::{Role, Team};
 
+use super::rift::RiftBackground;
 use super::{screen_root, team_color, team_name};
 use crate::net::{Connection, GameState};
 use crate::ui::logic::format::role_label;
-use crate::ui::theme::{DANGER, GOLD, GOLD_HI, GREEN, MUTED, PANEL, TEAL, TEXT, hexa};
+use crate::ui::theme::{DANGER, GOLD, GOLD_HI, GREEN, MUTED, PANEL, TEAL, TEXT, hex, hexa};
 use crate::ui::{ButtonLook, Screen, UiFonts, button};
 
 const ROLES: [Role; 4] = [Role::Top, Role::Jungle, Role::Mid, Role::Bot];
@@ -138,6 +139,7 @@ fn spawn(
             ),
         ))
         .with_children(|root| {
+            root.spawn(RiftBackground::new(hex(0x4ea2ff), 0.7).bundle());
             // ---------------------------------------------------------------- en-tête
             root.spawn(Node {
                 align_items: AlignItems::Center,

@@ -17,6 +17,7 @@ use bevy::ui_widgets::{Activate, TextInput};
 use lov_shared::data::champions::CHAMPIONS;
 use lov_shared::protocol::ClientMsg;
 
+use super::rift::RiftBackground;
 use super::screen_root;
 use super::stage::{ChampionStage, StageView};
 use crate::net::{Connection, GameState, now_ms};
@@ -151,6 +152,7 @@ fn on_enter(
             }),
         )
         .with_children(|root| {
+            root.spawn(RiftBackground::new(css(&CHAMPIONS[ui.featured % CHAMPIONS.len()].palette.primary), 1.0).bundle());
             root.spawn(Node {
                 flex_grow: 1.0,
                 flex_direction: FlexDirection::Row,
@@ -601,11 +603,12 @@ fn on_activate(
     }
 }
 
-/// Champion de la vitrine et éclat d'ultime sur la scène ; liseré de la plaque à sa couleur.
+/// Champion de la vitrine et éclat d'ultime sur la scène ; plaque et fond à sa couleur.
 fn drive_stage(
     ui: Res<HomeUi>,
     mut stages: Query<&mut ChampionStage>,
     mut plates: Query<&mut BorderColor, With<PlateBox>>,
+    mut backgrounds: Query<&mut RiftBackground>,
 ) {
     let Some(champ) = CHAMPIONS.get(ui.featured % CHAMPIONS.len().max(1)) else {
         return;
@@ -616,6 +619,12 @@ fn drive_stage(
         }
         if stage.pulse != ui.pulse {
             stage.pulse = ui.pulse;
+        }
+    }
+    for mut bg in &mut backgrounds {
+        let tint = css(&champ.palette.primary);
+        if bg.tint != tint {
+            bg.tint = tint;
         }
     }
     for mut b in &mut plates {

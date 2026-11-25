@@ -12,12 +12,13 @@ use lov_shared::data::items::item;
 use lov_shared::protocol::{ClientMsg, GameOver, PlayerStats};
 use lov_shared::types::Team;
 
+use super::rift::RiftBackground;
 use super::{screen_root, team_color, team_name};
 use crate::net::{Connection, GameState};
 use crate::ui::logic::format::{
     format_clock, format_gold_short, format_int, format_kda_ratio, mvp_score,
 };
-use crate::ui::theme::{DANGER, GOLD, GOLD_HI, MUTED, PANEL, TEXT, hexa};
+use crate::ui::theme::{DANGER, GOLD, GOLD_HI, MUTED, PANEL, TEXT, hex, hexa};
 use crate::ui::{ButtonLook, Screen, UiFonts, button};
 
 /// Joueur MVP : meilleur `mvpScore` (le premier en cas d'égalité, comme le tri stable du web).
@@ -88,6 +89,9 @@ fn on_enter(mut commands: Commands, state: Res<GameState>, fonts: Res<UiFonts>) 
             },
         ))
         .with_children(|root| {
+            root.spawn(
+                RiftBackground::new(if won { hex(0xf6dc94) } else { hex(0xff5a5a) }, 1.2).bundle(),
+            );
             root.spawn((
                 Text::new(if won { "VICTOIRE" } else { "DÉFAITE" }),
                 f.display(96.0, 900),

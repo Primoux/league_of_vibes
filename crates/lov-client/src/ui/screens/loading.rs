@@ -9,10 +9,11 @@ use lov_shared::data::champions::get_champion;
 use lov_shared::data::summoners::summoner;
 use lov_shared::types::Team;
 
+use super::rift::RiftBackground;
 use super::{screen_root, team_color};
 use crate::net::GameState;
 use crate::ui::logic::format::class_label;
-use crate::ui::theme::{GOLD, GOLD_HI, MUTED, TEXT, css, hexa};
+use crate::ui::theme::{GOLD, GOLD_HI, MUTED, TEXT, css, hex, hexa};
 use crate::ui::{Screen, UiFonts, remaining};
 
 pub const TIPS: [&str; 8] = [
@@ -80,6 +81,7 @@ fn on_enter(
             },
         ))
         .with_children(|root| {
+            root.spawn(RiftBackground::new(hex(0xb072ff), 0.8).bundle());
             for team in [Team::Blue, Team::Red] {
                 root.spawn(Node {
                     column_gap: px(16),
