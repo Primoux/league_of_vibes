@@ -1,6 +1,7 @@
 //! Écrans hors partie : portage de `packages/client/src/ui/screens/` (area `ui-screens`).
 //!
-//! Accueil, salon, draft, chargement et fin de partie, et la scène 3D des champions (`stage`).
+//! Accueil, salon, draft, chargement et fin de partie, avec la scène 3D des champions (`stage`) et le
+//! fond animé (`rift`).
 
 use bevy::prelude::*;
 use lov_shared::types::Team;
@@ -13,6 +14,7 @@ pub mod end;
 pub mod home;
 pub mod loading;
 pub mod lobby;
+pub mod rift;
 pub mod stage;
 
 /// Racine plein écran d'un écran, détruite en sortie d'état. Fond : dégradé radial sombre de
@@ -68,6 +70,7 @@ impl Plugin for ScreensPlugin {
             loading::LoadingPlugin,
             end::EndPlugin,
             stage::StagePlugin,
+            rift::RiftPlugin,
         ));
     }
 }

@@ -21,6 +21,7 @@ use lov_shared::protocol::{ClientMsg, DraftPick, DraftState};
 use lov_shared::schema::{ChampionDef, Targeting};
 use lov_shared::types::{AbilitySlot, Role, SummonerId, Team};
 
+use super::rift::RiftBackground;
 use super::stage::{ChampionStage, StageView};
 use super::{screen_root, team_color, team_name};
 use crate::net::{Connection, GameState};
@@ -295,6 +296,7 @@ fn spawn(
             ),
         ))
         .with_children(|root| {
+            root.spawn(RiftBackground::new(accent, 0.8).bundle());
             team_panel(root, f, Team::Blue, draft, view.my_team, &turn, me, names);
             // ---------------------------------------------------------------- centre
             root.spawn(Node {
