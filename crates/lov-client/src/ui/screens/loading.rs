@@ -1,7 +1,9 @@
 //! Écran de chargement : portage de `packages/client/src/ui/screens/Loading.tsx`.
 //!
-//! Cartes des joueurs des deux équipes (champion, titre, classe, sorts d'invocateur), barre de
+//! Cartes des joueurs des deux équipes (illustration, champion, titre, classe, sorts d'invocateur), barre de
 //! progression jusqu'au début de la partie, astuce qui change toutes les 4 s.
+
+use std::f32::consts::PI;
 
 use bevy::prelude::*;
 use lov_shared::constants::LOADING_SECONDS;
@@ -12,6 +14,7 @@ use lov_shared::types::Team;
 use super::rift::RiftBackground;
 use super::{screen_root, team_color};
 use crate::net::GameState;
+use crate::ui::icons::{ChampionPortrait, PortraitKind};
 use crate::ui::logic::format::class_label;
 use crate::ui::theme::{GOLD, GOLD_HI, MUTED, TEXT, css, hex, hexa};
 use crate::ui::{Screen, UiFonts, remaining};
@@ -101,11 +104,9 @@ fn on_enter(
                                 width: px(200),
                                 height: px(300),
                                 flex_direction: FlexDirection::Column,
-                                justify_content: JustifyContent::End,
-                                padding: UiRect::all(px(12)),
-                                row_gap: px(3),
                                 border: UiRect::all(px(2)),
                                 border_radius: BorderRadius::all(px(10)),
+                                overflow: Overflow::clip(),
                                 ..default()
                             },
                             BackgroundGradient::from(LinearGradient {
@@ -120,40 +121,61 @@ fn on_enter(
                             BorderColor::all(border),
                         ))
                         .with_children(|card| {
-                            let initial: String =
-                                c.map_or("?".into(), |c| c.name.chars().take(1).collect());
+                            // illustration (la zone est presque carrée : recadrage carré)
+                            let mut art = card.spawn(Node {
+                                flex_grow: 1.0,
+                                min_height: px(0),
+                                ..default()
+                            });
+                            if let Some(c) = c {
+                                art.with_child(
+                                    ChampionPortrait::new(&c.id, PortraitKind::Square).with(Node {
+                                        width: percent(100),
+                                        height: percent(100),
+                                        ..default()
+                                    }),
+                                );
+                            }
                             card.spawn((
-                                Text::new(initial),
-                                f.display(96.0, 900),
-                                TextColor(hexa(0xffffff, 0.85)),
                                 Node {
-                                    flex_grow: 1.0,
-                                    align_self: AlignSelf::Center,
+                                    flex_direction: FlexDirection::Column,
+                                    row_gap: px(3),
+                                    padding: UiRect::new(px(12), px(12), px(10), px(12)),
                                     ..default()
                                 },
-                            ));
-                            card.spawn((
-                                Text::new(c.map_or("???".into(), |c| c.name.clone())),
-                                f.display(22.0, 900),
-                                TextColor(TEXT),
-                            ));
-                            card.spawn((
-                                Text::new(c.map_or(String::new(), |c| c.title.clone())),
-                                f.text(11.0, 500),
-                                TextColor(MUTED),
-                            ));
-                            card.spawn((
-                                Text::new(name(&p.player_id)),
-                                f.text(13.0, 700),
-                                TextColor(GOLD),
-                            ));
-                            let class = c.map_or("", |c| class_label(c.class));
-                            let sums = format!(
-                                "{class}   ·   {} / {}",
-                                summoner(p.summoners[0]).name,
-                                summoner(p.summoners[1]).name
-                            );
-                            card.spawn((Text::new(sums), f.text(10.0, 600), TextColor(MUTED)));
+                                BackgroundGradient::from(LinearGradient {
+                                    angle: PI,
+                                    stops: vec![
+                                        ColorStop::new(hexa(0x0a0c18, 0.9), percent(0)),
+                                        ColorStop::new(hex(0x05060c), percent(100)),
+                                    ],
+                                    ..default()
+                                }),
+                            ))
+                            .with_children(|meta| {
+                                meta.spawn((
+                                    Text::new(c.map_or("???".into(), |c| c.name.clone())),
+                                    f.display(20.0, 900),
+                                    TextColor(GOLD_HI),
+                                ));
+                                meta.spawn((
+                                    Text::new(c.map_or(String::new(), |c| c.title.clone())),
+                                    f.text(11.0, 500),
+                                    TextColor(MUTED),
+                                ));
+                                meta.spawn((
+                                    Text::new(name(&p.player_id)),
+                                    f.text(13.0, 700),
+                                    TextColor(TEXT),
+                                ));
+                                let class = c.map_or("", |c| class_label(c.class));
+                                let sums = format!(
+                                    "{class}   ·   {} / {}",
+                                    summoner(p.summoners[0]).name,
+                                    summoner(p.summoners[1]).name
+                                );
+                                meta.spawn((Text::new(sums), f.text(10.0, 600), TextColor(MUTED)));
+                            });
                         });
                     }
                 });

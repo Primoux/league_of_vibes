@@ -21,6 +21,7 @@ use super::rift::RiftBackground;
 use super::screen_root;
 use super::stage::{ChampionStage, StageView};
 use crate::net::{Connection, GameState, now_ms};
+use crate::ui::icons::{Artworks, ChampionPortrait, PortraitKind};
 use crate::ui::logic::format::{class_label, role_label};
 use crate::ui::theme::{GOLD, GOLD_HI, GOLD_LO, MUTED, PANEL, TEXT, css, hexa};
 use crate::ui::{ButtonLook, Screen, UiFonts, button, set_enabled};
@@ -126,6 +127,8 @@ enum Plate {
 struct Glow;
 #[derive(Component)]
 struct PlateBox;
+#[derive(Component)]
+struct StageArt;
 #[derive(Component)]
 struct Chip(usize);
 
@@ -367,6 +370,19 @@ fn on_enter(
                                 BackgroundGradient::default(),
                             ))
                             .with_children(|glow| {
+                                // illustration peinte en fond d'ambiance derrière la scène
+                                glow.spawn((
+                                    StageArt,
+                                    Node {
+                                        position_type: PositionType::Absolute,
+                                        right: percent(-8),
+                                        height: percent(100),
+                                        aspect_ratio: Some(1.0),
+                                        ..default()
+                                    },
+                                    ImageNode::default().with_color(hexa(0xffffff, 0.28)),
+                                    Pickable::IGNORE,
+                                ));
                                 glow.spawn((
                                     StageView(stage),
                                     Node {
@@ -438,11 +454,7 @@ fn on_enter(
                                         Chip(i),
                                         Act::Pick(i),
                                     ))
-                                    .with_child((
-                                        Text::new(c.name.chars().next().map(String::from).unwrap_or_default()),
-                                        f.display(22.0, 800),
-                                        TextColor(Color::WHITE),
-                                    ));
+                                    .with_child(ChampionPortrait::new(&c.id, PortraitKind::Round).sized(44.0));
                             }
                         });
                 });
@@ -609,6 +621,8 @@ fn drive_stage(
     mut stages: Query<&mut ChampionStage>,
     mut plates: Query<&mut BorderColor, With<PlateBox>>,
     mut backgrounds: Query<&mut RiftBackground>,
+    mut arts: Query<&mut ImageNode, With<StageArt>>,
+    artworks: Res<Artworks>,
 ) {
     let Some(champ) = CHAMPIONS.get(ui.featured % CHAMPIONS.len().max(1)) else {
         return;
@@ -619,6 +633,12 @@ fn drive_stage(
         }
         if stage.pulse != ui.pulse {
             stage.pulse = ui.pulse;
+        }
+    }
+    let art = artworks.faded(&champ.id).unwrap_or_default();
+    for mut node in &mut arts {
+        if node.image != art {
+            node.image = art.clone();
         }
     }
     for mut bg in &mut backgrounds {

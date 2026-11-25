@@ -15,6 +15,7 @@ use bevy::ui_widgets::Button;
 use crate::net::{Autoplay, GameState, now_ms};
 use lov_shared::protocol::RoomPhase;
 
+pub mod icons;
 pub mod lab;
 pub mod logic;
 pub mod screens;
@@ -211,7 +212,7 @@ impl Plugin for UiPlugin {
         app.insert_resource(Autoplay(forced))
             .init_state::<Screen>()
             .add_systems(Update, (follow_state, paint_buttons))
-            .add_plugins(screens::ScreensPlugin);
+            .add_plugins((icons::IconsPlugin, screens::ScreensPlugin));
     }
 
     /// Polices chargées avant le premier `OnEnter` (l'accueil s'affiche dès le démarrage).

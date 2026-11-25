@@ -16,6 +16,7 @@ pub mod loading;
 pub mod lobby;
 pub mod rift;
 pub mod stage;
+pub mod studio;
 
 /// Racine plein écran d'un écran, détruite en sortie d'état. Fond : dégradé radial sombre de
 /// `.lov-screen` (`#17112e` → `#04050c`). `layout` : disposition des enfants (taille et position sont
@@ -71,6 +72,7 @@ impl Plugin for ScreensPlugin {
             end::EndPlugin,
             stage::StagePlugin,
             rift::RiftPlugin,
+            studio::StudioPlugin,
         ));
     }
 }

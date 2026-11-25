@@ -7,6 +7,7 @@ Aucun asset, nom ou son provenant de Riot Games / League of Legends.
 |---|---|---|---|---|
 | Polices Cinzel et Inter (chargées depuis Google Fonts, non embarquées) | https://fonts.google.com/specimen/Cinzel · https://fonts.google.com/specimen/Inter | Natanael Gama · Rasmus Andersson | SIL OFL 1.1 (police autorisée par le plan UI) | mistral-ui |
 | `crates/lov-client/src/ui/screens/fonts/Cinzel.ttf`, `Inter.ttf` (embarquées dans le client natif, licences `*-OFL.txt` à côté) | https://github.com/google/fonts/tree/main/ofl/cinzel · https://github.com/google/fonts/tree/main/ofl/inter | The Cinzel Project Authors · The Inter Project Authors | SIL OFL 1.1 (mêmes polices que le client web ; embarquement permis par la licence, à valider par un mainteneur) | ayteyssi |
+| `crates/lov-client/src/ui/icons/champions/*.webp` (copies des illustrations de `client/src/assets/champions/`, prompts dans `manifest.json`) | Image originale générée pour le projet | codex-champions | Généré ; aucun asset tiers | ayteyssi |
 | `client/src/render/champions/melenchon.ts` | Géométrie Three.js originale, générée par code | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |
 | `client/src/fx/champions/melenchon.ts` | Micro, papiers, ondes et pancarte Canvas générés par code | codex-champions | Code du dépôt ; aucun asset tiers | codex-champions |
 | `client/src/assets/champions/grondak.webp` | Image originale générée pour le projet ; prompt dans manifest.json | codex-champions | Généré ; aucun asset tiers | codex-champions |

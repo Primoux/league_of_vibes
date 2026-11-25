@@ -15,6 +15,7 @@ use lov_shared::types::Team;
 use super::rift::RiftBackground;
 use super::{screen_root, team_color, team_name};
 use crate::net::{Connection, GameState};
+use crate::ui::icons::{ChampionPortrait, PortraitKind};
 use crate::ui::logic::format::{
     format_clock, format_gold_short, format_int, format_kda_ratio, mvp_score,
 };
@@ -269,17 +270,25 @@ fn row(
         .with_children(|row| {
             row.spawn(Node {
                 width: px(COLS[0]),
-                flex_direction: FlexDirection::Column,
+                column_gap: px(10),
+                align_items: AlignItems::Center,
                 ..default()
             })
-            .with_children(|who| {
-                let badge = if is_mvp { "   MVP" } else { "" };
-                who.spawn((
-                    Text::new(format!("{name}{badge}")),
-                    f.text(14.0, 800),
-                    TextColor(if is_mvp { GOLD_HI } else { TEXT }),
-                ));
-                who.spawn((Text::new(champ), f.text(11.0, 500), TextColor(MUTED)));
+            .with_children(|cell| {
+                cell.spawn(ChampionPortrait::new(&r.champion_id, PortraitKind::Round).sized(36.0));
+                cell.spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    ..default()
+                })
+                .with_children(|who| {
+                    let badge = if is_mvp { "   MVP" } else { "" };
+                    who.spawn((
+                        Text::new(format!("{name}{badge}")),
+                        f.text(14.0, 800),
+                        TextColor(if is_mvp { GOLD_HI } else { TEXT }),
+                    ));
+                    who.spawn((Text::new(champ), f.text(11.0, 500), TextColor(MUTED)));
+                });
             });
             row.spawn(Node {
                 width: px(COLS[1]),

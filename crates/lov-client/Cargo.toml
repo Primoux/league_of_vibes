@@ -10,5 +10,5 @@ workspace = true
 
 [dependencies]
 lov-shared = { path = "../lov-shared" }
-bevy = { version = "0.20.1", features = ["bevy_dev_tools", "render_dev_tools"] }
+bevy = { version = "0.20.1", features = ["bevy_dev_tools", "render_dev_tools", "webp"] }
 tungstenite = "0.30.0"
