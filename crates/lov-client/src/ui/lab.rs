@@ -1,11 +1,13 @@
 //! Atelier de l'interface : `LOV_UILAB=<écran>` affiche un écran avec des données fictives, sans serveur
-//! (`?uilab` du client web). Écrans : `accueil`, `salon`, `draft` ;
+//! (`?uilab` du client web). Écrans : `accueil`, `salon`, `draft`, `chargement`, `fin` ;
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 2 s, pour vérifier le rendu sans regarder la
 //! fenêtre.
 
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
-use lov_shared::protocol::{DraftPick, DraftState, LobbyPlayer, LobbyState, RoomPhase};
+use lov_shared::protocol::{
+    DraftPick, DraftState, GameOver, LobbyPlayer, LobbyState, PlayerStats, RoomPhase,
+};
 use lov_shared::types::{Role, SummonerId, Team};
 
 use crate::net::GameState;
@@ -98,6 +100,36 @@ pub fn demo_draft(server_now: f64) -> DraftState {
     }
 }
 
+/// Fin de partie fictive : victoire bleue en 27:42.
+pub fn demo_result() -> GameOver {
+    let row = |id: &str, champ: &str, team: Team, k: u32, d: u32, a: u32, cs: u32, dmg: f64| {
+        PlayerStats {
+            player_id: id.into(),
+            champion_id: champ.into(),
+            team,
+            kills: k,
+            deaths: d,
+            assists: a,
+            cs,
+            gold: f64::from(cs) * 21.0 + f64::from(k) * 300.0,
+            damage_to_champions: dmg,
+            items: vec![Some("long_sword".into()), Some("boots".into()), None],
+        }
+    };
+    GameOver {
+        winner: Team::Blue,
+        duration: 1662.0,
+        stats: vec![
+            row("p1", "ilyra", Team::Blue, 9, 2, 11, 182, 21450.0),
+            row("p2", "kaelen", Team::Blue, 6, 4, 8, 121, 14200.0),
+            row("p3", "solenne", Team::Blue, 1, 3, 17, 34, 6100.0),
+            row("p4", "grondak", Team::Red, 3, 6, 5, 140, 9800.0),
+            row("p5", "vrenna", Team::Red, 4, 5, 3, 166, 12900.0),
+            row("p7", "zephyr", Team::Red, 2, 5, 4, 150, 11000.0),
+        ],
+    }
+}
+
 fn fill(mut state: ResMut<GameState>) {
     let screen = requested().unwrap_or_default();
     state.player_id = Some("p1".into());
@@ -110,6 +142,19 @@ fn fill(mut state: ResMut<GameState>) {
             lobby.phase = RoomPhase::Draft;
             state.draft = Some(demo_draft(now));
         }
+        "chargement" => {
+            lobby.phase = RoomPhase::Loading;
+            let mut d = demo_draft(now);
+            for (p, c) in d.picks.iter_mut().zip([
+                "ilyra", "grondak", "vrenna", "kaelen", "solenne", "nyx", "zephyr",
+            ]) {
+                p.champion_id = Some(c.into());
+                p.locked = true;
+            }
+            state.draft = Some(d);
+            state.loading_ends_at = Some(now + 3500.0);
+        }
+        "fin" => state.result = Some(demo_result()),
         _ => return,
     }
     state.lobby = Some(lobby);
