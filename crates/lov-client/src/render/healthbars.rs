@@ -25,6 +25,7 @@ use bevy::render::render_resource::{
 use bevy::shader::ShaderRef;
 use lov_shared::types::{EntityId, EntityKind, EntitySnapshot, Team, TeamOrNeutral};
 
+use super::camera::MainCamera;
 use super::models::kit::hex;
 
 const SHADER: &str = "embedded://lov_client/render/healthbars.wesl";
@@ -309,7 +310,7 @@ pub(super) struct BarWorld<'w, 's> {
     materials: ResMut<'w, Assets<BarMaterial>>,
     bars: ResMut<'w, HealthBars>,
     window: Single<'w, 's, &'static Window>,
-    camera: Single<'w, 's, (&'static Camera, &'static GlobalTransform), With<Camera3d>>,
+    camera: Single<'w, 's, (&'static Camera, &'static GlobalTransform), With<MainCamera>>,
     nodes: Query<'w, 's, (&'static mut Node, &'static mut Visibility), Without<Text>>,
     texts: Query<'w, 's, &'static mut Text>,
     transforms: Query<'w, 's, &'static Transform>,
