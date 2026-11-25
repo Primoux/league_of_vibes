@@ -1,6 +1,11 @@
-//! Rendu de la carte : sol, murs, brousses.
+//! Rendu de la carte « Faille des Vibes » : portage de `packages/client/src/render/map/` (issue #108).
 //!
-//! Murs et brousses viennent de `lov_shared::map` (`WALLS`, `BRUSHES`).
+//! - `geometry` : relief du terrain (`terrain_height`), distances aux voies et à la rivière ;
+//! - `noise` : texture de bruit tuilable partagée par les shaders du décor ;
+//! - `masks` + `terrain` : sol avec relief, peint par shader (herbe, voies, sable, dallage, caustiques).
+//!
+//! Murs et brousses viennent de `lov_shared::map` (`WALLS`, `BRUSHES`) ; ils restent des prismes simples
+//! jusqu'au portage de la végétation (`vegetation.ts`).
 
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, PrimitiveTopology};
@@ -9,6 +14,11 @@ use bevy::prelude::*;
 use super::{from_shared, to_world};
 use lov_shared::constants;
 use lov_shared::map::{BRUSHES, WALLS};
+
+pub mod geometry;
+mod masks;
+pub mod noise;
+pub mod terrain;
 
 pub const MAP_SIZE: f32 = constants::MAP_SIZE as f32;
 const WALL_HEIGHT: f32 = 1.4;
@@ -71,7 +81,16 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_map);
+        bevy::asset::embedded_asset!(app, "terrain.wesl");
+        app.add_plugins(MaterialPlugin::<terrain::TerrainMaterial>::default())
+            .add_systems(
+                Startup,
+                (
+                    noise::create_noise_texture,
+                    (terrain::spawn_terrain, spawn_map),
+                )
+                    .chain(),
+            );
     }
 }
 
@@ -80,7 +99,6 @@ fn spawn_map(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let size = MAP_SIZE * super::RENDER_SCALE;
     let mut matte = |color: Color| {
         materials.add(StandardMaterial {
             base_color: color,
@@ -88,11 +106,6 @@ fn spawn_map(
             ..default()
         })
     };
-    commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(size, size))),
-        MeshMaterial3d(matte(Color::srgb(0.22, 0.33, 0.24))),
-        Transform::from_xyz(size / 2.0, 0.0, -size / 2.0),
-    ));
     commands.spawn((
         Mesh3d(meshes.add(prisms(&polygons(&WALLS), WALL_HEIGHT, true))),
         MeshMaterial3d(matte(Color::srgb(0.36, 0.37, 0.42))),
