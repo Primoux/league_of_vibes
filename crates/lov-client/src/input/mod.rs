@@ -34,6 +34,7 @@ use lov_shared::schema::Targeting as SpellTargeting;
 use lov_shared::types::{AbilitySlot, Cooldowns, EntityId, EntityKind, SummonerSlot, Vec2 as Pos};
 
 use crate::net::{Connection, GameState};
+use crate::render::camera::MainCamera;
 use crate::render::map::MAP_SIZE;
 use crate::render::{to_game, to_shared, to_world};
 use picking::{ray_cylinder, world_hitbox};
@@ -128,7 +129,7 @@ fn cursor_ray(window: &Window, camera: &Camera, transform: &GlobalTransform) -> 
 /// Sol et entité sous le curseur, chaque image (la caméra bouge).
 fn update_pointer(
     window: Single<&Window>,
-    camera: Single<(&Camera, &GlobalTransform), With<Camera3d>>,
+    camera: Single<(&Camera, &GlobalTransform), With<MainCamera>>,
     state: Res<GameState>,
     keys: Res<ButtonInput<KeyCode>>,
     mut input: ResMut<PlayerInput>,
