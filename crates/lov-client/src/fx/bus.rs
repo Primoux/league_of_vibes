@@ -19,6 +19,9 @@ use lov_shared::types::GameEvent;
 pub struct FxBus {
     /// Délai appliqué à la livraison normale (ms). 0 = livraison directe.
     pub delay_ms: f64,
+    /// Remplir la livraison immédiate. Désactivé par défaut : sans lecteur, chaque événement y serait
+    /// copié pour rien.
+    pub immediate_enabled: bool,
     queue: VecDeque<(f64, GameEvent)>,
     immediate: Vec<GameEvent>,
     ready: Vec<GameEvent>,
@@ -27,7 +30,9 @@ pub struct FxBus {
 impl FxBus {
     /// Reçoit un événement à l'instant `now` (ms).
     pub fn dispatch(&mut self, e: GameEvent, now: f64) {
-        self.immediate.push(e.clone());
+        if self.immediate_enabled {
+            self.immediate.push(e.clone());
+        }
         if self.delay_ms <= 0.0 {
             self.ready.push(e);
         } else {
@@ -93,6 +98,7 @@ mod tests {
     fn retarde_la_livraison_normale_pas_l_immediate() {
         let mut bus = FxBus {
             delay_ms: 100.0,
+            immediate_enabled: true,
             ..default()
         };
         let mut late = Vec::new();
@@ -120,11 +126,18 @@ mod tests {
 
     #[test]
     fn une_sortie_videe_ne_relivre_pas() {
-        let mut bus = FxBus::default();
+        let mut bus = FxBus {
+            immediate_enabled: true,
+            ..default()
+        };
         bus.dispatch(lvl(2), 0.0);
         let first = bus.take_ready();
         bus.recycle(first);
         assert!(bus.take_ready().is_empty());
         assert!(bus.take_immediate().len() == 1 && bus.take_immediate().is_empty());
+        // sans lecteur de la livraison immédiate, rien n'y est copié
+        let mut quiet = FxBus::default();
+        quiet.dispatch(lvl(3), 0.0);
+        assert!(quiet.take_immediate().is_empty());
     }
 }
