@@ -76,8 +76,6 @@ fn run_fx(world: &mut World) {
     let ready = {
         let mut bus = world.resource_mut::<FxBus>();
         bus.update(now_ms());
-        // personne ne lit encore la livraison immédiate : on la vide pour qu'elle ne grossisse pas
-        drop(bus.take_immediate());
         bus.take_ready()
     };
     for e in &ready {
@@ -93,4 +91,75 @@ fn run_fx(world: &mut World) {
 /// comme dans three.js, et laisse les objets transparents ordinaires (biais 0) dessinés avant les FX.
 pub(crate) fn render_order(order: f32) -> f32 {
     order * 1.0e5
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    use lov_shared::types::{GameEvent, Vec2};
+
+    use super::core::palette::FxColors;
+    use super::core::runtime::{Effect, Fx};
+    use super::registry::{FxHandlers, RegisterFx};
+    use super::*;
+
+    static AREAS: AtomicU32 = AtomicU32::new(0);
+    static TICKS: AtomicU32 = AtomicU32::new(0);
+    static LATER: AtomicU32 = AtomicU32::new(0);
+
+    struct Tick;
+    impl Effect for Tick {
+        fn update(&mut self, _: &mut Fx, _: f32) -> bool {
+            TICKS.fetch_add(1, Ordering::Relaxed);
+            true
+        }
+    }
+
+    fn area(fx: &mut Fx, e: &GameEvent, _: &FxColors) {
+        if matches!(e, GameEvent::AreaEffect { .. }) {
+            AREAS.fetch_add(1, Ordering::Relaxed);
+            fx.add(Tick);
+            fx.after(0.0, |_| {
+                LATER.fetch_add(1, Ordering::Relaxed);
+            });
+        }
+    }
+
+    /// `ServerEvent` → bus → dispatcher → handler → effet et minuteur, avec les vrais systèmes de
+    /// `FxPlugin`, dans une application sans rendu.
+    #[test]
+    fn un_evenement_du_reseau_traverse_toute_la_chaine() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_message::<ServerEvent>()
+            .add_message::<CameraShake>()
+            .init_resource::<FxRuntime>()
+            .init_resource::<FxDispatcher>()
+            .init_resource::<FxBus>()
+            .add_systems(Update, (collect_events, run_fx).chain())
+            .register_fx(
+                "chaine_q",
+                FxHandlers {
+                    area: Some(area),
+                    ..default()
+                },
+            );
+        app.update();
+        app.world_mut()
+            .write_message(ServerEvent(GameEvent::AreaEffect {
+                source: 1,
+                fx_key: "chaine_q".into(),
+                pos: Vec2 { x: 0.0, y: 0.0 },
+                radius: 100.0,
+                duration: 0.5,
+            }));
+        app.update();
+        app.update();
+        assert_eq!(AREAS.load(Ordering::Relaxed), 1);
+        assert!(TICKS.load(Ordering::Relaxed) >= 1, "l'effet tourne");
+        assert_eq!(LATER.load(Ordering::Relaxed), 1, "la tâche est partie");
+        assert_eq!(app.world().resource::<FxDispatcher>().stats.custom, 1);
+        assert_eq!(app.world().resource::<FxRuntime>().active_effects(), 1);
+    }
 }

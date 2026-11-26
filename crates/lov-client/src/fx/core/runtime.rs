@@ -10,7 +10,9 @@
 //! - les systèmes de meshes instanciés (`bursts`, `effects/meshBursts.ts`) relèvent de l'area fx-effects ;
 //! - le tremblement de caméra est publié en message [`CameraShake`] : la caméra ne l'applique pas encore ;
 //! - les sprites ne désactivent pas le test de profondeur (`depthTest: false` du web) : le matériau
-//!   standard de Bevy ne le permet pas.
+//!   standard de Bevy ne le permet pas ;
+//! - le runtime n'est pas remis à zéro entre deux parties (le web le recrée à chaque `installFx`) ;
+//! - un effet ajouté par une tâche du minuteur fait sa première mise à jour à l'image suivante.
 
 use std::collections::HashMap;
 
@@ -22,7 +24,6 @@ use super::entities::EntityTracker;
 use super::palette::{FxColors, palette_for_key};
 use super::scheduler::Scheduler;
 use crate::fx::particles::{ParticleSystem, StdStyles};
-use crate::fx::render_order;
 use crate::fx::shaders::{
     DecalMaterial, DecalMesh, GroundDecal, Ribbon, RibbonMaterial, RibbonMode,
 };
@@ -432,7 +433,9 @@ impl<'w> Fx<'w> {
                         base_color_texture: Some(glow),
                         unlit: true,
                         alpha_mode: AlphaMode::Add,
-                        depth_bias: render_order(13.0),
+                        // pas de `depth_bias` : sur `StandardMaterial`, c'est un vrai biais de profondeur
+                        // du pipeline, pas une simple clé de tri ; le mélange additif ne dépend pas de
+                        // l'ordre de dessin
                         double_sided: true,
                         cull_mode: None,
                         ..default()
