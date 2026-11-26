@@ -61,6 +61,16 @@ impl<C> Scheduler<C> {
     pub fn clear(&mut self) {
         self.tasks.clear();
     }
+
+    /// Reprend les tâches d'un autre minuteur, en gardant leur délai restant. Sert au runtime FX, qui
+    /// sort son minuteur pendant qu'il l'avance : ce qui est planifié entre-temps va dans un minuteur vide.
+    pub fn absorb(&mut self, other: Scheduler<C>) {
+        let shift = self.now - other.now;
+        self.tasks.extend(other.tasks.into_iter().map(|t| Task {
+            at: t.at + shift,
+            f: t.f,
+        }));
+    }
 }
 
 #[cfg(test)]
