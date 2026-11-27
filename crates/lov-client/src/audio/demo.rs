@@ -3,7 +3,8 @@
 //! Rejoue en boucle une galerie de sons, un toutes les 1,2 s, et écrit son nom dans la console : les
 //! quatre formes d'onde, glissements, filtres de bruit, une recette d'ult portée du client web, la
 //! spatialisation (le même coup de plus en plus loin) et une rafale qui bute sur la polyphonie ; puis la
-//! galerie de musique : chaque instrument sur un bus du canal Musique, et les jingles d'élimination.
+//! galerie de musique : chaque instrument sur un bus du canal Musique, puis les jingles d'élimination sur un
+//! bus du canal Voix.
 
 use bevy::prelude::*;
 use lov_shared::types::Vec2 as GameVec2;
@@ -189,6 +190,7 @@ const GALLERY: &[Entry] = &[
 ];
 
 /// Une entrée de la galerie de musique : nom, durée avant la suivante, phrase jouée à l'instant `t`.
+/// Les noms en « jingle » passent par un bus du canal Voix au gain global 1, comme dans `sounds.ts`.
 type MusicEntry = (&'static str, f32, fn(&mut Score, f64));
 
 const MUSIC: &[MusicEntry] = &[
@@ -241,31 +243,31 @@ const MUSIC: &[MusicEntry] = &[
             kalimba(s, n, t + 0.4 + i as f64 * 0.45, 0.03);
         }
     }),
-    ("premier sang (allié)", 3.6, |s, t| {
+    ("jingle : premier sang (allié)", 3.6, |s, t| {
         first_blood_sting(s, t, StingSide::Ally)
     }),
-    ("premier sang (ennemi)", 3.6, |s, t| {
+    ("jingle : premier sang (ennemi)", 3.6, |s, t| {
         first_blood_sting(s, t, StingSide::Enemy)
     }),
-    ("kill simple (allié)", 1.8, |s, t| {
+    ("jingle : kill simple (allié)", 1.8, |s, t| {
         kill_sting(s, t, 0, StingSide::Ally)
     }),
-    ("double kill (soi)", 2.0, |s, t| {
+    ("jingle : double kill (soi)", 2.0, |s, t| {
         kill_sting(s, t, 2, StingSide::Own)
     }),
-    ("triple kill (allié)", 2.6, |s, t| {
+    ("jingle : triple kill (allié)", 2.6, |s, t| {
         kill_sting(s, t, 4, StingSide::Ally)
     }),
-    ("triple kill (ennemi)", 2.6, |s, t| {
+    ("jingle : triple kill (ennemi)", 2.6, |s, t| {
         kill_sting(s, t, 4, StingSide::Enemy)
     }),
-    ("quadra kill (soi)", 3.0, |s, t| {
+    ("jingle : quadra kill (soi)", 3.0, |s, t| {
         kill_sting(s, t, 6, StingSide::Own)
     }),
-    ("penta kill (soi)", 3.6, |s, t| {
+    ("jingle : penta kill (soi)", 3.6, |s, t| {
         kill_sting(s, t, 8, StingSide::Own)
     }),
-    ("série légendaire (soi)", 4.0, |s, t| {
+    ("jingle : série légendaire (soi)", 4.0, |s, t| {
         kill_sting(s, t, 9, StingSide::Own)
     }),
 ];
@@ -274,7 +276,8 @@ const MUSIC: &[MusicEntry] = &[
 struct Lab {
     due: f32,
     index: usize,
-    bus: Option<MusicBusHandle>,
+    music: Option<MusicBusHandle>,
+    stings: Option<MusicBusHandle>,
 }
 
 fn replay(time: Res<Time>, mut audio: ResMut<AudioManager>, mut lab: Local<Lab>) {
@@ -295,22 +298,49 @@ fn replay(time: Res<Time>, mut audio: ResMut<AudioManager>, mut lab: Local<Lab>)
     };
     lab.due = time.elapsed_secs() + period;
     info!("audiolab : musique — {name}");
-    let bus = match &lab.bus {
+    let jingle = name.starts_with("jingle");
+    let slot = if jingle {
+        &mut lab.stings
+    } else {
+        &mut lab.music
+    };
+    let bus = match slot {
         Some(bus) => bus.clone(),
         None => {
-            let bus = audio.music_bus(Channel::Music);
-            audio.bus(
-                &bus,
+            let bus = audio.music_bus(if jingle {
+                Channel::Voice
+            } else {
+                Channel::Music
+            });
+            let open = if jingle {
+                BusCommand::SetMaster(1.0)
+            } else {
                 BusCommand::Fade {
                     to: 0.95,
                     seconds: 0.3,
-                },
-            );
-            lab.bus = Some(bus.clone());
+                }
+            };
+            audio.bus(&bus, open);
+            *slot = Some(bus.clone());
             bus
         }
     };
     let mut score = Score::new();
     play(&mut score, bus.current_time() + 0.05);
     audio.bus(&bus, BusCommand::Play(score));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chaque_entree_de_la_galerie_de_musique_programme_des_notes() {
+        for &(name, period, play) in MUSIC {
+            let mut s = Score::new();
+            play(&mut s, 1.0);
+            assert!(!s.is_empty(), "{name}");
+            assert!(s.end() > 1.0 && period > 1.0, "{name}");
+        }
+    }
 }

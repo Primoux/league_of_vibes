@@ -401,6 +401,20 @@ mod tests {
     }
 
     #[test]
+    fn le_gestionnaire_cree_et_pilote_un_bus_de_musique() {
+        let (mut am, rx) = AudioManager::for_tests();
+        let bus = am.music_bus(Channel::Voice);
+        let mut score = music::Score::new();
+        music::stings::kill_sting(&mut score, 0.05, 0, music::stings::StingSide::Ally);
+        am.bus(&bus, BusCommand::SetMaster(1.0));
+        am.bus(&bus, BusCommand::Play(score));
+        let mut s = Stream::new(Some(rx));
+        let samples: Vec<f32> = s.by_ref().take(SAMPLE_RATE as usize).collect();
+        assert!(samples.iter().any(|x| x.abs() > 0.01), "jingle audible");
+        assert!(bus.current_time() > 0.49, "horloge du bus publiée");
+    }
+
+    #[test]
     fn la_distance_attenue_le_gain_de_l_effet() {
         let (mut am, rx) = AudioManager::for_tests();
         am.set_listener(GameVec2 { x: 0.0, y: 0.0 });

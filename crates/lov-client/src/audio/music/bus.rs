@@ -116,8 +116,9 @@ impl PingPong {
 
 /// `DynamicsCompressorNode` (seuil −16 dB, genou 12 dB, rapport 3,5, attaque 10 ms, relâchement 300 ms).
 ///
-/// Courbe statique et gain de rattrapage de l'implémentation de référence (Chromium) : genou
-/// exponentiel calé sur la pente `1 / ratio`, rattrapage `(1 / courbe(1))^0.6`. Écart : la dynamique est
+/// Courbe statique de la spécification : identité sous le seuil, pente `1 / ratio` après le genou ; la
+/// forme du genou, laissée au navigateur, est celle de Chromium (exponentielle calée sur la pente
+/// `1 / ratio`). Gain de rattrapage de la spécification : `(1 / courbe(1))^0.6`. Écart : la dynamique est
 /// un simple lissage attaque / relâchement du gain, sans l'anticipation de 6 ms ni le relâchement adaptatif.
 #[derive(Debug)]
 struct Compressor {

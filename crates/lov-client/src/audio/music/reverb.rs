@@ -430,6 +430,21 @@ mod tests {
     }
 
     #[test]
+    fn la_reverb_du_bus_rend_exactement_l_impulsion_de_3_2_s() {
+        let ir = make_impulse(IMPULSE_SECONDS, IMPULSE_DECAY);
+        let scale = normalization_scale(&ir);
+        let mut verb = Reverb::default();
+        for i in 0..ir[0].len() + BLOCK {
+            let [l, r] = verb.process(if i == 0 { 1.0 } else { 0.0 });
+            let want = |ch: usize| ir[ch].get(i).map_or(0.0, |s| s * scale);
+            assert!(
+                (l - want(0)).abs() < 1e-6 && (r - want(1)).abs() < 1e-6,
+                "[{i}]"
+            );
+        }
+    }
+
+    #[test]
     fn la_reverb_rend_l_impulsion_normalisee_sans_latence() {
         // impulsion courte au même pré-délai, pour un test rapide
         let ir = make_impulse(0.1, IMPULSE_DECAY);

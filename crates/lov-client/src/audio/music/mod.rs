@@ -183,6 +183,21 @@ mod tests {
     }
 
     #[test]
+    fn une_note_en_retard_part_tout_de_suite() {
+        let (mut bus, _) = MusicBus::new(4);
+        bus.command(BusCommand::SetMaster(1.0));
+        render_bus(&mut bus, 0.5);
+        let mut s = Score::new();
+        bass(&mut s, 45, 0.4, 1.0, 0.12);
+        bus.command(BusCommand::Play(s));
+        let out = render_bus(&mut bus, 0.05);
+        assert!(
+            out.iter().any(|x| x.abs() > 0.01),
+            "jouée dès le premier bloc"
+        );
+    }
+
+    #[test]
     fn le_fondu_part_de_la_valeur_courante() {
         let (mut bus, _) = MusicBus::new(2);
         let level = |bus: &mut MusicBus| {
