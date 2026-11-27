@@ -22,7 +22,7 @@ use crate::fx::effects::primitives::{
 };
 use crate::fx::registry::{FxHandlers, ProjectileHandle, RegisterFx};
 use crate::render::camera::MainCamera;
-use crate::render::champions::melenchon::spawn_melenchon;
+use crate::render::champions::melenchon::{HOLOGRAM_ID, spawn_melenchon};
 use crate::render::views::EntityView;
 use crate::ui::UiFonts;
 
@@ -146,12 +146,70 @@ fn papers(fx: &mut Fx, at: Vec3, count: usize) {
 const SIGN_W: f32 = 5.4;
 const SIGN_H: f32 = 1.35;
 
+/// Taille de mise en page de la pancarte (px logiques), fixée une fois pour toutes : le texte garde
+/// une seule taille de police (bevy_text crée un atlas de glyphes par taille et ne le libère jamais),
+/// et la pancarte est mise à l'échelle de sa projection par son `UiTransform`.
+const LAYOUT_H: f32 = 128.0;
+const LAYOUT_W: f32 = LAYOUT_H * SIGN_W / SIGN_H;
+/// Police : 60/256 de la hauteur, comme le canvas du web.
+const FONT_SIZE: f32 = 30.0;
+
+/// Fond de la pancarte et encre du texte (sRGB).
+const INK: [f32; 3] = [1.0, 246.0 / 255.0, 229.0 / 255.0];
+const BOARD: [f32; 3] = [17.0 / 255.0, 28.0 / 255.0, 50.0 / 255.0];
+
+type CameraQuery = QueryState<(&'static Camera, &'static GlobalTransform), With<MainCamera>>;
+
 struct Proclamation {
     root: Entity,
     stripes: [Entity; 3],
     lines: [Entity; 2],
     at: Vec3,
     t: f32,
+    colors: [Vec3; 3],
+    /// Dernière opacité écrite : les couleurs ne sont réécrites que quand elle change.
+    opacity: f32,
+    camera: CameraQuery,
+}
+
+impl Proclamation {
+    /// Place la pancarte : centre à l'écran `at` (px), `ppu` pixels par unité du monde.
+    fn place(&mut self, world: &mut World, placed: Option<(Vec2, f32)>, opacity: f32) {
+        let Some((at, ppu)) = placed else {
+            if let Some(mut v) = world.get_mut::<Visibility>(self.root) {
+                v.set_if_neq(Visibility::Hidden);
+            }
+            return;
+        };
+        let scale = SIGN_H * ppu / LAYOUT_H;
+        let transform = UiTransform {
+            translation: Val2::px(at.x - LAYOUT_W / 2.0, at.y - LAYOUT_H / 2.0),
+            scale: Vec2::splat(scale),
+            ..default()
+        };
+        if let Some(mut tf) = world.get_mut::<UiTransform>(self.root) {
+            tf.set_if_neq(transform);
+        }
+        if opacity != self.opacity {
+            self.opacity = opacity;
+            if let Some(mut bg) = world.get_mut::<BackgroundColor>(self.root) {
+                bg.0 = Color::srgba(BOARD[0], BOARD[1], BOARD[2], opacity);
+            }
+            for (e, c) in self.stripes.iter().zip(self.colors) {
+                if let Some(mut bg) = world.get_mut::<BackgroundColor>(*e) {
+                    bg.0 = rgba(c, opacity);
+                }
+            }
+            for e in self.lines {
+                if let Some(mut c) = world.get_mut::<TextColor>(e) {
+                    c.0 = Color::srgba(INK[0], INK[1], INK[2], opacity);
+                }
+            }
+        }
+        if let Some(mut v) = world.get_mut::<Visibility>(self.root) {
+            v.set_if_neq(Visibility::Inherited);
+        }
+    }
 }
 
 impl Effect for Proclamation {
@@ -161,50 +219,14 @@ impl Effect for Proclamation {
         let opacity = (t * 10.0).min((1.0 - t) * 5.0).clamp(0.0, 1.0);
         let anchor = self.at + Vec3::Y * (3.4 + t * 0.45);
         let world = fx.world();
-        let placed = {
-            let mut q = world.query_filtered::<(&Camera, &GlobalTransform), With<MainCamera>>();
-            q.iter(world).next().and_then(|(camera, tf)| {
-                let at = camera.world_to_viewport(tf, anchor).ok()?;
-                let side = camera
-                    .world_to_viewport(tf, anchor + tf.right() * 1.0)
-                    .ok()?;
-                Some((at, (side - at).length()))
-            })
-        };
-        if let Some((at, ppu)) = placed {
-            let (w, h) = (SIGN_W * ppu, SIGN_H * ppu);
-            if let Some(mut node) = world.get_mut::<Node>(self.root) {
-                node.left = Val::Px(at.x - w / 2.0);
-                node.top = Val::Px(at.y - h / 2.0);
-                node.width = Val::Px(w);
-                node.height = Val::Px(h);
-                node.padding = UiRect::top(Val::Px(h * 0.04));
-            }
-            if let Some(mut bg) = world.get_mut::<BackgroundColor>(self.root) {
-                bg.0 = Color::srgba(17.0 / 255.0, 28.0 / 255.0, 50.0 / 255.0, opacity);
-            }
-            for (i, e) in self.stripes.iter().enumerate() {
-                if let Some(mut bg) = world.get_mut::<BackgroundColor>(*e) {
-                    bg.0 = rgba(colors()[i], opacity);
-                }
-                if let Some(mut node) = world.get_mut::<Node>(*e) {
-                    node.height = Val::Px(h * 7.0 / 256.0);
-                }
-            }
-            for e in self.lines {
-                if let Some(mut font) = world.get_mut::<TextFont>(e) {
-                    font.font_size = (h * 60.0 / 256.0).into();
-                }
-                if let Some(mut c) = world.get_mut::<TextColor>(e) {
-                    c.0 = Color::srgba(1.0, 246.0 / 255.0, 229.0 / 255.0, opacity);
-                }
-            }
-            if let Some(mut v) = world.get_mut::<Visibility>(self.root) {
-                v.set_if_neq(Visibility::Inherited);
-            }
-        } else if let Some(mut v) = world.get_mut::<Visibility>(self.root) {
-            v.set_if_neq(Visibility::Hidden);
-        }
+        let placed = self.camera.iter(world).next().and_then(|(camera, tf)| {
+            let at = camera.world_to_viewport(tf, anchor).ok()?;
+            let side = camera
+                .world_to_viewport(tf, anchor + tf.right() * 1.0)
+                .ok()?;
+            Some((at, (side - at).length()))
+        });
+        self.place(world, placed, opacity);
         self.t < 1.0
     }
 
@@ -215,21 +237,26 @@ impl Effect for Proclamation {
     }
 }
 
-fn proclamation(fx: &mut Fx, at: Vec3) {
-    let font = fx
-        .world()
-        .get_resource::<UiFonts>()
-        .map(|f| f.display(24.0, 700));
-    let world = fx.world();
+fn spawn_proclamation(world: &mut World, at: Vec3) -> Proclamation {
+    let font = world.get_resource::<UiFonts>().map_or_else(
+        || TextFont::from_font_size(FONT_SIZE),
+        |f| f.display(FONT_SIZE, 700),
+    );
     let root = world
         .spawn((
             Name::new("fx-melenchon-pancarte"),
             Node {
                 position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                top: Val::Px(0.0),
+                width: Val::Px(LAYOUT_W),
+                height: Val::Px(LAYOUT_H),
+                padding: UiRect::top(Val::Px(LAYOUT_H * 0.04)),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 ..default()
             },
+            UiTransform::IDENTITY,
             BackgroundColor(Color::NONE),
             GlobalZIndex(-4),
             Visibility::Hidden,
@@ -245,6 +272,7 @@ fn proclamation(fx: &mut Fx, at: Vec3) {
                 flex_direction: FlexDirection::Row,
                 ..default()
             },
+            Pickable::IGNORE,
             ChildOf(root),
         ))
         .id();
@@ -253,9 +281,11 @@ fn proclamation(fx: &mut Fx, at: Vec3) {
             .spawn((
                 Node {
                     flex_grow: 1.0,
+                    height: Val::Px(LAYOUT_H * 7.0 / 256.0),
                     ..default()
                 },
                 BackgroundColor(Color::NONE),
+                Pickable::IGNORE,
                 ChildOf(band),
             ))
             .id()
@@ -264,24 +294,32 @@ fn proclamation(fx: &mut Fx, at: Vec3) {
         world
             .spawn((
                 Text::new(text),
-                font.clone()
-                    .unwrap_or_else(|| TextFont::from_font_size(24.0)),
+                font.clone(),
                 TextColor(Color::NONE),
                 Node {
                     margin: UiRect::top(Val::Percent(1.0)),
                     ..default()
                 },
+                Pickable::IGNORE,
                 ChildOf(root),
             ))
             .id()
     });
-    fx.add(Proclamation {
+    Proclamation {
         root,
         stripes,
         lines,
         at,
         t: 0.0,
-    });
+        colors: colors(),
+        opacity: -1.0,
+        camera: world.query_filtered(),
+    }
+}
+
+fn proclamation(fx: &mut Fx, at: Vec3) {
+    let p = spawn_proclamation(fx.world(), at);
+    fx.add(p);
 }
 
 // ---------------------------------------------------------------------------------- Q
@@ -437,7 +475,9 @@ fn e_area(fx: &mut Fx, e: &GameEvent, c: &FxColors) {
     }
 }
 
-/// Hologramme du tribun qui harangue à l'endroit visé pendant le délai.
+/// Hologramme du tribun qui harangue à l'endroit visé pendant le délai. Il ne prend de la source
+/// que son orientation : sans identifiant serveur, il ne reçoit aucun de ses événements, et il s'anime
+/// sur un snapshot synthétique (vivant, sans buff), comme le clone du web.
 fn spawn_hologram(fx: &mut Fx, source: EntityId, at: Vec3) -> Entity {
     let facing = fx
         .world()
@@ -460,7 +500,7 @@ fn spawn_hologram(fx: &mut Fx, source: EntityId, at: Vec3) -> Entity {
                 &mut meshes,
                 &mut materials,
                 root,
-                source,
+                HOLOGRAM_ID,
                 TeamOrNeutral::Blue,
                 true,
             )
@@ -637,6 +677,100 @@ mod tests {
         }
         assert_eq!(w.resource::<FxRuntime>().active_effects(), 0);
         assert_eq!(named(&mut w), 0, "plus rien à l'écran");
+    }
+
+    #[test]
+    fn la_pancarte_garde_une_seule_taille_de_police() {
+        let mut w = fx_world();
+        let mut p = spawn_proclamation(&mut w, Vec3::ZERO);
+        let mut sizes = std::collections::HashSet::new();
+        let mut scales = std::collections::HashSet::new();
+        let mut opacity_writes = 0;
+        // toute la durée (2 s à 60 i/s), la projection varie à chaque image (montée, perspective)
+        for i in 0..=120 {
+            let t = i as f32 / 120.0;
+            let ppu = 30.0 + 40.0 * t + (i as f32 * 0.37).sin() * 3.0;
+            let opacity = (t * 10.0).min((1.0 - t) * 5.0).clamp(0.0, 1.0);
+            let before = p.opacity;
+            p.place(
+                &mut w,
+                Some((Vec2::new(400.0, 300.0 - 50.0 * t), ppu)),
+                opacity,
+            );
+            opacity_writes += usize::from(p.opacity != before);
+            for e in p.lines {
+                let f = w.get::<TextFont>(e).map(|f| f.font_size);
+                sizes.insert(format!("{f:?}"));
+            }
+            if let Some(tf) = w.get::<UiTransform>(p.root) {
+                scales.insert(tf.scale.x.to_bits());
+            }
+        }
+        assert_eq!(sizes.len(), 1, "une seule taille de police : {sizes:?}");
+        assert!(
+            scales.len() > 100,
+            "la pancarte suit sa projection par l'échelle"
+        );
+        assert!(
+            opacity_writes < 40,
+            "couleurs réécrites à chaque image : {opacity_writes}"
+        );
+        let node = w.get::<Node>(p.root).map(|n| n.width);
+        assert_eq!(node, Some(Val::Px(LAYOUT_W)), "mise en page fixe");
+    }
+
+    #[test]
+    fn l_hologramme_ignore_la_source() {
+        use crate::render::champions::melenchon::{MelenchonView, animate_melenchon};
+        use bevy::ecs::system::RunSystemOnce;
+        use lov_shared::types::{BuffSnapshot, EntityKind, EntitySnapshot};
+        let mut w = fx_world();
+        // la vraie source : morte et sous l'ult ; l'hologramme ne doit hériter de rien
+        let source = EntitySnapshot {
+            id: 5,
+            kind: EntityKind::Champion,
+            team: TeamOrNeutral::Blue,
+            x: 0.0,
+            y: 0.0,
+            facing: 1.0,
+            hp: 0.0,
+            max_hp: 1.0,
+            mana: None,
+            max_mana: None,
+            shield: None,
+            dead: Some(true),
+            subtype: Some("melenchon".into()),
+            owner_id: None,
+            level: None,
+            anim: None,
+            buffs: Some(vec![BuffSnapshot {
+                id: "melenchon_r".into(),
+                remaining: 5.0,
+                stacks: None,
+            }]),
+            champ: None,
+        };
+        let mut state = crate::net::GameState::default();
+        state.buffer.entities.insert(5, source);
+        w.insert_resource(state);
+        w.init_resource::<Time>();
+        let root = spawn_hologram(&mut Fx::new(&mut w), 5, Vec3::ZERO);
+        let id = w.get::<MelenchonView>(root).map(|m| m.id);
+        assert_eq!(
+            id,
+            Some(HOLOGRAM_ID),
+            "aucun id serveur : aucun événement routé"
+        );
+        let before = w
+            .get::<MelenchonView>(root)
+            .map(|m| format!("{:?}", m.state));
+        w.resource_mut::<Time>()
+            .advance_by(std::time::Duration::from_millis(50));
+        assert!(w.run_system_once(animate_melenchon).is_ok());
+        let after = w
+            .get::<MelenchonView>(root)
+            .map(|m| format!("{:?}", m.state));
+        assert_ne!(before, after, "animé sans le snapshot de la source");
     }
 
     #[test]
