@@ -1,0 +1,36 @@
+# Mises à jour des dépendances : une PR groupée par semaine et par écosystème, plus les alertes de
+# sécurité dès qu'elles paraissent. Relire comme une PR `infra` (AGENTS.md) : changelog des crates,
+# CI verte, et `cargo deny`/clippy si une API a bougé.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: [area:infra]
+    commit-message:
+      prefix: "chore(infra)"
+    groups:
+      crates-mineures:
+        update-types: [minor, patch]
+    # Bevy et wgpu changent d'API à chaque version majeure : montée faite à la main, dans une PR dédiée.
+    ignore:
+      - dependency-name: "bevy*"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+      - dependency-name: "wgpu*"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    labels: [area:infra]
+    commit-message:
+      prefix: "chore(infra)"
+    groups:
+      actions:
+        patterns: ["*"]
