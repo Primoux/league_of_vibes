@@ -17,6 +17,7 @@
 //! La caméra (Espace, Y, flèches, molette) reste dans `render::camera`. Les champs que l'interface et
 //! les FX lisent (ciblage en cours, entité survolée, panneaux ouverts) sont dans [`PlayerInput`].
 
+pub mod markers;
 pub mod picking;
 pub mod rules;
 
@@ -82,6 +83,8 @@ pub struct PlayerInput {
     right_held: bool,
     since_follow: f32,
     last_follow: Option<Pos>,
+    /// Ordres de l'image à marquer au sol ([`markers`]).
+    clicks: Vec<markers::ClickMark>,
 }
 
 pub struct InputPlugin;
@@ -89,10 +92,17 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerInput>()
-            .add_systems(Startup, confine_cursor)
+            .init_resource::<markers::MarkerCursor>()
+            .add_systems(Startup, (confine_cursor, markers::spawn_markers))
             .add_systems(
                 Update,
-                (update_pointer, mouse_orders, key_orders, update_cursor_icon)
+                (
+                    update_pointer,
+                    mouse_orders,
+                    key_orders,
+                    update_cursor_icon,
+                    markers::update_markers,
+                )
                     .chain()
                     .after(crate::render::camera::drive_camera),
             )
@@ -205,6 +215,7 @@ fn confirm(t: Targeting, state: &GameState, input: &mut PlayerInput, conn: &Conn
             None => {
                 if let Some(pos) = pos {
                     conn.send(ClientMsg::AttackMove { pos });
+                    input.clicks.push(markers::ClickMark { pos, attack: true });
                 }
             }
         },
@@ -319,8 +330,14 @@ fn mouse_orders(
         set_targeting(&mut input, None);
         if let Some(target_id) = enemy_hover(&state, &input) {
             conn.send(ClientMsg::Attack { target_id });
+            // marqueur rouge sous la cible, comme `markers.spawn(hoverEntity())` du web
+            if let Some(p) = state.pose(target_id) {
+                let pos = Pos { x: p.x, y: p.y };
+                input.clicks.push(markers::ClickMark { pos, attack: true });
+            }
         } else if let Some(pos) = input.cursor {
             conn.send(ClientMsg::Move { pos });
+            input.clicks.push(markers::ClickMark { pos, attack: false });
             input.right_held = true;
             input.since_follow = 0.0;
             input.last_follow = Some(pos);
@@ -688,6 +705,70 @@ mod tests {
         input.hover = Some(1);
         confirm(Targeting::AttackMove, &state, &mut input, &conn);
         assert!(matches!(sent.try_recv(), Ok(ClientMsg::AttackMove { .. })));
+    }
+
+    /// #273 : clic droit au sol → marqueur vert ; attaque-déplacement au sol → rouge ; le marqueur
+    /// se pose, puis s'éteint au bout de 0,45 s.
+    #[test]
+    fn les_ordres_au_sol_posent_un_marqueur() {
+        use bevy::ecs::system::RunSystemOnce;
+        let (state, mut input, conn, _sent) = setup();
+        let ground = input.cursor.expect("curseur au sol");
+        confirm(Targeting::AttackMove, &state, &mut input, &conn);
+        assert_eq!(
+            input.clicks,
+            [markers::ClickMark {
+                pos: ground,
+                attack: true
+            }]
+        );
+        // l'ennemi survolé est attaqué : pas de marqueur au sol
+        input.clicks.clear();
+        input.hover = Some(2);
+        confirm(Targeting::AttackMove, &state, &mut input, &conn);
+        assert!(input.clicks.is_empty());
+        input.hover = None;
+
+        let mut world = World::new();
+        world.init_resource::<Assets<Mesh>>();
+        world.init_resource::<Assets<StandardMaterial>>();
+        world.init_resource::<markers::MarkerCursor>();
+        let mut buttons = ButtonInput::<MouseButton>::default();
+        buttons.press(MouseButton::Right);
+        world.insert_resource(buttons);
+        world.insert_resource(ButtonInput::<KeyCode>::default());
+        world.insert_resource(state);
+        world.insert_resource(conn);
+        world.insert_resource(Time::<()>::default());
+        world.insert_resource(input);
+        assert!(world.run_system_once(markers::spawn_markers).is_ok());
+        assert!(world.run_system_once(mouse_orders).is_ok());
+        assert_eq!(
+            world.resource::<PlayerInput>().clicks,
+            [markers::ClickMark {
+                pos: ground,
+                attack: false
+            }]
+        );
+        assert!(world.run_system_once(markers::update_markers).is_ok());
+        assert!(world.resource::<PlayerInput>().clicks.is_empty());
+        let shown = |world: &mut World| {
+            world
+                .query::<(&Visibility, &Transform)>()
+                .iter(world)
+                .filter(|(v, _)| **v != Visibility::Hidden)
+                .map(|(_, t)| t.translation)
+                .collect::<Vec<_>>()
+        };
+        let on = shown(&mut world);
+        assert_eq!(on.len(), 1);
+        assert_eq!(on[0], markers::marker_pos(ground));
+        // 0,45 s plus tard, il est éteint
+        world
+            .resource_mut::<Time>()
+            .advance_by(std::time::Duration::from_millis(460));
+        assert!(world.run_system_once(markers::update_markers).is_ok());
+        assert!(shown(&mut world).is_empty());
     }
 
     #[test]
