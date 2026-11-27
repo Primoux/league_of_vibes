@@ -296,7 +296,7 @@ pub const MODEL: ChampionModelDef = ChampionModelDef {
 };
 
 /// Portage de `packages/client/test/touilleur-model.test.ts` (index du Touilleur ; la fin du canal est
-/// testée avec sa vue, les moulinets FX attendent #111).
+/// testée avec sa vue, les moulinets FX dans `fx/champions/touilleur.rs`).
 #[cfg(test)]
 mod tests {
     use lov_shared::types::{EntityKind, EntitySnapshot, TeamOrNeutral};
