@@ -1,5 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+
+/** Les attentes de vitest dont ce fichier se sert, sur `node:assert` (lancé par `node --test`). */
+function expect(actual: unknown, message?: string) {
+  return {
+    toBe: (v: unknown) => assert.equal(actual, v, message),
+    toEqual: (v: unknown) => assert.deepEqual(actual, v, message),
+    toContain: (v: string) => assert.ok(String(actual).includes(v), message ?? `« ${v} » attendu dans : ${String(actual)}`),
+  };
+}
 
 /** Lance le garde-fou de périmètre sur une liste de fichiers simulée. */
 function run(args: string[]): { ok: boolean; out: string } {
@@ -17,7 +27,7 @@ function run(args: string[]): { ok: boolean; out: string } {
 
 /** Les labels que la CI posera sur la PR, un par ligne. */
 const labels = (title: string, body = ''): string[] =>
-  run(['--labels', '--title', title, '--body', body, '--files', 'packages/client/src/ui/hud/Hud.tsx'])
+  run(['--labels', '--title', title, '--body', body, '--files', 'crates/lov-client/src/ui/hud/mod.rs'])
     .out.split('\n')
     .filter(Boolean);
 
@@ -36,31 +46,31 @@ function check(title: string, files: string[], body = ''): { ok: boolean; out: s
 
 describe('check-areas : une PR = une area', () => {
   it('accepte une PR dans son area', () => {
-    expect(check('feat(ui-hud): barre de mana', ['packages/client/src/ui/hud/Hud.tsx']).ok).toBe(true);
+    expect(check('feat(ui-hud): barre de mana', ['crates/lov-client/src/ui/hud/mod.rs']).ok).toBe(true);
   });
 
   it('refuse un fichier hors de son area', () => {
     const r = check('feat(ui-hud): barre de mana', [
-      'packages/client/src/ui/hud/Hud.tsx',
-      'packages/server/src/nav/grid.ts',
+      'crates/lov-client/src/ui/hud/mod.rs',
+      'crates/lov-sim/src/nav/grid.rs',
     ]);
     expect(r.ok).toBe(false);
-    expect(r.out).toContain('nav/grid.ts');
+    expect(r.out).toContain('nav/grid.rs');
   });
 
   it('refuse un titre sans area', () => {
-    expect(check('ajoute un truc', ['packages/client/src/ui/hud/Hud.tsx']).ok).toBe(false);
+    expect(check('ajoute un truc', ['crates/lov-client/src/ui/hud/mod.rs']).ok).toBe(false);
   });
 
   it('refuse une area inconnue', () => {
-    expect(check('feat(cuisine): soupe', ['packages/client/src/ui/hud/Hud.tsx']).ok).toBe(false);
+    expect(check('feat(cuisine): soupe', ['crates/lov-client/src/ui/hud/mod.rs']).ok).toBe(false);
   });
 
   it('autorise docs et tests depuis n’importe quelle area', () => {
     expect(
       check('feat(nav): champ de flux', [
-        'packages/server/src/nav/flow.ts',
-        'packages/server/test/nav.test.ts',
+        'crates/lov-sim/src/nav/flow.rs',
+        'crates/lov-sim/tests/nav.rs',
         'docs/notes.md',
       ]).ok,
     ).toBe(true);
@@ -69,44 +79,24 @@ describe('check-areas : une PR = une area', () => {
 
 describe('check-areas : contrats partagés', () => {
   it('refuse un contrat dans une PR normale', () => {
-    const r = check('feat(nav): champ de flux', ['packages/server/src/nav/flow.ts', 'packages/shared/src/types.ts']);
+    const r = check('feat(nav): champ de flux', ['crates/lov-sim/src/nav/flow.rs', 'crates/lov-shared/src/types.rs']);
     expect(r.ok).toBe(false);
     expect(r.out).toContain('contract');
   });
 
   it('accepte une PR de contrat qui ne contient que des contrats', () => {
-    expect(check('contract: ajoute visionScore', ['packages/shared/src/types.ts', 'packages/shared/src/protocol.ts']).ok).toBe(true);
+    expect(check('contract: ajoute visionScore', ['crates/lov-shared/src/types.rs', 'crates/lov-shared/src/protocol.rs']).ok).toBe(true);
   });
 
   it('refuse une PR de contrat qui embarque du code', () => {
-    const r = check('contract: ajoute visionScore', ['packages/shared/src/types.ts', 'packages/server/src/nav/flow.ts']);
+    const r = check('contract: ajoute visionScore', ['crates/lov-shared/src/types.rs', 'crates/lov-sim/src/nav/flow.rs']);
     expect(r.ok).toBe(false);
-    expect(r.out).toContain('nav/flow.ts');
+    expect(r.out).toContain('nav/flow.rs');
   });
 });
 
 describe('check-areas : tranche verticale champion', () => {
-  const nyx = [
-    'packages/shared/src/data/champions/nyx.ts',
-    'packages/server/src/abilities/champions/nyx.ts',
-    'packages/client/src/render/champions/models/nyx.ts',
-    'packages/client/src/fx/champions/nyx.ts',
-    'packages/shared/src/data/champions/index.ts',
-  ];
-
-  it('accepte un champion de bout en bout', () => {
-    const r = check('feat(champion): Nyx', nyx);
-    expect(r.ok).toBe(true);
-    expect(r.out).toContain('nyx');
-  });
-
-  it('refuse deux champions dans la même PR', () => {
-    const r = check('feat(champion): Nyx et Zephyr', [...nyx, 'packages/client/src/fx/champions/zephyr.ts']);
-    expect(r.ok).toBe(false);
-    expect(r.out).toContain('zephyr');
-  });
-
-  // Migration Rust : la même tranche existe dans `crates/`, avec `mod.rs` comme registre partagé.
+  // `mod.rs` est le registre partagé de la tranche.
   const nyxRust = [
     'crates/lov-shared/src/data/champions/nyx.rs',
     'crates/lov-sim/src/abilities/champions/nyx.rs',
@@ -115,13 +105,13 @@ describe('check-areas : tranche verticale champion', () => {
     'crates/lov-shared/src/data/champions/mod.rs',
   ];
 
-  it('accepte un champion Rust de bout en bout, registre mod.rs compris', () => {
+  it('accepte un champion de bout en bout, registre mod.rs compris', () => {
     const r = check('feat(champion): Nyx en Rust', nyxRust);
     expect(r.ok).toBe(true);
     expect(r.out).toContain('nyx');
   });
 
-  it('refuse deux champions Rust dans la même PR', () => {
+  it('refuse deux champions dans la même PR', () => {
     const r = check('feat(champion): Nyx et Zephyr', [...nyxRust, 'crates/lov-client/src/fx/champions/zephyr.rs']);
     expect(r.ok).toBe(false);
     expect(r.out).toContain('zephyr');
@@ -161,15 +151,15 @@ describe('check-areas : registre des systèmes Rust', () => {
 
 describe('check-areas : fonctionnalité qui traverse plusieurs areas', () => {
   const boutique = [
-    'packages/client/src/ui/hud/Shop.tsx',
-    'packages/client/src/ui/logic/shop.ts',
-    'packages/client/src/ui/redesign.css',
+    'crates/lov-client/src/ui/hud/shop.rs',
+    'crates/lov-client/src/ui/logic/shop.rs',
+    'crates/lov-client/src/ui/icons/draw.rs',
   ];
 
   it('refuse deux areas quand une seule est déclarée', () => {
     const r = check('feat(ui-hud): boutique plus claire', boutique);
     expect(r.ok).toBe(false);
-    expect(r.out).toContain('logic/shop.ts');
+    expect(r.out).toContain('logic/shop.rs');
   });
 
   it('accepte un scope à plusieurs areas dans le titre', () => {
@@ -191,18 +181,18 @@ describe('check-areas : fonctionnalité qui traverse plusieurs areas', () => {
 
   it('avertit sans bloquer au-delà de trois areas', () => {
     const r = check('feat(input,ui-hud,ui-core,client-net,render): mode jeu', [
-      'packages/client/src/input/gameMode.ts',
-      'packages/client/src/ui/hud/Hud.tsx',
-      'packages/client/src/ui/styles.css',
-      'packages/client/src/state.ts',
-      'packages/client/src/main.ts',
+      'crates/lov-client/src/input/mod.rs',
+      'crates/lov-client/src/ui/hud/mod.rs',
+      'crates/lov-client/src/ui/mod.rs',
+      'crates/lov-client/src/net/mod.rs',
+      'crates/lov-client/src/main.rs',
     ]);
     expect(r.ok).toBe(true);
     expect(r.out).toContain('5 areas déclarées');
   });
 
   it('refuse toujours un contrat, même avec plusieurs areas', () => {
-    const r = check('feat(ui-hud,ui-core): boutique', [...boutique, 'packages/shared/src/schema.ts']);
+    const r = check('feat(ui-hud,ui-core): boutique', [...boutique, 'crates/lov-shared/src/schema.rs']);
     expect(r.ok).toBe(false);
   });
 });
@@ -246,12 +236,12 @@ describe('check-areas : couverture du dépôt', () => {
 
   it('les données de jeu partagées appartiennent à l’area qui possède leur comportement', () => {
     const cases: [string, string][] = [
-      ['packages/shared/src/data/structures.ts', 'feat(systems): plaques de tour'],
-      ['packages/shared/src/data/minions.ts', 'fix(systems): dégâts des sbires'],
-      ['packages/shared/src/data/monsters.ts', 'fix(world-ai): camps de jungle'],
-      ['packages/shared/src/data/items.ts', 'feat(items): nouvel objet'],
-      ['packages/shared/src/data/buffs.ts', 'feat(abilities): nouveau CC'],
-      ['packages/shared/src/data/summoners.ts', 'fix(abilities): sort d’invocateur'],
+      ['crates/lov-shared/src/data/structures.rs', 'feat(systems): plaques de tour'],
+      ['crates/lov-shared/src/data/minions.rs', 'fix(systems): dégâts des sbires'],
+      ['crates/lov-shared/src/data/monsters.rs', 'fix(world-ai): camps de jungle'],
+      ['crates/lov-shared/src/data/items.rs', 'feat(items): nouvel objet'],
+      ['crates/lov-shared/src/data/buffs.rs', 'feat(abilities): nouveau CC'],
+      ['crates/lov-shared/src/data/summoners.rs', 'fix(abilities): sort d’invocateur'],
     ];
     for (const [file, title] of cases) expect(check(title, [file]).ok, `${title} → ${file}`).toBe(true);
   });

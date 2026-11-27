@@ -19,7 +19,7 @@ labels: ["bug"]
 | Champion(s) | |
 | Moment de la partie | <!-- draft, début, après un objectif… --> |
 | Navigateur et OS | |
-| `npm run dev` ou build de prod | |
+| `cargo run` (dev) ou release | |
 | Nombre de joueurs / bots | |
 
 ## Console et logs

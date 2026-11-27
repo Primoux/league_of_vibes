@@ -387,12 +387,41 @@ impl GameState {
     }
 }
 
+/// Fichier posé à côté de l'exécutable, qui donne l'adresse du serveur (une ligne, `ws://hôte:3000/ws`).
+const SERVER_FILE: &str = "serveur.txt";
+
+/// Adresse du serveur : `LOV_URL`, sinon la première ligne de `serveur.txt` à côté de l'exécutable,
+/// sinon le serveur local.
+pub fn server_url() -> String {
+    if let Ok(url) = std::env::var("LOV_URL") {
+        return url;
+    }
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| std::fs::read_to_string(exe.with_file_name(SERVER_FILE)).ok())
+        .and_then(|text| url_from_file(&text))
+        .unwrap_or_else(|| DEFAULT_URL.to_string())
+}
+
+/// Première ligne utile du fichier (commentaires `#` et lignes vides ignorés) ; `hôte:port` seul est
+/// complété en `ws://hôte:port/ws`.
+fn url_from_file(text: &str) -> Option<String> {
+    let line = text
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty() && !l.starts_with('#'))?;
+    Some(if line.starts_with("ws://") || line.starts_with("wss://") {
+        line.to_owned()
+    } else {
+        format!("ws://{line}/ws")
+    })
+}
+
 pub struct NetPlugin;
 
 impl Plugin for NetPlugin {
     fn build(&self, app: &mut App) {
-        let url = std::env::var("LOV_URL").unwrap_or_else(|_| DEFAULT_URL.to_string());
-        app.insert_resource(Connection::deferred(url))
+        app.insert_resource(Connection::deferred(server_url()))
             .init_resource::<Autoplay>()
             .init_resource::<GameState>()
             .add_message::<ServerEvent>()

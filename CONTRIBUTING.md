@@ -38,32 +38,37 @@ Le script écrit `.agent` — non versionné : il dit à tes IA qui elles sont s
 teste. Il ne touche pas à ton identité git : la tienne est déjà la bonne, et GitHub rattache les commits à ton
 compte via ton adresse e-mail. Il te prévient seulement si `user.email` n'est pas réglé.
 
-Vérifie la version de Node : `.nvmrc` dit **24**, comme la CI. Avec une autre version, tu verras des échecs
-que personne d'autre ne voit.
+Rust s'installe avec rustup ; la version de `rust-toolchain.toml` (celle de la CI) est installée toute
+seule à la première commande `cargo`. Sous Linux, Bevy demande `libasound2-dev libudev-dev libxkbcommon-dev
+libwayland-dev`.
 
 Puis lance le jeu :
 
 ```bash
-npm run dev          # serveur sur :3000, client sur :5173
+DEV_LOBBY=1 cargo run -p lov-server     # serveur sur :3000
+cargo run -p lov-client                 # un client par joueur
 ```
 
-Ouvre <http://localhost:5173/?dev=1> dans **deux onglets** : crée une salle dans le premier, rejoins-la avec
-le code dans le second, lance la partie. `?dev=1` autorise une salle de moins de 8 joueurs.
+Crée une salle dans le premier client, rejoins-la avec le code dans le second, lance la partie.
+`DEV_LOBBY=1` autorise une salle de moins de 8 joueurs.
 
 Raccourci utile quand tu veux juste voir le jeu tourner :
 
 ```bash
-SKIP_DRAFT=1 DEV_LOBBY=1 npm run dev:server     # pas de draft, champions attribués d'office
+SKIP_DRAFT=1 DEV_LOBBY=1 cargo run -p lov-server     # pas de draft, champions attribués d'office
+LOV_AUTOPLAY=1 cargo run -p lov-client               # crée une salle de dev et la lance seul
 ```
 
-Et pour travailler **sans serveur du tout** (`npm run dev:client` suffit) :
+Et pour travailler **sans serveur du tout** :
 
-| URL | Ce que tu vois |
+| Variable | Ce que tu vois |
 |---|---|
-| `?fxlab&champ=nyx` | les sorts d'un champion, pilotés par la vraie simulation |
-| `?modellab&champ=nyx` | son modèle 3D et ses animations, à côté du portrait de référence |
-| `?maplab` | la carte seule |
-| `?uilab=home` / `=draft` / `=game` | les écrans et le HUD avec des données factices |
+| `LOV_SPELLLAB=nyx` | les sorts d'un champion, sur la vraie simulation |
+| `LOV_VIEWLAB=1` | les modèles 3D et leurs animations |
+| `LOV_FXLAB=1` | les briques des effets (particules, décals, matériaux) |
+| `LOV_UILAB=accueil` / `draft` / `jeu` / `boutique` | les écrans et le HUD avec des données factices |
+
+Ajoute `LOV_SCREENSHOT=capture.png` pour en garder une image sans regarder la fenêtre.
 
 ---
 
@@ -132,10 +137,10 @@ Le code range **un fichier par champion** à chaque étage. Tu peux donc livrer 
 croiser personne :
 
 ```
-packages/shared/src/data/champions/<nom>.ts            stats, sorts, coûts
-packages/server/src/abilities/champions/<nom>.ts       logique serveur
-packages/client/src/render/champions/models/<nom>.ts   modèle 3D
-packages/client/src/fx/champions/<nom>.ts              FX et sons
+crates/lov-shared/src/data/champions/<nom>.rs            stats, sorts, coûts
+crates/lov-sim/src/abilities/champions/<nom>.rs          logique serveur
+crates/lov-client/src/render/champions/models/<nom>.rs   modèle 3D
+crates/lov-client/src/fx/champions/<nom>.rs              FX
 ```
 
 Titre : `feat(champion): <Nom>`. Une PR `champion` ne couvre **qu'un** champion, la CI le vérifie. Les seuls
@@ -157,11 +162,11 @@ Pendant le travail :
 
 - **Ne va pas éditer le code d'un autre domaine pour y brancher ta logique.** Passe par les points de
   rendez-vous prévus : côté serveur l'`EventBus` (`world.events.on/emit`), `entity.data.<domaine>` et les API
-  de `PLAN.md §2.1` (`applyDamage`, `addBuff`…) ; côté client le `store` (`client/src/state.ts`) et le
-  `fxBus` (`client/src/fx/FxBus.ts`).
+  de `PLAN.md §2.1` (`apply_damage`, `add_buff`…) ; côté client `net::GameState`, `input::PlayerInput`,
+  les messages `ServerEvent` et le registre des FX (`register_fx`).
 - **Une API dont tu dépends n'existe pas encore ?** Mocke-la chez toi, ou crée-la avec la signature exacte du
   `PLAN.md` et une implémentation minimale — et dis-le dans ta PR. N'attends pas.
-- **Toute règle de jeu vient avec son test** headless (`packages/*/test/`) : crée un `World`, ajoute des
+- **Toute règle de jeu vient avec son test** headless (`crates/lov-sim/tests/`) : crée un `World`, ajoute des
   entités, fais des `step()`, vérifie.
 - **Tu ne touches jamais au test d'un autre** pour faire passer ta PR. Si un test d'autrui casse à cause de
   toi, c'est ton code — ou le contrat — qui doit changer. Dis-le dans la PR.
@@ -170,7 +175,7 @@ Pendant le travail :
 Avant de pousser, obligatoire et vert :
 
 ```bash
-npm run typecheck && npm test && npm run build
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 ```
 
 ---
@@ -182,11 +187,12 @@ git push -u origin ui-hud/barre-de-mana
 gh pr create --fill          # puis remplis le template
 ```
 
-Le titre porte l'area. Le corps référence l'issue (`Closes #57`). Trois jobs tournent :
+Le titre porte l'area. Le corps référence l'issue (`Closes #57`). Quatre jobs tournent :
 
 | Job | Ce qu'il vérifie |
 |---|---|
-| `check` | typecheck, tests, build du client, puis 8 bots WebSocket qui jouent vraiment |
+| `check` | format du code, tests du garde-fou des areas |
+| `rust` | clippy, tests, puis 8 bots WebSocket qui passent le draft et jouent vraiment |
 | `areas` | ta PR reste dans son area, ne touche aucun contrat partagé, et ne couvre qu'un champion |
 | `size` | avertit au-delà de ~800 lignes modifiées |
 
@@ -213,8 +219,8 @@ Une PR sans activité pendant **3 jours** reçoit un rappel automatique : à ce 
 ## 7. Le cas particulier : toucher un contrat partagé
 
 ```
-packages/shared/src/protocol.ts   types.ts   schema.ts   constants.ts   map.ts
-packages/server/src/systems/index.ts
+crates/lov-shared/   Cargo.toml, src/lib.rs, protocol.rs, types.rs, schema.rs, constants.rs, map.rs, math.rs
+crates/lov-sim/src/systems/registry.rs
 ```
 
 Ces fichiers sont lus par tout le monde : un changement y bloque tous les autres. C'est le **seul** point où
@@ -239,7 +245,7 @@ on se sérialise.
 | CI `areas` rouge : « fichiers de contrat » | sors-les dans une PR `contract:` séparée (§7). |
 | Un test dit « fichier qu'aucune area ne couvre » | tu as créé un fichier dans un chemin que `areas.json` ne décrit pas. Rattache-le à l'area qui possède son comportement — sinon personne ne pourra plus le modifier. `node scripts/check-areas.mjs --audit` liste les cas. |
 | « ça marche chez moi » | vérifie `node -v` contre `.nvmrc`. C'est la cause numéro un. |
-| Des tests échouent sans que tu aies touché à ça | certains tests dépendent de l'horloge murale et lâchent sur une machine chargée. Relance-les seuls : `npx vitest run packages/server/test/wards.test.ts`. S'ils passent seuls, ce n'est pas toi — voir l'issue de suivi. |
+| Des tests échouent sans que tu aies touché à ça | certains tests dépendent de l'horloge murale et lâchent sur une machine chargée. Relance-les seuls : `cargo test -p lov-sim --test <fichier>`. S'ils passent seuls, ce n'est pas toi — voir l'issue de suivi. |
 | Conflit dans un fichier que tu ne connais pas | garde la version de `main`, réapplique ton ajout par-dessus. En cas de doute, demande à qui l'a écrit plutôt que de trancher. |
 | Tu es bloqué par le travail de quelqu'un | commente **son** issue, et contourne avec un mock en attendant. |
 
@@ -257,11 +263,12 @@ Area : <l'area de l'issue> — ton périmètre est celui que .github/areas.json 
 
 Contraintes :
 - Tu ne modifies QUE les fichiers de cette area (+ ses tests). Rien d'autre, même si ça t'arrangerait.
-- Tu ne touches à aucun fichier de contrat partagé (protocol.ts, types.ts, schema.ts, constants.ts,
-  map.ts, systems/index.ts). S'il en faut un, tu t'arrêtes et tu me le dis.
+- Tu ne touches à aucun fichier de contrat partagé (lov-shared : protocol.rs, types.rs, schema.rs,
+  constants.rs, map.rs ; lov-sim : systems/registry.rs). S'il en faut un, tu t'arrêtes et tu me le dis.
 - Tu n'affaiblis, ne skippes et ne supprimes jamais un test existant.
 - Avant de proposer la PR : node scripts/check-areas.mjs --title "<titre>", puis
-  npm run typecheck && npm test && npm run build, tous verts.
+  cargo fmt --all --check, cargo clippy --workspace --all-targets -- -D warnings et
+  cargo test --workspace, tous verts.
 - Textes du jeu en français. Aucun nom, visuel, son ni texte de Riot.
 ```
 

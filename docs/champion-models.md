@@ -30,16 +30,14 @@ complètent le roster : index levé animé indépendamment du poignet, moustache
 ## Atelier interactif
 
 ```bash
-npm install
-npm run dev:client
-# http://localhost:5173/?modellab
-# http://localhost:5173/?modellab&champ=master67
+LOV_VIEWLAB=champions cargo run -p lov-client    # les treize champions côte à côte
+LOV_VIEWLAB=1 cargo run -p lov-client            # tous les modèles du jeu
 ```
 
 - Sélectionner chacun des treize champions et comparer le portrait au modèle.
 - Tourner/zoomer, passer en vue de jeu et vérifier les silhouettes et les armes.
 - Essayer course, attaque, Q/W/E/R, mort puis retour. Les gestes du 67 restent présents en course/incantation.
-- Pour les FX et les règles simulées, utiliser `?fxlab` ; l'atelier n'envoie pas de commandes au serveur.
+- Pour les FX et les règles simulées, utiliser `LOV_SPELLLAB=<champion>` ; l'atelier n'envoie pas de commandes au serveur.
 - Vérifier Nyx pendant l'invisibilité dans le labo FX : tissu, métal et lumières deviennent translucides ensemble.
 
 ## Budget et contrôles
@@ -60,18 +58,7 @@ pendant Q/W/E/R, les normales sous échelle non uniforme/rotation, le métal dis
 libération des nouvelles ressources fusionnées. Les tests précédents des gestes, de mort/retour, des
 sorts et du réseau restent exécutés.
 
-## Reproduire les rendus hors WebGL
+## Reproduire les rendus
 
-Node avec les dépendances du dépôt ; Blender 4.3+ pour le rendu CPU (outil de contrôle optionnel,
-aucune dépendance du jeu). Les fichiers temporaires restent hors du dépôt.
-
-```bash
-node --import tsx packages/client/tools/exportChampionModels.ts /tmp/champion-models.json
-blender -b -t 4 -P packages/client/tools/renderChampionModels.py -- /tmp/champion-models.json /tmp/champion-renders
-# Ajouter des identifiants après le dossier pour ne rendre que certains champions.
-```
-
-L'export utilise les véritables vues du jeu, leur pose au repos déformée par les os, les couleurs linéaires,
-les normales et les paramètres de matière. L'éclairage et le tone mapping Blender diffèrent du jeu.
-La planche est un contrôle de géométrie/matières, pas une capture du moteur WebGL. Aucun contrôle
-WebGL interactif ni mesure de FPS n'a été possible dans l'environnement de développement distant.
+Les outils d'export vers Blender de la version TypeScript ont été retirés avec elle (#122) ; l'historique git
+les garde. Pour une capture du jeu : `LOV_VIEWLAB=champions LOV_SCREENSHOT=/tmp/champions.png cargo run -p lov-client`.

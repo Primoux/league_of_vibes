@@ -29,15 +29,15 @@ labels: ["area:champion"]
 | R | | |
 
 Chiffres (dégâts, coûts, recharges, portées) : à caler sur un champion existant de la même classe dans
-`packages/shared/src/data/champions/`, puis à ajuster.
+`crates/lov-shared/src/data/champions/`, puis à ajuster.
 
 ## Les quatre fichiers à écrire
-- [ ] `packages/shared/src/data/champions/<id>.ts` — stats, sorts, coûts
-- [ ] `packages/server/src/abilities/champions/<id>.ts` — logique serveur
-- [ ] `packages/client/src/render/champions/models/<id>.ts` — modèle 3D
-- [ ] `packages/client/src/fx/champions/<id>.ts` — FX et sons
+- [ ] `crates/lov-shared/src/data/champions/<id>.rs` — stats, sorts, coûts
+- [ ] `crates/lov-sim/src/abilities/champions/<id>.rs` — logique serveur
+- [ ] `crates/lov-client/src/render/champions/models/<id>.rs` — modèle 3D
+- [ ] `crates/lov-client/src/fx/champions/<id>.rs` — FX
 - [ ] une ligne ajoutée dans chaque `index.ts` de registre
-- [ ] un test headless du kit dans `packages/server/test/`
+- [ ] un test headless du kit dans `crates/lov-sim/tests/`
 
 ## Contrat partagé nécessaire ?
 <!-- Un kit qui demande un nouveau type d'effet, de CC ou de message réseau touche un contrat partagé :

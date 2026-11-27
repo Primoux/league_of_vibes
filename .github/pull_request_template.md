@@ -29,11 +29,10 @@ Aucun
 <!-- Tests ajoutés + étapes manuelles. -->
 
 ## Checklist
-- [ ] `npm run typecheck && npm test && npm run build` verts en local
-- [ ] Si la PR touche `crates/` : `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace` verts
+- [ ] `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace` verts
 - [ ] Une seule area, une seule issue
 - [ ] `main` mergé dans ma branche (PR sans conflit)
 - [ ] Pas de `any` non justifié, pas de `// @ts-ignore`, pas de test affaibli ou supprimé
-- [ ] Pas de nouvelle dépendance npm, ou justifiée ci-dessus
+- [ ] Pas de nouvelle crate, ou justifiée ci-dessus
 - [ ] Aucun nom / visuel / son / texte de Riot ; assets générés ou CC0, listés dans `ASSETS.md`
 - [ ] Textes du jeu en français

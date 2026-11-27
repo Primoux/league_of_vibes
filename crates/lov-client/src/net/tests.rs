@@ -427,3 +427,17 @@ fn la_connexion_ne_part_qu_au_premier_connect() {
     conn.connect("Bob");
     assert!(conn.started());
 }
+
+#[test]
+fn adresse_du_serveur_lue_dans_le_fichier() {
+    use super::url_from_file;
+    assert_eq!(
+        url_from_file("# commentaire\n\n  ws://jeu.exemple:3000/ws \n"),
+        Some("ws://jeu.exemple:3000/ws".into())
+    );
+    assert_eq!(
+        url_from_file("192.168.1.20:3000"),
+        Some("ws://192.168.1.20:3000/ws".into())
+    );
+    assert_eq!(url_from_file("# rien\n"), None);
+}
