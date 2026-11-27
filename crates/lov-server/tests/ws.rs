@@ -1,9 +1,9 @@
 //! Tests d'intégration du serveur : vrai WebSocket sur un port éphémère.
 //!
-//! Portage des parties de `net.test.ts` qui exercent `net/server.ts` sans `room.ts`. Les tests TS
-//! « création et jonction de salle » et « reconnexion pendant le draft » dépendent de `Room` : ils restent à
-//! porter avec les salles. Les tests « salle simulée » ci-dessous couvrent l'aiguillage du serveur avec une
-//! salle factice.
+//! Portage de `net.test.ts`. « Création et jonction de salle » et « reconnexion avec le token pendant
+//! le draft » passent par de vraies salles (`GameRooms`, draft compris). Les tests « salle simulée »
+//! ci-dessous couvrent en plus l'aiguillage du serveur avec une salle factice, qui journalise ce qu'il
+//! reçoit.
 
 use futures_util::{SinkExt, StreamExt};
 use lov_server::room::{Conn, GameRooms, Room, RoomFactory};
@@ -97,6 +97,15 @@ async fn handshake(ws: &mut Ws, name: &str) -> (String, String) {
             (player_id, reconnect_token)
         }
         other => panic!("welcome attendu, reçu {other:?}"),
+    }
+}
+
+/// `Client.wait(t, pred)` du TS : lit jusqu'au premier message qui correspond (3 s par message).
+async fn wait<T>(ws: &mut Ws, mut pick: impl FnMut(ServerMsg) -> Option<T>) -> T {
+    loop {
+        if let Some(found) = pick(recv(ws).await) {
+            return found;
+        }
     }
 }
 
@@ -280,6 +289,106 @@ async fn token_libere_a_la_deconnexion_hors_salle() {
         ServerMsg::Welcome { player_id: p, .. } => assert_ne!(p, player_id),
         other => panic!("{other:?}"),
     }
+    server.close().await;
+}
+
+// net.test.ts › « hello → welcome avec token secret, création et jonction de salle, ping réseau »,
+// avec une vraie salle
+#[tokio::test]
+async fn creation_et_jonction_d_une_vraie_salle() {
+    let server = start().await;
+    let mut a = connect(&server).await;
+    let (player_id, token) = handshake(&mut a, "Alice").await;
+    assert_ne!(token, player_id);
+    send_msg(
+        &mut a,
+        &ClientMsg::CreateRoom {
+            dev_mode: Some(true),
+        },
+    )
+    .await;
+    let code = wait(&mut a, |m| match m {
+        ServerMsg::Lobby { state } => Some(state.code),
+        _ => None,
+    })
+    .await;
+    let mut b = connect(&server).await;
+    handshake(&mut b, "Bob").await;
+    send_msg(
+        &mut b,
+        &ClientMsg::JoinRoom {
+            code: code.to_lowercase(),
+        },
+    )
+    .await;
+    let players = wait(&mut b, |m| match m {
+        ServerMsg::Lobby { state } if state.players.len() == 2 => Some(state.players),
+        _ => None,
+    })
+    .await;
+    let mut teams: Vec<Team> = players.iter().map(|p| p.team).collect();
+    teams.sort_by_key(|t| *t == Team::Red);
+    assert_eq!(teams, [Team::Blue, Team::Red]);
+    send_msg(&mut b, &ClientMsg::NetPing { client_time: 42.0 }).await;
+    let pong = wait(&mut b, |m| match m {
+        ServerMsg::Pong { client_time, .. } => Some(client_time),
+        _ => None,
+    })
+    .await;
+    assert_eq!(pong, Some(42.0));
+    server.close().await;
+}
+
+// net.test.ts › « reconnexion avec le token pendant le draft », avec une vraie salle
+#[tokio::test]
+async fn reconnexion_avec_le_token_pendant_le_draft() {
+    let server = start().await;
+    let mut a = connect(&server).await;
+    let (player_id, token) = handshake(&mut a, "Alice").await;
+    send_msg(
+        &mut a,
+        &ClientMsg::CreateRoom {
+            dev_mode: Some(true),
+        },
+    )
+    .await;
+    wait(&mut a, |m| {
+        matches!(m, ServerMsg::Lobby { .. }).then_some(())
+    })
+    .await;
+    send_msg(&mut a, &ClientMsg::StartGame).await;
+    wait(&mut a, |m| {
+        matches!(m, ServerMsg::Draft { .. }).then_some(())
+    })
+    .await;
+    a.close(None).await.expect("fermeture");
+    drop(a);
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    let mut a2 = connect(&server).await;
+    send_msg(&mut a2, &hello("Alice", PROTOCOL_VERSION, Some(&token))).await;
+    let again = wait(&mut a2, |m| match m {
+        ServerMsg::Welcome { player_id, .. } => Some(player_id),
+        _ => None,
+    })
+    .await;
+    assert_eq!(again, player_id);
+    let first_pick = wait(&mut a2, |m| match m {
+        ServerMsg::Draft { state } => state.picks.first().map(|p| p.player_id.clone()),
+        _ => None,
+    })
+    .await;
+    assert_eq!(first_pick, player_id);
+
+    // Usurper le playerId public ne donne pas la session.
+    let mut c = connect(&server).await;
+    send_msg(&mut c, &hello("Eve", PROTOCOL_VERSION, Some(&player_id))).await;
+    let eve = wait(&mut c, |m| match m {
+        ServerMsg::Welcome { player_id, .. } => Some(player_id),
+        _ => None,
+    })
+    .await;
+    assert_ne!(eve, player_id);
     server.close().await;
 }
 

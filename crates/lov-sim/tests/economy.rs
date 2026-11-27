@@ -1,13 +1,12 @@
 //! Tests de l'économie, de la boutique, du rappel, des objets et des balises : port de
 //! `packages/server/test/economy.test.ts`, `recall.test.ts`, `items.test.ts` et `wards.test.ts`.
 //!
-//! Substitutions :
-//! - les systèmes pas encore portés (sorts d'invocateur, jungle, objectifs) sont absents du monde de
-//!   test ; aucun test de ces fichiers n'en dépend ;
-//! - l'ennemi `sable` du TS (données pas encore portées) est remplacé par `tharox` : seuls son équipe
-//!   et sa position comptent ;
-//! - le test de snapshot des balises appelle directement les hooks `selfState` et `entitySnapshot`
-//!   que `buildSnapshot` exécute (`net/snapshot.ts` n'est pas encore porté).
+//! Le monde de test est celui du TS : la liste complète des systèmes, moins les systèmes de PvE
+//! (`minions`, `structures`, `jungle`, `objectives`) pour la suite économique.
+//!
+//! Écart : le test de snapshot des balises appelle directement les hooks `selfState` et
+//! `entitySnapshot` que `buildSnapshot` exécute ; la construction des snapshots vit dans `lov-server`
+//! (`snapshot.rs`, testée par `lov-server/tests/snapshot.rs`), dont `lov-sim` ne dépend pas.
 
 mod common;
 
@@ -510,7 +509,7 @@ fn rappel_canalise_8_s_puis_teleporte_a_la_fontaine() {
 fn rappel_interrompu_par_les_degats_subis() {
     let mut s = full_world();
     let c = champ(&mut s.world, Team::Blue, v(6000.0, 6000.0));
-    let enemy = champ_as(&mut s.world, Team::Red, v(6100.0, 6000.0), "tharox");
+    let enemy = champ_as(&mut s.world, Team::Red, v(6100.0, 6000.0), "sable");
     let ends = listen(&mut s, &[EventKind::RecallEnd]);
     cmd(&mut s, c, ClientMsg::Recall);
     s.run(2.0);
@@ -570,7 +569,7 @@ fn rappel_dure_4_s_avec_le_buff_du_leviathan() {
 fn rappel_annule_a_la_mort_et_impossible_quand_mort() {
     let mut s = full_world();
     let c = champ(&mut s.world, Team::Blue, v(6000.0, 6000.0));
-    let enemy = champ_as(&mut s.world, Team::Red, v(6100.0, 6000.0), "tharox");
+    let enemy = champ_as(&mut s.world, Team::Red, v(6100.0, 6000.0), "sable");
     play_dead(&mut s, c);
     cmd(&mut s, c, ClientMsg::Recall);
     assert!(st(&s, c).recall.is_none());
@@ -881,7 +880,7 @@ fn vengeance_pas_de_boucle_entre_deux_porteurs() {
     play_dead(&mut s, a);
     buy(&mut s, a, "carapace_du_roc");
     s.e_mut(a).dead = false;
-    let b = champ_as(&mut s.world, Team::Red, v(5100.0, 5000.0), "tharox");
+    let b = champ_as(&mut s.world, Team::Red, v(5100.0, 5000.0), "sable");
     set_gold(&mut s, b, 9999.0);
     play_dead(&mut s, b);
     buy(&mut s, b, "carapace_du_roc");
