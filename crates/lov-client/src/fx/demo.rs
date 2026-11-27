@@ -7,7 +7,7 @@
 //! `F9` bascule le post-traitement (qualité haute / basse) ; `LOV_POST=low` démarre en qualité basse.
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 3 s (`LOV_SCREENSHOT_AT=4.5` pour choisir l'instant).
 //!
-//! Tout au fond, un sort factice parcourt la chaîne complète des FX de sorts : un `ServerEvent` de zone,
+//! À droite de la grille, un sort factice parcourt la chaîne complète des FX de sorts : un `ServerEvent` de zone,
 //! toutes les 2,5 s, passe par le bus et le dispatcher jusqu'à un handler enregistré (`register_fx`), qui
 //! compose les primitives du runtime : décal de télégraphie (`add`), puis éclat (sprite) et traînée (ruban)
 //! à l'explosion (`after`). C'est l'exemple à suivre pour écrire le FX d'un sort.
@@ -630,7 +630,7 @@ fn cast_demo_spell(
         return;
     }
     *next = time.elapsed_secs() + DEMO_PERIOD;
-    let p = crate::render::to_game(rig.focus + Vec3::new(0.0, 0.0, -4.5 * SPACING));
+    let p = crate::render::to_game(rig.focus + Vec3::new(3.3 * SPACING, 0.0, 0.0));
     events.write(ServerEvent(GameEvent::AreaEffect {
         source: 0,
         fx_key: DEMO_KEY.into(),
