@@ -14,6 +14,7 @@ pub mod master67;
 pub mod melenchon;
 pub mod nyx;
 pub mod sable;
+pub mod solenne;
 pub mod touilleur;
 
 /// Enregistre les FX de tous les champions.
@@ -29,6 +30,7 @@ impl Plugin for ChampionFxPlugin {
         melenchon::register(app);
         nyx::register(app);
         sable::register(app);
+        solenne::register(app);
         touilleur::register(app);
     }
 }
