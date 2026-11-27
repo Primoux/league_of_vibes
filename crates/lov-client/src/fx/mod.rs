@@ -4,11 +4,17 @@
 
 use bevy::prelude::*;
 
+// Bus et clés des FX : appelés par le dispatcher (PR suivante de #111) ; jusque-là, seuls les tests les
+// appellent.
+#[allow(dead_code)]
+pub mod bus;
 // Le pool, le minuteur et les easings servent au runtime des effets (`FxRuntime`), porté dans une PR
 // suivante de #111 ; jusque-là, seuls les tests les appellent.
 #[allow(dead_code)]
 pub mod core;
 pub mod demo;
+#[allow(dead_code)]
+pub mod keys;
 pub mod particles;
 pub mod post;
 pub mod shaders;
