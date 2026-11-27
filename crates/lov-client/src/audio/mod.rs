@@ -21,6 +21,7 @@ pub mod mixer;
 // seuls la démo et les tests en appellent une partie.
 #[allow(dead_code)]
 pub mod music;
+pub mod sounds;
 #[allow(dead_code)]
 pub mod synth;
 
@@ -307,6 +308,7 @@ impl Plugin for SoundPlugin {
             .insert_resource(PendingStream(Some(SynthStream {
                 rx: Mutex::new(Some(rx)),
             })))
+            .add_plugins(sounds::plugin)
             .add_systems(Startup, start_stream)
             .add_systems(First, (tick_clock, follow_camera));
     }
