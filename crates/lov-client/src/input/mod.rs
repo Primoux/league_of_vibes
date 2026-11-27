@@ -372,6 +372,8 @@ fn key_orders(
                 set_targeting(&mut input, None);
             } else if input.shop_open {
                 input.shop_open = false;
+            } else if typing {
+                // saisie du chat : le champ se ferme lui-même
             } else {
                 // Panneau de réglages : la souris est rendue au système tant qu'il est ouvert.
                 input.settings_open = !input.settings_open;

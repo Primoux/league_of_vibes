@@ -1,8 +1,8 @@
 //! Atelier de l'interface : `LOV_UILAB=<écran>` affiche un écran avec des données fictives, sans serveur
 //! (`?uilab` du client web). Écrans : `accueil`, `salon`, `draft`, `chargement`, `jeu` (HUD),
-//! `boutique` (HUD, boutique ouverte), `fin` ;
-//! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 2 s, pour vérifier le rendu sans regarder la
-//! fenêtre.
+//! `boutique`, `scores`, `reglages` (HUD, panneau ouvert), `fin` ;
+//! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 2 s (`LOV_SCREENSHOT_AT=5` pour choisir
+//! l'instant), pour vérifier le rendu sans regarder la fenêtre.
 
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
@@ -307,9 +307,11 @@ fn fill(mut state: ResMut<GameState>, mut input: ResMut<PlayerInput>) {
             state.loading_ends_at = Some(now + 3500.0);
         }
         "fin" => state.result = Some(demo_result()),
-        "jeu" | "boutique" => {
+        "jeu" | "boutique" | "scores" | "reglages" => {
             demo_game(&mut state);
             input.shop_open = screen == "boutique";
+            input.scoreboard_open = screen == "scores";
+            input.settings_open = screen == "reglages";
             return;
         }
         _ => return,
@@ -318,7 +320,11 @@ fn fill(mut state: ResMut<GameState>, mut input: ResMut<PlayerInput>) {
 }
 
 fn shoot(mut commands: Commands, time: Res<Time>, mut done: Local<bool>) {
-    if *done || time.elapsed_secs() < 2.0 {
+    let at = std::env::var("LOV_SCREENSHOT_AT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2.0);
+    if *done || time.elapsed_secs() < at {
         return;
     }
     *done = true;
