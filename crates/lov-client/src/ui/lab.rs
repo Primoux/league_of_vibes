@@ -1,15 +1,23 @@
 //! Atelier de l'interface : `LOV_UILAB=<écran>` affiche un écran avec des données fictives, sans serveur
-//! (`?uilab` du client web). Écrans : `accueil`, `salon`, `draft`, `chargement`, `fin` ;
+//! (`?uilab` du client web). Écrans : `accueil`, `salon`, `draft`, `chargement`, `jeu` (HUD),
+//! `boutique` (HUD, boutique ouverte), `fin` ;
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 2 s, pour vérifier le rendu sans regarder la
 //! fenêtre.
 
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
-use lov_shared::protocol::{
-    DraftPick, DraftState, GameOver, LobbyPlayer, LobbyState, PlayerStats, RoomPhase,
-};
-use lov_shared::types::{Role, SummonerId, Team};
+use std::collections::BTreeMap;
 
+use lov_shared::protocol::{
+    DraftPick, DraftState, GameOver, GameStart, GameStartPlayer, LobbyPlayer, LobbyState,
+    PlayerStats, RoomPhase, Score, TeamScore,
+};
+use lov_shared::types::{
+    AbilityMap, BuffSnapshot, ChampSnapshot, Cooldowns, EntityKind, EntitySnapshot, Role,
+    SelfState, Stats, SummonerId, SummonerMap, Team, TeamOrNeutral, WardCharges,
+};
+
+use crate::input::PlayerInput;
 use crate::net::GameState;
 
 /// Écran demandé par `LOV_UILAB`, s'il est défini.
@@ -130,7 +138,151 @@ pub fn demo_result() -> GameOver {
     }
 }
 
-fn fill(mut state: ResMut<GameState>) {
+fn champion(id: u32, champ: &str, team: TeamOrNeutral, x: f64, y: f64, hp: f64) -> EntitySnapshot {
+    EntitySnapshot {
+        id,
+        kind: EntityKind::Champion,
+        team,
+        x,
+        y,
+        facing: 0.0,
+        hp,
+        max_hp: 1450.0,
+        mana: Some(420.0),
+        max_mana: Some(780.0),
+        shield: None,
+        dead: None,
+        subtype: Some(champ.into()),
+        owner_id: Some(format!("p{id}")),
+        level: Some(9),
+        anim: None,
+        buffs: None,
+        champ: Some(ChampSnapshot {
+            player_id: format!("p{id}"),
+            name: champ.into(),
+            kills: 3,
+            deaths: 1,
+            assists: 5,
+            cs: 87,
+            items: vec![
+                Some("long_sword".into()),
+                Some("boots".into()),
+                None,
+                None,
+                None,
+                None,
+                Some("stealth_ward".into()),
+            ],
+            respawn_in: None,
+        }),
+    }
+}
+
+/// Partie fictive pour le HUD : Ilyra niveau 9 en milieu de voie, un allié, des ennemis.
+pub fn demo_game(state: &mut GameState) {
+    let mut me = champion(1, "ilyra", TeamOrNeutral::Blue, 3400.0, 3300.0, 610.0);
+    me.shield = Some(180.0);
+    me.buffs = Some(vec![
+        BuffSnapshot {
+            id: "blue_buff".into(),
+            remaining: 92.0,
+            stacks: None,
+        },
+        BuffSnapshot {
+            id: "ilyra_q_slow".into(),
+            remaining: 1.4,
+            stacks: None,
+        },
+    ]);
+    let ally = champion(2, "kaelen", TeamOrNeutral::Blue, 3000.0, 3600.0, 900.0);
+    let enemy = champion(10, "grondak", TeamOrNeutral::Red, 3900.0, 3500.0, 1100.0);
+    for e in [me, ally, enemy] {
+        state.buffer.entities.insert(e.id, e);
+    }
+    state.my_entity = Some(1);
+    state.time = 754.0;
+    state.game = Some(GameStart {
+        you: "p1".into(),
+        team: Team::Blue,
+        entity_id: 1,
+        players: vec![GameStartPlayer {
+            id: "p1".into(),
+            name: "Aymeric".into(),
+            team: Team::Blue,
+            champion_id: "ilyra".into(),
+            summoners: [SummonerId::Flash, SummonerId::Heal],
+        }],
+        server_time: 0.0,
+    });
+    let side = |kills, towers, dragons: &[&str]| TeamScore {
+        kills,
+        towers,
+        dragons: dragons.iter().map(|d| (*d).to_string()).collect(),
+        grubs: 2,
+    };
+    state.score = Some(Score {
+        blue: side(14, 3, &["infernal", "ocean"]),
+        red: side(9, 1, &["mountain"]),
+    });
+    state.objective_timers = Some(BTreeMap::from([
+        ("dragon".to_string(), 812.0),
+        ("herald".to_string(), 1020.0),
+    ]));
+    state.self_state = Some(SelfState {
+        entity_id: 1,
+        gold: 1375.0,
+        xp: 420.0,
+        xp_to_next: 900.0,
+        level: 9,
+        skill_points: 1,
+        ability_levels: AbilityMap {
+            q: 5,
+            w: 2,
+            e: 1,
+            r: 1,
+        },
+        cooldowns: Cooldowns {
+            q: 2.4,
+            w: 0.0,
+            e: 9.0,
+            r: 0.0,
+            d: 140.0,
+            f: 0.0,
+        },
+        summoners: SummonerMap {
+            d: SummonerId::Flash,
+            f: SummonerId::Heal,
+        },
+        stats: Stats {
+            max_hp: 1450.0,
+            hp_regen: 9.0,
+            max_mana: 780.0,
+            mana_regen: 11.0,
+            ad: 62.0,
+            ap: 145.0,
+            armor: 48.0,
+            mr: 41.0,
+            attack_speed: 0.72,
+            attack_range: 550.0,
+            move_speed: 380.0,
+            crit_chance: 0.0,
+            ability_haste: 20.0,
+            lifesteal: 0.0,
+            armor_pen: 0.0,
+            magic_pen: 10.0,
+        },
+        recalling: None,
+        can_shop: true,
+        ward_charges: Some(WardCharges {
+            charges: 2,
+            cooldown_remaining: 0.0,
+        }),
+        item_charges: None,
+        item_cooldowns: None,
+    });
+}
+
+fn fill(mut state: ResMut<GameState>, mut input: ResMut<PlayerInput>) {
     let screen = requested().unwrap_or_default();
     state.player_id = Some("p1".into());
     state.connected = true;
@@ -155,6 +307,11 @@ fn fill(mut state: ResMut<GameState>) {
             state.loading_ends_at = Some(now + 3500.0);
         }
         "fin" => state.result = Some(demo_result()),
+        "jeu" | "boutique" => {
+            demo_game(&mut state);
+            input.shop_open = screen == "boutique";
+            return;
+        }
         _ => return,
     }
     state.lobby = Some(lobby);

@@ -342,6 +342,7 @@ fn mouse_orders(
     }
 }
 
+#[allow(clippy::too_many_arguments)] // un système Bevy : ses paramètres sont ses accès au monde
 fn key_orders(
     mut events: MessageReader<KeyboardInput>,
     keys: Res<ButtonInput<KeyCode>>,
@@ -349,7 +350,11 @@ fn key_orders(
     conn: Res<Connection>,
     mut input: ResMut<PlayerInput>,
     mut cursor: Single<&mut CursorOptions>,
+    focus: Option<Res<bevy::input_focus::InputFocus>>,
+    fields: Query<(), With<bevy::text::EditableText>>,
 ) {
+    // saisie en cours (recherche de la boutique, chat) : les lettres vont au champ, pas aux raccourcis
+    let typing = focus.is_some_and(|f| f.get().is_some_and(|e| fields.contains(e)));
     let ctrl = keys.any_pressed([KeyCode::ControlLeft, KeyCode::ControlRight]);
     let alt = keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
     let shift = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
@@ -382,6 +387,9 @@ fn key_orders(
                     CursorGrabMode::Confined
                 };
             }
+            continue;
+        }
+        if typing {
             continue;
         }
         if let Some(action) = digit_action(ev.key_code) {
