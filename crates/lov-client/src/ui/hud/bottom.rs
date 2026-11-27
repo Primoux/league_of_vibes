@@ -14,7 +14,7 @@ use lov_shared::protocol::ClientMsg;
 use lov_shared::schema::{ChampionDef, ItemCategory, ItemDef, Resource};
 use lov_shared::types::{AbilitySlot, EntitySnapshot, SelfState, Stats, SummonerSlot};
 
-use super::{HUD_Z, hud_root, label, set_bg, set_shown, set_text};
+use super::{HUD_Z, hud_root, label, set_bg, set_shown, set_text, set_val, str_key};
 use crate::input::{PlayerInput, Targeting};
 use crate::net::{Connection, GameState};
 use crate::ui::icons::draw::IconCache;
@@ -1051,14 +1051,6 @@ fn spawn(
 #[derive(Component, Default)]
 struct Src(Option<[u64; 3]>);
 
-/// Clé d'un identifiant, pour la comparer sans le copier.
-fn str_key(s: &str) -> f64 {
-    use std::hash::{Hash, Hasher};
-    let mut h = std::hash::DefaultHasher::new();
-    s.hash(&mut h);
-    f64::from_bits(h.finish())
-}
-
 /// Valeurs dont dépend le texte `t` (au plus trois).
 fn text_src(t: T, m: &Me, shield: f64) -> [f64; 3] {
     let st = m.st;
@@ -1189,13 +1181,6 @@ fn update_texts(
         src.0 = Some(key);
         text(*t, &m, shield, &mut buf);
         set_text(&mut txt, &buf);
-    }
-}
-
-/// Écrit `v` dans un champ du `Node` seulement s'il change (une écriture relance la mise en page).
-fn set_val(node: &mut Mut<Node>, field: fn(&mut Node) -> &mut Val, v: Val) {
-    if *field(node.bypass_change_detection()) != v {
-        *field(node.as_mut()) = v;
     }
 }
 

@@ -10,13 +10,13 @@ use lov_shared::data::champions::get_champion;
 use lov_shared::protocol::TeamScore;
 use lov_shared::types::{EntityId, EntityKind, Team, TeamOrNeutral};
 
-use super::{hud_root, label, set_shown, set_text};
+use super::{hud_root, label, set_shown, set_text, set_val, str_key};
 use crate::input::PlayerInput;
 use crate::net::{GameState, ServerEvent};
 use crate::ui::icons::draw::IconCache;
 use crate::ui::icons::{ChampionPortrait, PortraitKind};
 use crate::ui::logic::feed::{
-    AnnounceTone, Announcement, FeedEntry, FeedKind, FeedTracker, UnitRef, trim_feed,
+    AnnounceTone, Announcement, FeedEntry, FeedKind, FeedTracker, UnitRef,
 };
 use crate::ui::logic::format::{dragon_color, dragon_element, format_clock};
 use crate::ui::theme::{BLUE, GOLD, GOLD_HI, MUTED, PANEL, RED, TEXT, hex, hexa};
@@ -83,22 +83,36 @@ fn track(
         feed.queue.sort_by_key(|a| std::cmp::Reverse(a.priority));
         feed.queue.truncate(4);
     }
-    let trimmed = trim_feed(&feed.feed, |e| e.time, now, FEED_MAX, FEED_TTL);
-    if trimmed.len() != feed.feed.len() {
-        feed.feed = trimmed;
-        feed.dirty = true;
+    feed.trim(now);
+    feed.advance(time.delta_secs());
+}
+
+impl HudFeed {
+    /// Retire du fil les entrées trop vieilles et garde les `FEED_MAX` dernières, sur place
+    /// (`trimFeed`, sans copie).
+    fn trim(&mut self, now: f64) {
+        let before = self.feed.len();
+        self.feed.retain(|e| now - e.time <= FEED_TTL);
+        let n = self.feed.len();
+        if n > FEED_MAX {
+            self.feed.drain(..n - FEED_MAX);
+        }
+        if self.feed.len() != before {
+            self.dirty = true;
+        }
     }
-    feed.left -= time.delta_secs();
-    if feed.current.is_none() || feed.left <= 0.0 {
-        let next = if feed.queue.is_empty() {
-            None
-        } else {
-            Some(feed.queue.remove(0))
-        };
-        if next.is_some() || feed.current.is_some() {
-            feed.current = next;
-            feed.left = ANNOUNCE_SECS;
-            feed.dirty = true;
+
+    /// Avance la file des annonces de `dt` secondes : chacune reste `ANNOUNCE_SECS`.
+    fn advance(&mut self, dt: f32) {
+        self.left -= dt;
+        if self.current.is_some() && self.left > 0.0 {
+            return;
+        }
+        let next = (!self.queue.is_empty()).then(|| self.queue.remove(0));
+        if next.is_some() || self.current.is_some() {
+            self.current = next;
+            self.left = ANNOUNCE_SECS;
+            self.dirty = true;
         }
     }
 }
@@ -121,6 +135,7 @@ fn same_team(t: TeamOrNeutral, mine: Team) -> bool {
 // ---------------------------------------------------------------------------------- marqueurs
 
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
+#[require(Src)]
 enum T {
     Clock,
     Kills(Team),
@@ -553,28 +568,102 @@ fn score(state: &GameState, t: Team) -> Option<&TeamScore> {
     })
 }
 
-/// Alliés du joueur (sans lui), dans un ordre stable.
-fn allies(state: &GameState) -> Vec<EntityId> {
-    let Some(team) = state.game.as_ref().map(|g| g.team) else {
-        return vec![];
-    };
-    let me = state.my_entity;
-    let mut v: Vec<EntityId> = state
-        .entities()
-        .values()
-        .filter(|e| e.kind == EntityKind::Champion && Some(e.id) != me && same_team(e.team, team))
-        .map(|e| e.id)
-        .collect();
-    v.sort_unstable();
-    v.truncate(MAX_FRAMES);
-    v
+/// Alliés du joueur (sans lui), par identifiant croissant : calculés une fois par image.
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq, Debug)]
+struct Allies([Option<EntityId>; MAX_FRAMES]);
+
+impl Allies {
+    fn get(&self, i: usize) -> Option<EntityId> {
+        self.0.get(i).copied().flatten()
+    }
+
+    fn len(&self) -> usize {
+        self.0.iter().flatten().count()
+    }
 }
 
-fn update_texts(state: Res<GameState>, mut q: Query<(&T, &mut Text)>) {
+/// Les `MAX_FRAMES` plus petits identifiants de champions alliés, sans allocation.
+fn allies_of(state: &GameState) -> Allies {
+    let mut out = Allies::default();
+    let Some(team) = state.game.as_ref().map(|g| g.team) else {
+        return out;
+    };
+    let me = state.my_entity;
+    for e in state.entities().values() {
+        if e.kind != EntityKind::Champion || Some(e.id) == me || !same_team(e.team, team) {
+            continue;
+        }
+        // insertion dans la liste triée, le plus grand tombe au-delà de MAX_FRAMES
+        let mut id = Some(e.id);
+        for slot in &mut out.0 {
+            if slot.is_none_or(|s| id.is_some_and(|i| i < s)) {
+                std::mem::swap(slot, &mut id);
+            }
+            if id.is_none() {
+                break;
+            }
+        }
+    }
+    out
+}
+
+fn update_allies(state: Res<GameState>, mut allies: ResMut<Allies>) {
+    let now = allies_of(&state);
+    if *allies != now {
+        *allies = now;
+    }
+}
+
+/// Dernière valeur source d'un texte : il n'est reformaté que quand elle change.
+#[derive(Component, Default)]
+struct Src(Option<[u64; 3]>);
+
+fn text_src(t: T, state: &GameState, allies: &Allies) -> [f64; 3] {
     let me = state.my_entity.and_then(|id| state.entities().get(&id));
-    let allies = allies(&state);
-    let ally = |i: usize| allies.get(i).and_then(|id| state.entities().get(id));
-    for (t, mut text) in &mut q {
+    let ally = |i: usize| allies.get(i).and_then(|id| state.entities().get(&id));
+    let respawn = |e: Option<&lov_shared::types::EntitySnapshot>| {
+        e.and_then(|e| e.champ.as_ref())
+            .and_then(|c| c.respawn_in)
+            .map_or(-1.0, f64::ceil)
+    };
+    let n = |v: u32| f64::from(v);
+    match t {
+        T::Clock => [state.time.floor(), 0.0, 0.0],
+        T::Kills(team) => [score(state, team).map_or(0.0, |s| n(s.kills)), 0.0, 0.0],
+        T::Towers(team) => [score(state, team).map_or(0.0, |s| n(s.towers)), 0.0, 0.0],
+        T::Grubs(team) => [score(state, team).map_or(0.0, |s| n(s.grubs)), 0.0, 0.0],
+        T::Kda => me
+            .and_then(|e| e.champ.as_ref())
+            .map_or([0.0; 3], |c| [n(c.kills), n(c.deaths), n(c.assists)]),
+        T::Cs => [
+            me.and_then(|e| e.champ.as_ref()).map_or(0.0, |c| n(c.cs)),
+            0.0,
+            0.0,
+        ],
+        T::DeathName => [
+            me.and_then(|e| e.subtype.as_deref()).map_or(-1.0, str_key),
+            0.0,
+            0.0,
+        ],
+        T::DeathTimer => [respawn(me), 0.0, 0.0],
+        T::TfLevel(i) => [ally(i).map_or(-1.0, |e| n(e.level.unwrap_or(1))), 0.0, 0.0],
+        T::TfRespawn(i) => [respawn(ally(i)), 0.0, 0.0],
+    }
+}
+
+fn update_texts(
+    state: Res<GameState>,
+    allies: Res<Allies>,
+    mut q: Query<(&T, &mut Src, &mut Text)>,
+) {
+    let me = state.my_entity.and_then(|id| state.entities().get(&id));
+    let ally = |i: usize| allies.get(i).and_then(|id| state.entities().get(&id));
+    for (t, mut src, mut text) in &mut q {
+        let key = text_src(*t, &state, &allies).map(f64::to_bits);
+        if src.0 == Some(key) {
+            continue;
+        }
+        src.0 = Some(key);
         let s = match *t {
             T::Clock => format_clock(state.time),
             T::Kills(team) => score(&state, team).map_or(0, |s| s.kills).to_string(),
@@ -611,6 +700,7 @@ fn update_texts(state: Res<GameState>, mut q: Query<(&T, &mut Text)>) {
 
 fn update_shown(
     state: Res<GameState>,
+    allies: Res<Allies>,
     time: Res<Time>,
     mut q: Query<(&V, &mut Visibility)>,
     mut low: Query<&mut BackgroundGradient, With<LowHp>>,
@@ -620,7 +710,6 @@ fn update_shown(
     let ratio = me
         .filter(|e| e.dead != Some(true) && e.max_hp > 0.0)
         .map_or(1.0, |e| e.hp / e.max_hp);
-    let allies = allies(&state);
     for (v, mut vis) in &mut q {
         let on = match *v {
             V::Top | V::Strip => state.game.is_some(),
@@ -629,7 +718,7 @@ fn update_shown(
             V::Tf(i) => i < allies.len(),
             V::TfRespawn(i) => allies
                 .get(i)
-                .and_then(|id| state.entities().get(id))
+                .and_then(|id| state.entities().get(&id))
                 .is_some_and(|e| e.dead == Some(true)),
             V::LowHp => ratio < 0.3,
         };
@@ -658,20 +747,24 @@ fn update_shown(
 fn update_frames(
     mut commands: Commands,
     state: Res<GameState>,
+    allies: Res<Allies>,
     frames: Query<(Entity, &TeamFrame, Option<&ChampionPortrait>)>,
     mut fills: Query<(&Fill, &mut Node)>,
 ) {
-    let allies = allies(&state);
     for (e, tf, current) in &frames {
-        let snap = allies.get(tf.0).and_then(|id| state.entities().get(id));
-        let want = snap.and_then(|s| s.subtype.clone()).map(|c| {
-            ChampionPortrait::new(c, PortraitKind::Round)
-                .gray(snap.is_some_and(|s| s.dead == Some(true)))
-        });
-        if let Some(p) = want
-            && current != Some(&p)
-        {
-            commands.entity(e).insert(p);
+        let Some(snap) = allies.get(tf.0).and_then(|id| state.entities().get(&id)) else {
+            continue;
+        };
+        let Some(id) = snap.subtype.as_deref() else {
+            continue;
+        };
+        let dead = snap.dead == Some(true);
+        let same = current
+            .is_some_and(|c| c.id == id && c.kind == PortraitKind::Round && c.grayscale == dead);
+        if !same {
+            commands
+                .entity(e)
+                .insert(ChampionPortrait::new(id, PortraitKind::Round).gray(dead));
         }
     }
     for (fill, mut node) in &mut fills {
@@ -679,7 +772,7 @@ fn update_frames(
             Fill::TfHp(i) => (i, true),
             Fill::TfMana(i) => (i, false),
         };
-        let Some(e) = allies.get(i).and_then(|id| state.entities().get(id)) else {
+        let Some(e) = allies.get(i).and_then(|id| state.entities().get(&id)) else {
             continue;
         };
         let k = if hp {
@@ -687,10 +780,7 @@ fn update_frames(
         } else {
             e.mana.unwrap_or(0.0) / e.max_mana.unwrap_or(1.0).max(1.0)
         };
-        let w = percent((k * 100.0) as f32);
-        if node.width != w {
-            node.width = w;
-        }
+        set_val(&mut node, |n| &mut n.width, percent((k * 100.0) as f32));
     }
 }
 
@@ -702,9 +792,7 @@ fn update_drakes(
     mut q: Query<(Entity, &mut Drakes)>,
 ) {
     for (e, mut d) in &mut q {
-        let list = score(&state, d.0)
-            .map(|s| s.dragons.clone())
-            .unwrap_or_default();
+        let list = score(&state, d.0).map_or(&[][..], |s| s.dragons.as_slice());
         if d.1 == list.len() {
             continue;
         }
@@ -715,7 +803,7 @@ fn update_drakes(
             if list.is_empty() {
                 row.spawn(label(&fonts, "—", 12.0, 600, MUTED));
             }
-            for el in &list {
+            for el in list {
                 let c = dragon_element(el).map_or(hex(0xaaaaaa), |e| hex(dragon_color(e)));
                 row.spawn((
                     Node {
@@ -956,10 +1044,12 @@ pub struct OverlaysPlugin;
 impl Plugin for OverlaysPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HudFeed>()
+            .init_resource::<Allies>()
             .add_systems(OnEnter(Screen::Game), (reset, spawn))
             .add_systems(
                 Update,
                 (
+                    update_allies,
                     track,
                     redraw_feed,
                     update_texts,
@@ -978,22 +1068,127 @@ impl Plugin for OverlaysPlugin {
 mod tests {
     use super::*;
 
-    #[test]
-    fn la_file_des_annonces_avance() {
-        let mut feed = HudFeed::default();
-        feed.queue.push(Announcement {
-            key: 1,
+    fn annonce(key: u32, priority: u32) -> Announcement {
+        Announcement {
+            key,
             title: "Premier sang".into(),
             subtitle: None,
             tone: AnnounceTone::Gold,
             killer: None,
             victim: None,
-            priority: 5,
+            priority,
             element: None,
-        });
+        }
+    }
+
+    #[test]
+    fn la_file_des_annonces_avance() {
+        let mut feed = HudFeed::default();
+        feed.queue.extend([annonce(1, 5), annonce(2, 3)]);
+        feed.advance(0.016);
+        assert_eq!(feed.current.as_ref().map(|a| a.key), Some(1));
+        assert!(feed.dirty);
+        // la première reste 3,2 s
+        feed.dirty = false;
+        feed.advance(3.0);
+        assert_eq!(feed.current.as_ref().map(|a| a.key), Some(1));
+        assert!(!feed.dirty);
+        feed.advance(0.3);
+        assert_eq!(feed.current.as_ref().map(|a| a.key), Some(2));
+        // file vide : l'annonce s'efface à son tour
+        feed.advance(ANNOUNCE_SECS + 0.1);
         assert!(feed.current.is_none());
+        feed.dirty = false;
+        feed.advance(1.0);
+        assert!(!feed.dirty, "rien à montrer, rien à redessiner");
         assert_eq!(team_color(TeamOrNeutral::Blue), BLUE);
         assert!(same_team(TeamOrNeutral::Red, Team::Red));
         assert!(!same_team(TeamOrNeutral::Neutral, Team::Red));
+    }
+
+    #[test]
+    fn allies_tries_sans_le_joueur_ni_les_ennemis() {
+        use lov_shared::protocol::GameStart;
+        use lov_shared::types::EntitySnapshot;
+        let mut state = GameState::default();
+        state.game = Some(GameStart {
+            you: "p".into(),
+            team: Team::Blue,
+            entity_id: 4,
+            players: vec![],
+            server_time: 0.0,
+        });
+        state.my_entity = Some(4);
+        for (id, team) in [
+            (9, TeamOrNeutral::Blue),
+            (4, TeamOrNeutral::Blue),
+            (7, TeamOrNeutral::Red),
+            (2, TeamOrNeutral::Blue),
+            (12, TeamOrNeutral::Blue),
+            (5, TeamOrNeutral::Blue),
+            (3, TeamOrNeutral::Blue),
+        ] {
+            state.buffer.entities.insert(
+                id,
+                EntitySnapshot {
+                    id,
+                    kind: EntityKind::Champion,
+                    team,
+                    x: 0.0,
+                    y: 0.0,
+                    facing: 0.0,
+                    hp: 1.0,
+                    max_hp: 1.0,
+                    mana: None,
+                    max_mana: None,
+                    shield: None,
+                    dead: None,
+                    subtype: None,
+                    owner_id: None,
+                    level: None,
+                    anim: None,
+                    buffs: None,
+                    champ: None,
+                },
+            );
+        }
+        let a = allies_of(&state);
+        assert_eq!(a.0, [Some(2), Some(3), Some(5), Some(9)]);
+        assert_eq!(a.len(), 4);
+        state
+            .buffer
+            .entities
+            .retain(|id, _| *id != 3 && *id != 9 && *id != 12);
+        let a = allies_of(&state);
+        assert_eq!(a.0, [Some(2), Some(5), None, None]);
+        assert_eq!(a.len(), 2);
+    }
+
+    #[test]
+    fn le_fil_garde_les_entrees_recentes_sans_copie() {
+        let entry = |key: u32, time: f64| FeedEntry {
+            key,
+            time,
+            kind: FeedKind::Kill,
+            killer: None,
+            victim: None,
+            assists: vec![],
+            team: TeamOrNeutral::Blue,
+            label: None,
+            element: None,
+            monster: None,
+        };
+        let mut feed = HudFeed {
+            feed: (0..8).map(|k| entry(k, f64::from(k))).collect(),
+            ..HudFeed::default()
+        };
+        // à 15 s : les entrées de plus de 14 s tombent (0), puis on garde les 6 dernières
+        feed.trim(15.0);
+        let keys: Vec<u32> = feed.feed.iter().map(|e| e.key).collect();
+        assert_eq!(keys, vec![2, 3, 4, 5, 6, 7]);
+        assert!(feed.dirty);
+        feed.dirty = false;
+        feed.trim(15.0);
+        assert!(!feed.dirty);
     }
 }
