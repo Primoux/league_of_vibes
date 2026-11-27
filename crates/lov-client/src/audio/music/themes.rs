@@ -24,7 +24,6 @@ pub type PlayFn = fn(s: &mut Score, step: u32, loop_: u32, t: f64, intensity: f6
 /// Un thème : tempo, nombre de mesures de la boucle, et la fonction qui joue un pas.
 #[derive(Debug, Clone, Copy)]
 pub struct Theme {
-    pub id: ThemeId,
     pub bpm: f64,
     pub bars: u32,
     pub play: PlayFn,
@@ -429,19 +428,16 @@ fn game_play(b: &mut Score, step: u32, loop_: u32, t: f64, intensity: f64, sd: f
 /// Les trois thèmes (`THEMES`), dans l'ordre de [`ThemeId`].
 pub const THEMES: [Theme; 3] = [
     Theme {
-        id: ThemeId::Menu,
         bpm: 76.0,
         bars: 8,
         play: menu_play,
     },
     Theme {
-        id: ThemeId::Draft,
         bpm: 112.0,
         bars: 8,
         play: draft_play,
     },
     Theme {
-        id: ThemeId::Game,
         bpm: 66.0,
         bars: 8,
         play: game_play,
@@ -534,7 +530,10 @@ mod tests {
     #[test]
     fn joue_chaque_theme_sur_deux_boucles_a_toutes_les_intensites_sans_erreur() {
         let mut total = 0;
-        for th in &THEMES {
+        for (id, th) in [ThemeId::Menu, ThemeId::Draft, ThemeId::Game]
+            .iter()
+            .zip(&THEMES)
+        {
             for intensity in [0.0, 0.3, 0.6, 1.0] {
                 let mut s = Score::new();
                 for loop_ in 0..2 {
@@ -542,12 +541,7 @@ mod tests {
                         (th.play)(&mut s, step, loop_, f64::from(step) * 0.1, intensity, 0.1);
                     }
                 }
-                assert!(
-                    s.len() > 20,
-                    "{:?} à {intensity} : {} notes",
-                    th.id,
-                    s.len()
-                );
+                assert!(s.len() > 20, "{id:?} à {intensity} : {} notes", s.len());
                 total += s.len();
             }
         }

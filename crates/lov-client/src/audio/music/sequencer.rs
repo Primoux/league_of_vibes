@@ -94,6 +94,7 @@ pub struct Music {
 }
 
 impl Music {
+    #[cfg(test)]
     pub fn theme(&self) -> Option<ThemeId> {
         self.theme
     }

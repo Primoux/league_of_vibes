@@ -98,11 +98,6 @@ impl Param {
         self.push(time, value, Ramp::Exponential)
     }
 
-    /// `true` si la valeur ne change jamais (aucune rampe) : un filtre n'a alors pas à se recalculer.
-    pub fn is_constant(&self) -> bool {
-        self.len <= 1
-    }
-
     /// Valeur à l'instant `t` (secondes).
     pub fn value_at(&self, t: f64) -> f64 {
         let pts = &self.points[..self.len];
@@ -219,11 +214,6 @@ impl Noise {
         x ^= x << 5;
         self.0 = x;
         f64::from(x) / f64::from(u32::MAX) * 2.0 - 1.0
-    }
-
-    /// Valeur uniforme dans `[0, 1)`, pour les variations aléatoires des recettes.
-    pub fn unit(&mut self) -> f64 {
-        (self.next() + 1.0) * 0.5
     }
 }
 

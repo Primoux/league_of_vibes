@@ -4,7 +4,7 @@
 //! quatre formes d'onde, glissements, filtres de bruit, une recette d'ult portée du client web, la
 //! spatialisation (le même coup de plus en plus loin) et une rafale qui bute sur la polyphonie ; puis la
 //! galerie de musique : chaque instrument sur un bus du canal Musique, puis les jingles d'élimination sur un
-//! bus du canal Voix.
+//! bus du canal Voix. Enfin, une séquence d'événements de jeu factices fait entendre la table événement → son.
 //!
 //! `LOV_AUDIOLAB=themes` joue à la place chaque thème, un par un, puis la victoire et la défaite
 //! ([`tour`](super::music::tour)).
@@ -16,6 +16,7 @@ use super::mixer::Channel;
 use super::music::instruments::*;
 use super::music::stings::{StingSide, first_blood_sting, kill_sting};
 use super::music::{BusCommand, MusicBusHandle, Score};
+use super::sounds::lab::{EventLab, LAB};
 use super::synth::{FilterKind, NoiseOpts, ToneOpts, Wave};
 use super::{AudioManager, Recipe, SfxOpts};
 
@@ -285,14 +286,24 @@ struct Lab {
     index: usize,
     music: Option<MusicBusHandle>,
     stings: Option<MusicBusHandle>,
+    events: EventLab,
 }
 
 fn replay(time: Res<Time>, mut audio: ResMut<AudioManager>, mut lab: Local<Lab>) {
     if time.elapsed_secs() < lab.due {
         return;
     }
-    let i = lab.index % (GALLERY.len() + MUSIC.len());
+    let i = lab.index % (GALLERY.len() + MUSIC.len() + LAB.len());
     lab.index += 1;
+    if let Some(&(name, period, play)) = i
+        .checked_sub(GALLERY.len() + MUSIC.len())
+        .and_then(|e| LAB.get(e))
+    {
+        lab.due = time.elapsed_secs() + period;
+        info!("audiolab : {name}");
+        play(&mut audio, &mut lab.events);
+        return;
+    }
     let Some(&(name, period, play)) = i.checked_sub(GALLERY.len()).and_then(|m| MUSIC.get(m))
     else {
         // la rafale occupe la polyphonie 2,5 s : on laisse l'entrée suivante démarrer après

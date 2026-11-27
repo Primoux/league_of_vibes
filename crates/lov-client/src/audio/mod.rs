@@ -1,28 +1,21 @@
 //! Audio du client natif : effets et musique entièrement synthétisés, aucun asset externe.
 //!
-//! Portage de `packages/client/src/audio/` (issue #118), en plusieurs PR :
-//! - le moteur ([`synth`]), le mixage par canaux ([`mixer`]), les séries de kills ([`kill_streaks`]) et
-//!   la sortie vers la carte son ;
-//! - le moteur de musique ([`music`]) : bus, réverbération, instruments, jingles d'élimination, puis les
-//!   thèmes et le séquenceur qui suit l'écran ([`music::sequencer`]) ;
-//! - ensuite : la table événement de jeu → son (`sounds.ts`).
+//! Portage de `packages/client/src/audio/` (issue #118) :
+//! - le moteur ([`synth`]), le mixage par canaux ([`mixer`]) et la sortie vers la carte son ;
+//! - la table événement de jeu → son ([`sounds`]) et les annonces de séries de kills ([`kill_streaks`]) ;
+//! - la musique ([`music`]) : bus, réverbération, instruments, jingles d'élimination, thèmes, et le
+//!   séquenceur qui suit l'écran ([`music::sequencer`]) ;
+//! - la démo sans serveur ([`demo`], `LOV_AUDIOLAB`).
 //!
 //! Le client web pilote un `AudioContext` ; ici le jeu envoie des [`Sfx`] tout faits au fil audio par un
 //! canal, et un [`Mixer`] les rend dans une source Bevy sans fin ([`SynthStream`]). Rien n'est alloué ni
 //! verrouillé par échantillon sur le fil audio.
 
 pub mod demo;
-// Les séries de kills, les volumes et une partie de l'API de synthèse servent à la table événement → son
-// et à la musique, portées dans les PR suivantes de #118 ; jusque-là, seuls les tests et la démo les appellent.
-#[allow(dead_code)]
 pub mod kill_streaks;
-#[allow(dead_code)]
 pub mod mixer;
-// Le bus et les jingles servent à la table événement → son et aux thèmes (PR suivantes de #118) ; d'ici là,
-// seuls la démo et les tests en appellent une partie.
-#[allow(dead_code)]
 pub mod music;
-#[allow(dead_code)]
+pub mod sounds;
 pub mod synth;
 
 use std::num::NonZero;
@@ -76,8 +69,6 @@ pub struct Recipe<'a> {
     seed: &'a mut u32,
 }
 
-// `random` sert aux recettes à variations (cristaux de l'ult d'Ilyra), portées dans la PR suivante de #118.
-#[allow(dead_code)]
 impl Recipe<'_> {
     pub fn tone(&mut self, o: ToneOpts) -> &mut Self {
         self.voices.push(synth::tone(o));
@@ -119,8 +110,6 @@ pub struct AudioManager {
     next_bus: u32,
 }
 
-// Volumes et positions d'entités servent aux paramètres et à la table événement → son (PR suivantes de #118).
-#[allow(dead_code)]
 impl AudioManager {
     fn new(tx: SyncSender<Command>) -> Self {
         Self {
@@ -142,24 +131,6 @@ impl AudioManager {
     fn for_tests() -> (Self, Receiver<Command>) {
         let (tx, rx) = sync_channel(COMMAND_QUEUE);
         (Self::new(tx), rx)
-    }
-
-    pub fn set_volume(&mut self, ch: Channel, v: f32) {
-        self.volumes.set(ch, v);
-        self.send(Command::Volumes(self.volumes));
-    }
-
-    pub fn volume(&self, ch: Channel) -> f32 {
-        self.volumes.get(ch)
-    }
-
-    pub fn set_muted(&mut self, muted: bool) {
-        self.volumes.muted = muted;
-        self.send(Command::Volumes(self.volumes));
-    }
-
-    pub fn muted(&self) -> bool {
-        self.volumes.muted
     }
 
     pub fn set_listener(&mut self, pos: GameVec2) {
@@ -208,6 +179,29 @@ impl AudioManager {
         // File pleine ou fil audio absent (pas de carte son, personne ne lit) : le son est perdu, le jeu
         // continue, et la file ne grossit pas indéfiniment.
         let _ = self.tx.try_send(cmd);
+    }
+}
+
+// Réglages du son (`setVolume`, `setMuted`) : l'écran des paramètres de l'interface les appellera ; la
+// persistance des volumes d'un lancement à l'autre reste à porter (#118). D'ici là, seuls les tests les appellent.
+#[allow(dead_code)]
+impl AudioManager {
+    pub fn set_volume(&mut self, ch: Channel, v: f32) {
+        self.volumes.set(ch, v);
+        self.send(Command::Volumes(self.volumes));
+    }
+
+    pub fn volume(&self, ch: Channel) -> f32 {
+        self.volumes.get(ch)
+    }
+
+    pub fn set_muted(&mut self, muted: bool) {
+        self.volumes.muted = muted;
+        self.send(Command::Volumes(self.volumes));
+    }
+
+    pub fn muted(&self) -> bool {
+        self.volumes.muted
     }
 }
 
@@ -308,7 +302,7 @@ impl Plugin for SoundPlugin {
             .insert_resource(PendingStream(Some(SynthStream {
                 rx: Mutex::new(Some(rx)),
             })))
-            .add_plugins(music::sequencer::MusicPlugin)
+            .add_plugins((sounds::plugin, music::sequencer::MusicPlugin))
             .add_systems(Startup, start_stream)
             .add_systems(First, (tick_clock, follow_camera));
     }

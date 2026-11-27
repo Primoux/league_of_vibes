@@ -19,6 +19,7 @@ impl Score {
         Self::default()
     }
 
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.notes.len()
     }
@@ -28,6 +29,7 @@ impl Score {
     }
 
     /// Instant où la dernière source de la phrase s'arrête (temps du bus), `-∞` si elle est vide.
+    #[cfg(test)]
     pub fn end(&self) -> f64 {
         self.notes
             .iter()
