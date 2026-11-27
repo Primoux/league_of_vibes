@@ -246,10 +246,10 @@ fn draw_scoreboard(
         let mut tr: Vec<ScoreRow> = all.iter().filter(|r| r.team == team).cloned().collect();
         sort_score_rows(&mut tr);
         let kills: u32 = tr.iter().map(|r| r.kills).sum();
-        let value: f64 = tr
+        // `fold` depuis 0 : la somme d'une équipe vide ne vaut pas « -0 »
+        let value = tr
             .iter()
-            .map(|r| inventory_value(&r.items, &ITEM_LIST))
-            .sum();
+            .fold(0.0, |acc, r| acc + inventory_value(&r.items, &ITEM_LIST));
         let color = if team == Team::Blue { BLUE } else { RED };
         p.spawn(Node {
             column_gap: px(14),
