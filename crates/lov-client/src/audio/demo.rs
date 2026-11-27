@@ -5,6 +5,9 @@
 //! spatialisation (le même coup de plus en plus loin) et une rafale qui bute sur la polyphonie ; puis la
 //! galerie de musique : chaque instrument sur un bus du canal Musique, puis les jingles d'élimination sur un
 //! bus du canal Voix. Enfin, une séquence d'événements de jeu factices fait entendre la table événement → son.
+//!
+//! `LOV_AUDIOLAB=themes` joue à la place chaque thème, un par un, puis la victoire et la défaite
+//! ([`tour`](super::music::tour)).
 
 use bevy::prelude::*;
 use lov_shared::types::Vec2 as GameVec2;
@@ -26,7 +29,11 @@ pub struct AudioLabPlugin;
 
 impl Plugin for AudioLabPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, replay);
+        if std::env::var("LOV_AUDIOLAB").is_ok_and(|v| v == "themes") {
+            app.add_systems(Update, super::music::tour::tour);
+        } else {
+            app.add_systems(Update, replay);
+        }
     }
 }
 

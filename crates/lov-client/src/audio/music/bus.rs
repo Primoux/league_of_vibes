@@ -289,6 +289,7 @@ impl MusicBus {
         self.n as f64 / SR
     }
 
+    #[cfg(test)]
     pub fn active(&self) -> usize {
         self.notes.len()
     }

@@ -125,6 +125,7 @@ impl SfxGate {
         true
     }
 
+    #[cfg(test)]
     pub fn active(&self) -> usize {
         self.releases.len()
     }
@@ -147,6 +148,7 @@ impl Sfx {
         }
     }
 
+    #[cfg(test)]
     pub fn with(mut self, voice: Voice) -> Self {
         self.voices.push(voice);
         self
@@ -210,6 +212,7 @@ impl Mixer {
         self.volumes = v;
     }
 
+    #[cfg(test)]
     pub fn active(&self) -> usize {
         self.active.len()
     }
