@@ -34,6 +34,9 @@ pub mod shaders;
 // pilote elle-même depuis l'état de l'input.
 #[allow(dead_code)]
 pub mod telegraph;
+// Effets du monde : `register_auto_attack_fx` et les couleurs d'équipe servent aux FX des champions.
+#[allow(dead_code)]
+pub mod world;
 
 pub use bus::FxBus;
 pub use core::runtime::{CameraShake, FxRuntime};
@@ -56,6 +59,7 @@ impl Plugin for FxPlugin {
             post::PostFxPlugin,
             effects::EffectsPlugin,
             telegraph::TelegraphPlugin,
+            world::WorldFxPlugin,
         ))
         .add_message::<ServerEvent>()
         .add_message::<CameraShake>()
