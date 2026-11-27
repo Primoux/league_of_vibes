@@ -655,6 +655,14 @@ impl Effect for ProjectileFx {
     }
 
     fn end(&mut self, fx: &mut Fx) {
+        // terminé en plein vol (remise à zéro entre deux parties) : `on_end` rend ce qu'il détient
+        // (décal, entité…) ; `land` l'a déjà pris s'il a eu lieu
+        if self.flying {
+            self.flying = false;
+            if let Some(end) = self.look.on_end.take() {
+                end(fx, self.head);
+            }
+        }
         fx.release_sprite(self.sprite.clone());
         if let Some(r) = self.ribbon.take() {
             fx.release_ribbon(r);
@@ -805,6 +813,7 @@ impl Effect for Fading {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use std::sync::Arc;
     use std::sync::atomic::{AtomicU32, Ordering};
 
     use super::*;
@@ -946,6 +955,78 @@ pub(crate) mod tests {
             0,
             "ruban effacé"
         );
+    }
+
+    #[test]
+    fn remise_a_zero_pendant_une_telegraphie_rend_son_decal() {
+        let mut w = fx_world();
+        telegraph(
+            &mut Fx::new(&mut w),
+            Vec3::ZERO,
+            2.0,
+            0.5,
+            Vec3::ONE,
+            TelegraphOptions::default(),
+        );
+        let decal = {
+            let mut q = w.query::<(Entity, &GroundDecal)>();
+            q.iter(&w).map(|(e, _)| e).next()
+        };
+        // en plein remplissage : le `done` lance le fondu, qui détient le décal jusqu'à son propre `end`
+        run(&mut w, 0.2);
+        assert_eq!(visible_decals(&mut w), 1);
+        FxRuntime::reset(&mut w);
+        assert_eq!(visible_decals(&mut w), 0, "décal caché");
+        assert_eq!(w.resource::<FxRuntime>().active_effects(), 0);
+        let again = Fx::new(&mut w).acquire_decal().entity;
+        assert_eq!(Some(again), decal, "décal rendu au pool");
+    }
+
+    fn counted_projectile(w: &mut World, ends: &Arc<AtomicU32>) -> ProjectileStop {
+        let ends = ends.clone();
+        ProjectileFx::launch(
+            &mut Fx::new(w),
+            Vec3::ZERO,
+            Vec3::new(100.0, 0.0, 0.0),
+            10.0,
+            ProjectileLook {
+                on_end: Some(Box::new(move |_, _| {
+                    ends.fetch_add(1, Ordering::Relaxed);
+                })),
+                ..default()
+            },
+        )
+    }
+
+    #[test]
+    fn remise_a_zero_pendant_un_vol_appelle_on_end_une_fois() {
+        let mut w = fx_world();
+        let ends = Arc::new(AtomicU32::new(0));
+        let _stop = counted_projectile(&mut w, &ends);
+        run(&mut w, 0.2);
+        assert_eq!(ends.load(Ordering::Relaxed), 0, "toujours en vol");
+        FxRuntime::reset(&mut w);
+        assert_eq!(
+            ends.load(Ordering::Relaxed),
+            1,
+            "`on_end` rend ce qu'il détient"
+        );
+        assert_eq!(w.resource::<FxRuntime>().active_effects(), 0);
+    }
+
+    #[test]
+    fn remise_a_zero_apres_l_impact_n_appelle_pas_on_end_deux_fois() {
+        let mut w = fx_world();
+        let ends = Arc::new(AtomicU32::new(0));
+        let mut stop = counted_projectile(&mut w, &ends);
+        run(&mut w, 0.1);
+        stop.finish(&mut Fx::new(&mut w), Vec3::new(1.0, 0.0, 0.0));
+        run(&mut w, 0.1);
+        assert_eq!(ends.load(Ordering::Relaxed), 1);
+        // le ruban s'efface encore : l'effet est actif quand la remise à zéro arrive
+        assert_eq!(w.resource::<FxRuntime>().active_effects(), 1);
+        FxRuntime::reset(&mut w);
+        assert_eq!(ends.load(Ordering::Relaxed), 1);
     }
 
     #[test]

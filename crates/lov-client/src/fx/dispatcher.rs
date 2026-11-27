@@ -49,6 +49,11 @@ impl FxDispatcher {
         self.projectiles.len()
     }
 
+    /// Oublie les projectiles en vol (entre deux parties).
+    pub fn clear(&mut self) {
+        self.projectiles.clear();
+    }
+
     /// Traite un événement : handlers du monde, impact de sort, puis handler de la phase.
     pub fn handle(world: &mut World, e: &GameEvent) {
         world.resource_scope(|world, mut d: Mut<FxDispatcher>| d.run(world, e));
