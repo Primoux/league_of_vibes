@@ -19,6 +19,10 @@ pub mod core;
 pub mod demo;
 #[allow(dead_code)]
 pub mod dispatcher;
+// Primitives et auras : boîte à outils des FX de sorts (areas fx-effects et champion), dont une partie
+// n'est appelée que par les FX des champions et les tests.
+#[allow(dead_code)]
+pub mod effects;
 #[allow(dead_code)]
 pub mod keys;
 pub mod particles;
@@ -46,6 +50,7 @@ impl Plugin for FxPlugin {
             particles::ParticlesPlugin,
             shaders::ShadersPlugin,
             post::PostFxPlugin,
+            effects::EffectsPlugin,
         ))
         .add_message::<ServerEvent>()
         .add_message::<CameraShake>()
