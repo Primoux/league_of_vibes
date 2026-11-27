@@ -726,6 +726,10 @@ pub const HEIGHT: f32 = 2.65;
 
 // ---------------------------------------------------------------- monde
 
+/// Identifiant d'un hologramme : ne correspond à aucune entité du serveur, il ne reçoit donc aucun
+/// événement (comme `STAGE_ID` pour les vues hors partie).
+pub const HOLOGRAM_ID: EntityId = EntityId::MAX;
+
 /// Vue de Mélenchon : état d'animation et entités animées.
 #[derive(Component, Clone, Debug)]
 pub struct MelenchonView {
@@ -734,6 +738,8 @@ pub struct MelenchonView {
     groups: [Entity; GROUPS],
     mouth: Entity,
     tie: Entity,
+    /// Snapshot synthétique (vivant, sans buff) d'un hologramme, qui s'anime sans le serveur.
+    synthetic: Option<EntitySnapshot>,
 }
 
 /// Fait apparaître la caricature sous `view` (un hologramme est translucide et sans ombre).
@@ -817,6 +823,7 @@ pub fn spawn_melenchon(
         groups,
         mouth,
         tie,
+        synthetic: hologram.then(|| rest_snapshot(id)),
     }
 }
 
@@ -854,7 +861,8 @@ pub fn animate_melenchon(
 ) {
     let dt = time.delta_secs().min(0.1);
     for (view, mut m) in &mut views {
-        let Some(snap) = state.entities().get(&m.id) else {
+        let m = &mut *m;
+        let Some(snap) = m.synthetic.as_ref().or_else(|| state.entities().get(&m.id)) else {
             continue;
         };
         let f = m.state.step(snap, &view.anim, dt);
@@ -939,6 +947,7 @@ mod tests {
             groups: [Entity::PLACEHOLDER; GROUPS],
             mouth: Entity::PLACEHOLDER,
             tie: Entity::PLACEHOLDER,
+            synthetic: None,
         };
         let cast = GameEvent::AbilityCast {
             source: 1,
