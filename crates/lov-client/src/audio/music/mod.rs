@@ -1,7 +1,7 @@
-//! Moteur de musique : bus de mixage, réverbération, instruments et jingles d'élimination.
+//! Musique : bus de mixage, réverbération, instruments, jingles d'élimination, thèmes et séquenceur.
 //!
-//! Portage de `packages/client/src/audio/music/instruments.ts` et `stings.ts` (issue #118). Les thèmes,
-//! le séquenceur et la table des sons de jeu suivent dans d'autres PR.
+//! Portage de `packages/client/src/audio/music/instruments.ts`, `stings.ts`, `themes.ts` et de
+//! `audio/music.ts` ([`sequencer`]) (issue #118).
 //!
 //! Modèle temporel : le web programme des nœuds à un instant `t` de `ctx.currentTime`. Ici, un
 //! instrument ajoute des [`Note`](note::Note)s datées en **temps absolu du bus** à une [`Score`] ; la
@@ -14,7 +14,10 @@ pub mod bus;
 pub mod instruments;
 pub mod note;
 pub mod reverb;
+pub mod sequencer;
 pub mod stings;
+pub mod themes;
+pub mod tour;
 
 pub use bus::{BusCommand, MusicBus, MusicBusHandle};
 pub use note::Score;

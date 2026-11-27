@@ -3,8 +3,9 @@
 //! Portage de `packages/client/src/audio/` (issue #118), en plusieurs PR :
 //! - le moteur ([`synth`]), le mixage par canaux ([`mixer`]), les séries de kills ([`kill_streaks`]) et
 //!   la sortie vers la carte son ;
-//! - le moteur de musique ([`music`]) : bus, réverbération, instruments, jingles d'élimination ;
-//! - ensuite : la table événement de jeu → son (`sounds.ts`), puis les thèmes et le séquenceur.
+//! - le moteur de musique ([`music`]) : bus, réverbération, instruments, jingles d'élimination, puis les
+//!   thèmes et le séquenceur qui suit l'écran ([`music::sequencer`]) ;
+//! - ensuite : la table événement de jeu → son (`sounds.ts`).
 //!
 //! Le client web pilote un `AudioContext` ; ici le jeu envoie des [`Sfx`] tout faits au fil audio par un
 //! canal, et un [`Mixer`] les rend dans une source Bevy sans fin ([`SynthStream`]). Rien n'est alloué ni
@@ -307,6 +308,7 @@ impl Plugin for SoundPlugin {
             .insert_resource(PendingStream(Some(SynthStream {
                 rx: Mutex::new(Some(rx)),
             })))
+            .add_plugins(music::sequencer::MusicPlugin)
             .add_systems(Startup, start_stream)
             .add_systems(First, (tick_clock, follow_camera));
     }
