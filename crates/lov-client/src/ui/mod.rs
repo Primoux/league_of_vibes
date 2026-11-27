@@ -9,7 +9,7 @@
 
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
-use bevy::ui::InteractionDisabled;
+use bevy::ui::{InteractionDisabled, RelativeCursorPosition};
 use bevy::ui_widgets::Button;
 
 use crate::net::{Autoplay, GameState, now_ms};
@@ -201,6 +201,26 @@ fn paint_buttons(
     }
 }
 
+/// Panneau d'interface qui capte la souris : un clic dessus ne donne pas d'ordre dans le monde.
+/// `RelativeCursorPosition` est ajouté avec lui.
+#[derive(Component, Clone, Copy, Default)]
+#[require(RelativeCursorPosition)]
+pub struct BlocksWorld;
+
+/// La souris survole un panneau [`BlocksWorld`] visible : l'input ignore le monde sous le curseur.
+#[derive(Resource, Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct PointerOverUi(pub bool);
+
+fn pointer_over_ui(
+    panels: Query<(&RelativeCursorPosition, &InheritedVisibility), With<BlocksWorld>>,
+    mut over: ResMut<PointerOverUi>,
+) {
+    let now = panels.iter().any(|(c, v)| v.get() && c.cursor_over());
+    if over.0 != now {
+        over.0 = now;
+    }
+}
+
 const CINZEL: &[u8] = include_bytes!("screens/fonts/Cinzel.ttf");
 const INTER: &[u8] = include_bytes!("screens/fonts/Inter.ttf");
 
@@ -211,7 +231,9 @@ impl Plugin for UiPlugin {
         let forced = std::env::var("LOV_AUTOPLAY").is_ok_and(|v| v != "0");
         app.insert_resource(Autoplay(forced))
             .init_state::<Screen>()
+            .init_resource::<PointerOverUi>()
             .add_systems(Update, (follow_state, paint_buttons))
+            .add_systems(PreUpdate, pointer_over_ui.after(bevy::ui::UiSystems::Focus))
             .add_plugins((icons::IconsPlugin, screens::ScreensPlugin));
     }
 

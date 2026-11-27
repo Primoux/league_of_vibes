@@ -9,8 +9,10 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
 
-// Glyphes et dessin servent aux icônes du HUD (#113), branchées dans la PR suivante : en attendant,
-// seuls les tests les lisent.
+// Icônes du HUD (#113) : la fabrique et ses tables, dont une partie ne sert qu'aux écrans à venir
+// (rôles, emblèmes) et aux tests.
+#[allow(dead_code)]
+pub mod draw;
 #[allow(dead_code)]
 pub mod glyphs;
 #[allow(dead_code)]
@@ -99,7 +101,8 @@ pub struct IconsPlugin;
 
 impl Plugin for IconsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(portrait::PortraitPlugin);
+        app.add_plugins(portrait::PortraitPlugin)
+            .init_resource::<draw::IconCache>();
     }
 
     /// Illustrations décodées avant le premier écran (l'accueil les affiche dès le démarrage).
