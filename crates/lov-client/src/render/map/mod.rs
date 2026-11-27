@@ -2,7 +2,8 @@
 //!
 //! - `geometry` : relief du terrain (`terrain_height`), distances aux voies et à la rivière ;
 //! - `noise` : texture de bruit tuilable partagée par les shaders du décor ;
-//! - `masks` + `terrain` : sol avec relief, peint par shader (herbe, voies, sable, dallage, caustiques).
+//! - `masks` + `terrain` : sol avec relief, peint par shader (herbe, voies, sable, dallage, caustiques) ;
+//! - `water` : rivière animée (vagues, reflets, écume des berges).
 //!
 //! Murs et brousses viennent de `lov_shared::map` (`WALLS`, `BRUSHES`) ; ils restent des prismes simples
 //! jusqu'au portage de la végétation (`vegetation.ts`).
@@ -19,6 +20,7 @@ pub mod geometry;
 mod masks;
 pub mod noise;
 pub mod terrain;
+pub mod water;
 
 pub const MAP_SIZE: f32 = constants::MAP_SIZE as f32;
 const WALL_HEIGHT: f32 = 1.4;
@@ -82,15 +84,19 @@ pub struct MapPlugin;
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         bevy::asset::embedded_asset!(app, "terrain.wesl");
-        app.add_plugins(MaterialPlugin::<terrain::TerrainMaterial>::default())
-            .add_systems(
-                Startup,
-                (
-                    noise::create_noise_texture,
-                    (terrain::spawn_terrain, spawn_map),
-                )
-                    .chain(),
-            );
+        bevy::asset::embedded_asset!(app, "water.wesl");
+        app.add_plugins((
+            MaterialPlugin::<terrain::TerrainMaterial>::default(),
+            MaterialPlugin::<water::RiverMaterial>::default(),
+        ))
+        .add_systems(
+            Startup,
+            (
+                noise::create_noise_texture,
+                (terrain::spawn_terrain, water::spawn_river, spawn_map),
+            )
+                .chain(),
+        );
     }
 }
 
