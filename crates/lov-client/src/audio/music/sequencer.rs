@@ -317,13 +317,23 @@ pub struct MusicPlugin;
 
 impl Plugin for MusicPlugin {
     fn build(&self, app: &mut App) {
-        if super::super::demo::enabled() {
+        if !game_mode() {
             return;
         }
         app.add_message::<ServerEvent>()
             .init_resource::<MusicPlayer>()
             .add_systems(Update, advance_music);
     }
+}
+
+/// Le web n'installe l'audio que dans le jeu, pas dans ses bancs d'essai : on reprend ici les modes
+/// hors ligne de `main.rs` (charge, vue, interface, FX, audio), où la musique ne suit pas l'écran.
+fn game_mode() -> bool {
+    crate::render::stress::units_from_env().is_none()
+        && !crate::render::viewlab::enabled()
+        && crate::ui::lab::requested().is_none()
+        && !crate::fx::demo::enabled()
+        && !super::super::demo::enabled()
 }
 
 /// Chaque image : suit l'écran, lit les événements de jeu, puis avance le séquenceur. Rien n'est alloué
@@ -351,9 +361,15 @@ pub fn advance_music(
         _ => false,
     };
     music.follow(want, win, state.time, real, now, &mut out);
+    // `snapshot.self.entityId ?? game.entityId`
+    let me = state
+        .self_state
+        .as_ref()
+        .map(|x| x.entity_id)
+        .or(state.game.as_ref().map(|g| g.entity_id));
     let entities = state.entities();
     for ServerEvent(e) in events.read() {
-        music.on_event(e, state.my_entity, |id| entities.get(&id).map(|x| x.kind));
+        music.on_event(e, me, |id| entities.get(&id).map(|x| x.kind));
     }
     music.tick(real, time.delta_secs_f64(), now, &mut out);
 }
@@ -747,11 +763,97 @@ mod tests {
             app.world().resource::<MusicPlayer>().music.theme(),
             Some(ThemeId::Menu)
         );
-        app.update();
+        // sans fil audio, l'horloge du bus reste à 0 : après la première anticipation, plus rien ne part
+        for _ in 0..100 {
+            app.update();
+        }
         let again: Vec<Command> = rx.try_iter().collect();
         assert!(
             !again.iter().any(|c| matches!(c, Command::AddBus(..))),
             "un seul bus"
         );
+        assert!(
+            !again
+                .iter()
+                .any(|c| matches!(c, Command::Bus(_, BusCommand::Play(_)))),
+            "aucune phrase sur les images sans pas dû"
+        );
+    }
+
+    /// Rend `seconds` de musique hors ligne : le séquenceur lit l'horloge publiée par un vrai bus, rendu
+    /// par blocs de 256 trames. Renvoie la crête, la moyenne quadratique et le maximum de notes actives.
+    fn render(
+        mut setup: impl FnMut(&mut Music, f64, &mut dyn FnMut(BusCommand)),
+        seconds: f64,
+    ) -> (f32, f32, usize) {
+        let (mut bus, handle) = super::super::MusicBus::new(1);
+        let mut m = Music::default();
+        let mut buf = [0.0f32; 512];
+        let (mut peak, mut sum, mut n, mut most) = (0.0f32, 0.0f64, 0usize, 0usize);
+        let mut first = true;
+        while handle.current_time() < seconds {
+            let now = handle.current_time();
+            {
+                let mut out = |c| bus.command(c);
+                if first {
+                    setup(&mut m, now, &mut out);
+                    first = false;
+                }
+                m.tick(now, 256.0 / SR, now, &mut out);
+            }
+            buf.fill(0.0);
+            bus.render_add(&mut buf, 1.0);
+            most = most.max(bus.active());
+            for x in buf {
+                assert!(x.is_finite());
+                peak = peak.max(x.abs());
+                sum += f64::from(x * x);
+                n += 1;
+            }
+        }
+        (peak, (sum / n as f64).sqrt() as f32, most)
+    }
+
+    /// Chaque thème et chaque jingle, rendus par le vrai bus : audibles, bornés, et loin du plafond de notes
+    /// du bus (au-delà, des notes seraient ignorées sans bruit).
+    #[test]
+    fn chaque_theme_et_chaque_jingle_se_rendent_par_le_bus() {
+        use super::super::bus::MAX_NOTES;
+        for (id, intensity) in [
+            (ThemeId::Menu, 0.0),
+            (ThemeId::Draft, 0.0),
+            (ThemeId::Game, 0.0),
+            (ThemeId::Game, 1.0),
+        ] {
+            let (peak, rms, most) = render(
+                |m, now, out| {
+                    m.follow(Want::Theme(id), false, 0.0, now, now, &mut |c| out(c));
+                    m.intensity.value = intensity;
+                    m.intensity.floor = intensity;
+                },
+                8.0,
+            );
+            assert!(
+                rms > 1e-3 && peak < 1.5,
+                "{id:?} à {intensity} : crête {peak}, rms {rms}"
+            );
+            assert!(most < MAX_NOTES / 4, "{id:?} à {intensity} : {most} notes");
+        }
+        for win in [true, false] {
+            let (peak, rms, most) = render(
+                |m, now, out| {
+                    m.follow(Want::Theme(ThemeId::Menu), false, 0.0, now, now, &mut |c| {
+                        out(c)
+                    });
+                    m.follow(Want::End, win, 0.0, now, now, &mut |c| out(c));
+                },
+                7.0,
+            );
+            assert!(
+                rms > 1e-3 && peak < 1.5,
+                "fin {win} : crête {peak}, rms {rms}"
+            );
+            assert!(most < MAX_NOTES / 4, "fin {win} : {most} notes");
+        }
     }
 }
