@@ -17,6 +17,7 @@ pub mod sable;
 pub mod solenne;
 pub mod tharox;
 pub mod touilleur;
+pub mod vrenna;
 
 /// Enregistre les FX de tous les champions.
 pub struct ChampionFxPlugin;
@@ -34,5 +35,6 @@ impl Plugin for ChampionFxPlugin {
         solenne::register(app);
         tharox::register(app);
         touilleur::register(app);
+        vrenna::register(app);
     }
 }
