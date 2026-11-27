@@ -12,6 +12,7 @@ pub mod ilyra;
 pub mod kaelen;
 pub mod master67;
 pub mod melenchon;
+pub mod nyx;
 
 /// Enregistre les FX de tous les champions.
 pub struct ChampionFxPlugin;
@@ -24,5 +25,6 @@ impl Plugin for ChampionFxPlugin {
         kaelen::register(app);
         master67::register(app);
         melenchon::register(app);
+        nyx::register(app);
     }
 }
