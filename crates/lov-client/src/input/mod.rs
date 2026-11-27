@@ -343,7 +343,7 @@ fn mouse_orders(
 }
 
 #[allow(clippy::too_many_arguments)] // un système Bevy : ses paramètres sont ses accès au monde
-fn key_orders(
+pub(crate) fn key_orders(
     mut events: MessageReader<KeyboardInput>,
     keys: Res<ButtonInput<KeyCode>>,
     state: Res<GameState>,
@@ -378,6 +378,8 @@ fn key_orders(
                 set_targeting(&mut input, None);
             } else if input.shop_open {
                 input.shop_open = false;
+            } else if typing {
+                // saisie du chat : le champ se ferme lui-même
             } else {
                 // Panneau de réglages : la souris est rendue au système tant qu'il est ouvert.
                 input.settings_open = !input.settings_open;

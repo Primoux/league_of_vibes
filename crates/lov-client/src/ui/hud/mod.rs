@@ -11,8 +11,10 @@ use super::Screen;
 use super::UiFonts;
 
 pub mod bottom;
+pub mod chat;
 pub mod minimap;
 pub mod overlays;
+pub mod panels;
 pub mod shop;
 
 /// Racine du HUD (plein écran, transparente aux clics).
@@ -114,6 +116,8 @@ impl Plugin for HudPlugin {
             overlays::OverlaysPlugin,
             minimap::MinimapPlugin,
             shop::ShopPlugin,
+            panels::PanelsPlugin,
+            chat::ChatPlugin,
         ));
     }
 }
