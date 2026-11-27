@@ -30,6 +30,10 @@ pub mod post;
 #[allow(dead_code)]
 pub mod registry;
 pub mod shaders;
+// Indicateurs de visée : l'API manuelle (`show_ability`…) sert aux démos et aux tests ; la partie les
+// pilote elle-même depuis l'état de l'input.
+#[allow(dead_code)]
+pub mod telegraph;
 
 pub use bus::FxBus;
 pub use core::runtime::{CameraShake, FxRuntime};
@@ -51,6 +55,7 @@ impl Plugin for FxPlugin {
             shaders::ShadersPlugin,
             post::PostFxPlugin,
             effects::EffectsPlugin,
+            telegraph::TelegraphPlugin,
         ))
         .add_message::<ServerEvent>()
         .add_message::<CameraShake>()
