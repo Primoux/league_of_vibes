@@ -7,7 +7,7 @@
 //!   Bevy les regroupe seul en un dessin instancié et les écarte une à une hors du champ de la caméra
 //!   (le client web découpe en tuiles de 2000 pour ça). La teinte d'instance passe par le `MeshTag` ;
 //! - qualité haute seulement (le client Bevy n'a pas encore de réglage de qualité) ;
-//! - le brouillard de guerre (`applyFog`) n'est pas encore porté (area `render`).
+//! - le brouillard de guerre (`applyFog` du web) assombrit la végétation hors de vue (`fog.rs`).
 
 use std::f64::consts::{FRAC_1_SQRT_2, TAU};
 
@@ -49,6 +49,10 @@ pub struct FoliageExt {
     /// x : force du vent, y : liseré.
     #[uniform(100)]
     pub params: Vec4,
+    /// Visibilité du brouillard de guerre ([`super::fog::FogOfWar`]).
+    #[texture(110)]
+    #[sampler(111)]
+    pub fog: Handle<Image>,
 }
 
 impl MaterialExtension for FoliageExt {
@@ -472,7 +476,13 @@ pub struct BrushView {
     pub opacity: f32,
 }
 
-fn foliage(rough: f32, wind: f32, rim: f32, double_sided: bool) -> FoliageMaterial {
+fn foliage(
+    fog: &Handle<Image>,
+    rough: f32,
+    wind: f32,
+    rim: f32,
+    double_sided: bool,
+) -> FoliageMaterial {
     FoliageMaterial {
         base: StandardMaterial {
             perceptual_roughness: rough,
@@ -482,6 +492,7 @@ fn foliage(rough: f32, wind: f32, rim: f32, double_sided: bool) -> FoliageMateri
         },
         extension: FoliageExt {
             params: Vec4::new(wind, rim, 0.0, 0.0),
+            fog: fog.clone(),
         },
     }
 }
@@ -508,6 +519,7 @@ fn spawn_all(
 pub(super) fn spawn_vegetation(
     mut commands: Commands,
     noise: Res<NoiseTexture>,
+    fog: Res<super::fog::FogOfWar>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<FoliageMaterial>>,
     mut cliffs: ResMut<Assets<CliffMaterial>>,
@@ -531,12 +543,12 @@ pub(super) fn spawn_vegetation(
     ));
     let layout = layout();
     // arbres
-    let trees = materials.add(foliage(0.88, 0.025, 0.55, false));
+    let trees = materials.add(foliage(&fog.texture, 0.88, 0.025, 0.55, false));
     for (geo, items) in tree_variants().iter().zip(&layout.trees) {
         spawn_all(&mut commands, &meshes.add(geo.to_mesh()), &trees, items);
     }
     // rochers
-    let rocks = materials.add(foliage(1.0, 0.0, 0.0, false));
+    let rocks = materials.add(foliage(&fog.texture, 1.0, 0.0, 0.0, false));
     spawn_all(
         &mut commands,
         &meshes.add(rock().to_mesh()),
@@ -546,7 +558,7 @@ pub(super) fn spawn_vegetation(
     // brousses : un matériau par brousse (opacité propre)
     let blade = meshes.add(blade_tuft(7, 0.85, 0.07, 0.05, hex(0x173d1c), hex(0x9ccf55)).to_mesh());
     for (poly, items) in layout.brushes.iter().enumerate() {
-        let material = materials.add(foliage(0.8, 0.09, 0.0, true));
+        let material = materials.add(foliage(&fog.texture, 0.8, 0.09, 0.0, true));
         let view = BrushView {
             poly,
             material: material.clone(),
@@ -557,9 +569,9 @@ pub(super) fn spawn_vegetation(
     }
     // touffes et fleurs au sol
     let tuft = meshes.add(blade_tuft(6, 0.36, 0.05, 0.035, hex(0x3b6e30), hex(0xb6d870)).to_mesh());
-    let tuft_mat = materials.add(foliage(0.85, 0.6, 0.0, true));
+    let tuft_mat = materials.add(foliage(&fog.texture, 0.85, 0.6, 0.0, true));
     spawn_all(&mut commands, &tuft, &tuft_mat, &layout.tufts);
-    let flower_mat = materials.add(foliage(0.7, 0.0, 0.0, true));
+    let flower_mat = materials.add(foliage(&fog.texture, 0.7, 0.0, 0.0, true));
     spawn_all(
         &mut commands,
         &meshes.add(flower().to_mesh()),

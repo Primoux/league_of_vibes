@@ -24,6 +24,9 @@ struct River {
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> u: River;
 @group(constants::MATERIAL_BIND_GROUP) @binding(1) var noise: texture_2d<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(2) var noise_sampler: sampler;
+// Brouillard de guerre (`FOG_GLSL` du web, voir `fog.rs`) : l'eau hors de vue est assombrie.
+@group(constants::MATERIAL_BIND_GROUP) @binding(3) var fog_vis: texture_2d<f32>;
+@group(constants::MATERIAL_BIND_GROUP) @binding(4) var fog_sampler: sampler;
 
 struct Vertex {
     @builtin(instance_index) instance_index: u32,
@@ -86,5 +89,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     var alpha = mix(0.42, 0.86, smoothstep(0.0, 0.65, depth));
     alpha = max(alpha, foam * 0.85);
     alpha *= (1.0 - smoothstep(0.97, 1.0, across)) * smoothstep(0.0, 4.0, ends);
+    let fog = textureSampleLevel(fog_vis, fog_sampler, vec2(in.world.x, -in.world.z) / 120.0, 0.0).r;
+    col = mix(col * 0.42, col, fog);
     return vec4(col, alpha);
 }

@@ -36,6 +36,18 @@ struct Terrain {
 @group(constants::MATERIAL_BIND_GROUP) @binding(103) var noise: texture_2d<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(104) var noise_sampler: sampler;
 
+
+// Brouillard de guerre (`applyFog` du web, voir `fog.rs`) : visibilité 0..1 lue en coordonnées de carte
+// (la carte fait 120 unités monde), zones non visibles assombries, désaturées et bleutées.
+@group(constants::MATERIAL_BIND_GROUP) @binding(110) var fog_vis: texture_2d<f32>;
+@group(constants::MATERIAL_BIND_GROUP) @binding(111) var fog_sampler: sampler;
+
+fn apply_fog(c: vec3<f32>, world: vec3<f32>) -> vec3<f32> {
+    let v = textureSampleLevel(fog_vis, fog_sampler, vec2(world.x, -world.z) / 120.0, 0.0).r;
+    let grey = vec3(dot(c, vec3(0.299, 0.587, 0.114)));
+    return mix(mix(grey, c, 0.45) * 0.42 * vec3(0.85, 0.9, 1.05), c, v);
+}
+
 fn n(uv: vec2<f32>) -> vec4<f32> {
     return textureSample(noise, noise_sampler, uv);
 }
@@ -128,5 +140,6 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     var out: FragmentOutput;
     out.color = apply_pbr_lighting(pbr_input);
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
+    out.color = vec4(apply_fog(out.color.rgb, in.world_position.xyz), out.color.a);
     return out;
 }

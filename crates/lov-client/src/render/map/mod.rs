@@ -3,6 +3,7 @@
 //! - `geometry` : relief du terrain (`terrain_height`), distances aux voies et à la rivière ;
 //! - `noise` : texture de bruit tuilable partagée par les shaders du décor ;
 //! - `masks` + `terrain` : sol avec relief, peint par shader (herbe, voies, sable, dallage, caustiques) ;
+//! - `fog` : brouillard de guerre (texture de visibilité lue par le sol, la végétation, l'eau et la minicarte) ;
 //! - `water` : rivière animée (vagues, reflets, écume des berges) ;
 //! - `cliffs` + `vegetation` + `vgeo` : murs en falaises, arbres, rochers, brousses animées par le vent,
 //!   touffes et fleurs (placement identique au client web, `rng`).
@@ -13,6 +14,7 @@ use bevy::prelude::*;
 use lov_shared::constants;
 
 mod cliffs;
+pub mod fog;
 pub mod geometry;
 mod masks;
 pub mod noise;
@@ -32,25 +34,26 @@ impl Plugin for MapPlugin {
         bevy::asset::embedded_asset!(app, "water.wesl");
         bevy::asset::embedded_asset!(app, "cliff.wesl");
         bevy::asset::embedded_asset!(app, "foliage.wesl");
-        app.add_plugins((
-            MaterialPlugin::<terrain::TerrainMaterial>::default(),
-            MaterialPlugin::<water::RiverMaterial>::default(),
-            MaterialPlugin::<cliffs::CliffMaterial>::default(),
-            MaterialPlugin::<vegetation::FoliageMaterial>::default(),
-        ))
-        .add_systems(
-            Startup,
-            (
-                noise::create_noise_texture,
+        app.init_resource::<fog::FogOfWar>()
+            .add_plugins((
+                MaterialPlugin::<terrain::TerrainMaterial>::default(),
+                MaterialPlugin::<water::RiverMaterial>::default(),
+                MaterialPlugin::<cliffs::CliffMaterial>::default(),
+                MaterialPlugin::<vegetation::FoliageMaterial>::default(),
+            ))
+            .add_systems(
+                Startup,
                 (
-                    terrain::spawn_terrain,
-                    water::spawn_river,
-                    vegetation::spawn_vegetation,
-                ),
+                    noise::create_noise_texture,
+                    (
+                        terrain::spawn_terrain,
+                        water::spawn_river,
+                        vegetation::spawn_vegetation,
+                    ),
+                )
+                    .chain(),
             )
-                .chain(),
-        )
-        .add_systems(Update, vegetation::fade_brushes);
+            .add_systems(Update, (vegetation::fade_brushes, fog::update_fog));
     }
 }
 
