@@ -11,6 +11,7 @@ pub mod grondak;
 pub mod ilyra;
 pub mod kaelen;
 pub mod master67;
+pub mod melenchon;
 
 /// Enregistre les FX de tous les champions.
 pub struct ChampionFxPlugin;
@@ -22,5 +23,6 @@ impl Plugin for ChampionFxPlugin {
         ilyra::register(app);
         kaelen::register(app);
         master67::register(app);
+        melenchon::register(app);
     }
 }
