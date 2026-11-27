@@ -14,6 +14,7 @@
 //! `LOV_VIEWLAB=1` lance la démo des vues d'entités (tous les modèles, toutes les animations) sans serveur.
 //! `LOV_UILAB=<écran>` affiche un écran de l'interface avec des données fictives, sans serveur.
 //! `LOV_STRESS=<n>` lance une scène de charge de n unités sans serveur (mesure de FPS).
+//! `LOV_DEBUG=1` affiche la ligne de debug (état, unités, snapshots) par-dessus l'interface.
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture 4 s après l'entrée en jeu, pour vérifier le rendu
 //! sans regarder la fenêtre (CI, IA).
 
@@ -103,13 +104,21 @@ fn update_status(
     rig: Res<render::camera::CameraRig>,
     screen: Option<Res<State<ui::Screen>>>,
     mut text: Single<(&mut Text, &mut Visibility), With<StatusText>>,
+    mut debug: Local<Option<bool>>,
 ) {
-    // Ligne de debug masquée sous les écrans (accueil, salon…).
+    // Ligne de debug masquée sous l'interface (écrans et HUD) : seulement avec `LOV_DEBUG=1`, lu une
+    // fois, ou sans interface (labos, scène de charge).
+    let debug = *debug.get_or_insert_with(|| std::env::var("LOV_DEBUG").is_ok_and(|v| v == "1"));
     let (text, visibility) = &mut *text;
-    **visibility = match screen.as_deref().map(State::get) {
-        Some(s) if *s != ui::Screen::Game => Visibility::Hidden,
-        _ => Visibility::Inherited,
-    };
+    let shown = debug || screen.is_none();
+    visibility.set_if_neq(if shown {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    });
+    if !shown {
+        return;
+    }
     // La police par défaut de Bevy n'a que l'ASCII : pas d'accents ici tant que l'area ui-core
     // n'a pas apporté une police du jeu.
     text.0 = format!(
