@@ -205,12 +205,13 @@ pub fn play_event(
                 AbilitySlot::E => ("E", "e"),
                 AbilitySlot::R => ("R", "r"),
             };
-            // Même ordre que le web : la clé `${championId}_${slot}` garde le slot en majuscule, donc les
-            // recettes dédiées (`grondak_r`…) ne sont jamais trouvées ici et la recette procédurale de
-            // la clé en minuscule l'emporte. Porté tel quel (voir la PR).
-            let recipe = recipes::custom(|k| is_ability_key(k, champion_id, upper))
-                .or_else(|| recipes::procedural(|k| is_ability_key(k, champion_id, upper)))
-                .or_else(|| recipes::procedural(|k| is_ability_key(k, champion_id, lower)));
+            // Les recettes dédiées sont enregistrées avec le slot en minuscule (`grondak_r`). Le web les
+            // cherchait avec `grondak_R` et ne les trouvait jamais (#244) : on cherche les deux casses.
+            let recipe = recipes::custom(|k| {
+                is_ability_key(k, champion_id, lower) || is_ability_key(k, champion_id, upper)
+            })
+            .or_else(|| recipes::procedural(|k| is_ability_key(k, champion_id, upper)))
+            .or_else(|| recipes::procedural(|k| is_ability_key(k, champion_id, lower)));
             let pos = pos_of(*source).or(*target_pos);
             match recipe {
                 Some(recipe) => recipe.play(a, pos, Some(1.0)),
