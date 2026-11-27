@@ -16,6 +16,11 @@ const DEFAULT_DISTANCE: f32 = 46.0;
 /// Direction du point visé vers la caméra : environ 56° au-dessus de l'horizon.
 const OFFSET: Vec3 = Vec3::new(0.0, 0.83, 0.56);
 
+/// Caméra de la partie. Les scènes rendues hors écran (champions de l'interface) ont leur propre
+/// `Camera3d` : les systèmes qui veulent la vue du joueur filtrent sur ce marqueur.
+#[derive(Component)]
+pub struct MainCamera;
+
 #[derive(Resource)]
 pub struct CameraRig {
     pub focus: Vec3,
@@ -43,6 +48,7 @@ fn spawn_camera(mut commands: Commands) {
     // Focale longue et caméra éloignée : peu de déformation sur les bords, comme une vue de MOBA.
     commands.spawn((
         Camera3d::default(),
+        MainCamera,
         PostFxCamera,
         Projection::Perspective(PerspectiveProjection {
             fov: 0.42,
@@ -69,7 +75,7 @@ fn spawn_camera(mut commands: Commands) {
 
 pub fn drive_camera(
     mut rig: ResMut<CameraRig>,
-    mut camera: Single<&mut Transform, With<Camera3d>>,
+    mut camera: Single<&mut Transform, With<MainCamera>>,
     window: Single<&Window>,
     keys: Res<ButtonInput<KeyCode>>,
     scroll: Res<AccumulatedMouseScroll>,
