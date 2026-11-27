@@ -9,6 +9,7 @@ use bevy::prelude::*;
 pub mod corvin;
 pub mod grondak;
 pub mod ilyra;
+pub mod kaelen;
 
 /// Enregistre les FX de tous les champions.
 pub struct ChampionFxPlugin;
@@ -18,5 +19,6 @@ impl Plugin for ChampionFxPlugin {
         corvin::register(app);
         grondak::register(app);
         ilyra::register(app);
+        kaelen::register(app);
     }
 }
