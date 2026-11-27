@@ -1,9 +1,9 @@
 //! HUD en partie : portage de `packages/client/src/ui/hud/` (area `ui-hud`).
 //!
 //! Construit une fois en entrant en partie (`Screen::Game`), puis mis à jour à chaque image : chaque
-//! élément dynamique porte un marqueur ([`HudText`], [`HudFill`], [`HudImage`], [`HudShow`],
-//! [`HudTint`]) que les systèmes remplissent à partir d'un modèle calculé depuis l'état du jeu. Rien n'est
-//! recréé tant que la partie dure ; un texte ou une couleur n'est réécrit que s'il change.
+//! élément dynamique porte un marqueur (texte, largeur, image, visibilité, couleur) que les systèmes de son
+//! module remplissent depuis l'état du jeu. Rien n'est recréé tant que la partie dure, hors listes
+//! courtes (fil des éliminations) ; un texte ou une couleur n'est réécrit que s'il change.
 
 use bevy::prelude::*;
 
@@ -11,6 +11,8 @@ use super::Screen;
 use super::UiFonts;
 
 pub mod bottom;
+pub mod minimap;
+pub mod overlays;
 
 /// Racine du HUD (plein écran, transparente aux clics).
 #[derive(Component)]
@@ -69,6 +71,30 @@ pub fn set_bg(bg: &mut Mut<BackgroundColor>, c: Color) {
     }
 }
 
+/// Écrit `v` dans un champ du `Node` seulement s'il change : une écriture relance la mise en page.
+pub fn set_val(node: &mut Mut<Node>, field: fn(&mut Node) -> &mut Val, v: Val) {
+    set_if(node, field, v);
+}
+
+/// Une valeur quelconque d'un composant, réécrite seulement si elle change.
+pub fn set_if<C: Component<Mutability = bevy::ecs::component::Mutable>, V: PartialEq>(
+    c: &mut Mut<C>,
+    field: fn(&mut C) -> &mut V,
+    v: V,
+) {
+    if *field(c.bypass_change_detection()) != v {
+        *field(c.as_mut()) = v;
+    }
+}
+
+/// Clé d'un identifiant, pour comparer ce qu'affiche un texte sans le copier.
+pub fn str_key(s: &str) -> f64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::hash::DefaultHasher::new();
+    s.hash(&mut h);
+    f64::from_bits(h.finish())
+}
+
 /// Visible ou non (sans marquer de changement inutile).
 pub fn set_shown(v: &mut Mut<Visibility>, on: bool) {
     v.set_if_neq(if on {
@@ -82,6 +108,10 @@ pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(bottom::BottomBarPlugin);
+        app.add_plugins((
+            bottom::BottomBarPlugin,
+            overlays::OverlaysPlugin,
+            minimap::MinimapPlugin,
+        ));
     }
 }
