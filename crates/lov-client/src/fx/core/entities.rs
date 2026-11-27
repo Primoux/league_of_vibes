@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use lov_shared::types::{EntityId, EntitySnapshot, Team, TeamOrNeutral};
 
 use crate::net::GameState;
-use crate::render::RENDER_SCALE;
+use crate::render::to_ground;
 
 /// Vue en lecture sur les entités connues (`EntityTracker`).
 #[derive(Clone, Copy)]
@@ -24,14 +24,10 @@ impl<'a> EntityTracker<'a> {
         }
     }
 
-    /// Position monde au sol (+ hauteur `h`) de l'entité, si elle est connue.
+    /// Position monde de l'entité, posée sur le relief du terrain (+ hauteur `h`), si elle est connue.
     pub fn pos(&self, id: EntityId, h: f32) -> Option<Vec3> {
         let p = self.state?.pose(id)?;
-        Some(Vec3::new(
-            p.x as f32 * RENDER_SCALE,
-            h,
-            -(p.y as f32) * RENDER_SCALE,
-        ))
+        Some(to_ground(Vec2::new(p.x as f32, p.y as f32), h))
     }
 
     /// Dernier état connu de l'entité.

@@ -36,7 +36,7 @@ use lov_shared::types::{AbilitySlot, Cooldowns, EntityId, EntityKind, SummonerSl
 use crate::net::{Connection, GameState};
 use crate::render::camera::MainCamera;
 use crate::render::map::MAP_SIZE;
-use crate::render::{to_game, to_shared, to_world};
+use crate::render::{ground_height, to_game, to_ground, to_shared};
 use picking::{ray_cylinder, world_hitbox};
 use rules::{DigitAction, digit_action, is_attackable, key_letter, needs_target};
 
@@ -148,9 +148,7 @@ fn update_pointer(
         input.hover = None;
         return;
     };
-    input.cursor = ray
-        .plane_intersection_point(Vec3::ZERO, InfinitePlane3d::new(Vec3::Y))
-        .map(to_game)
+    input.cursor = pick_ground(ray)
         .filter(|p| (0.0..=MAP_SIZE).contains(&p.x) && (0.0..=MAP_SIZE).contains(&p.y))
         .map(to_shared);
     let (origin, dir) = (ray.origin, *ray.direction);
@@ -162,14 +160,29 @@ fn update_pointer(
         let (Some((r, h)), Some(pose)) = (world_hitbox(e), state.pose(id)) else {
             continue;
         };
-        let at = to_world(Vec2::new(pose.x as f32, pose.y as f32), 0.0);
-        if let Some(t) = ray_cylinder(origin, dir, at.x, at.z, r, h)
+        // cylindre posé sur le relief : on ramène le rayon à un sol en y = 0
+        let at = to_ground(Vec2::new(pose.x as f32, pose.y as f32), 0.0);
+        if let Some(t) = ray_cylinder(origin - Vec3::Y * at.y, dir, at.x, at.z, r, h)
             && best.is_none_or(|(b, _)| t < b)
         {
             best = Some((t, id));
         }
     }
     input.hover = best.map(|(_, id)| id);
+}
+
+/// Point du sol sous le rayon (coordonnées de jeu) : intersection avec le plan y = 0, puis deux
+/// raffinements sur la hauteur réelle du terrain (rivière creusée), comme `pickGround` du web.
+fn pick_ground(ray: Ray3d) -> Option<Vec2> {
+    let mut height = 0.0;
+    let mut hit = None;
+    for _ in 0..3 {
+        let p = ray.plane_intersection_point(Vec3::Y * height, InfinitePlane3d::new(Vec3::Y))?;
+        let g = to_game(p);
+        hit = Some(g);
+        height = ground_height(f64::from(g.x), f64::from(g.y));
+    }
+    hit
 }
 
 fn ability_targeting(state: &GameState, slot: AbilitySlot) -> Option<SpellTargeting> {
@@ -519,6 +532,34 @@ mod tests {
     use lov_shared::protocol::{GameStart, GameStartPlayer};
     use lov_shared::types::{EntitySnapshot, SummonerId, Team, TeamOrNeutral};
     use std::sync::mpsc::Receiver;
+
+    /// #274 : un clic au milieu de la rivière (sol creusé) vise le point du lit sous le curseur, pas
+    /// celui du plan y = 0, décalé vers la caméra.
+    #[test]
+    fn le_clic_vise_le_lit_de_la_riviere() {
+        let target = Vec2::new(6000.0, 6000.0);
+        let ground = to_ground(target, 0.0);
+        assert!(ground.y < -0.2);
+        let origin = ground + Vec3::new(0.0, 20.0, 12.0);
+        let ray = Ray3d::new(origin, Dir3::new(ground - origin).expect("direction"));
+        let flat = to_game(
+            ray.plane_intersection_point(Vec3::ZERO, InfinitePlane3d::new(Vec3::Y))
+                .expect("plan"),
+        );
+        assert!(flat.distance(target) > 10.0, "{flat}");
+        let picked = pick_ground(ray).expect("sol");
+        assert!(picked.distance(target) < 1.0, "{picked}");
+        // sur une voie plate, rien ne change
+        let lane = to_ground(Vec2::new(1100.0, 6000.0), 0.0);
+        let o = lane + Vec3::new(0.0, 20.0, 12.0);
+        let ray = Ray3d::new(o, Dir3::new(lane - o).expect("direction"));
+        assert!(
+            pick_ground(ray)
+                .expect("sol")
+                .distance(Vec2::new(1100.0, 6000.0))
+                < 0.5
+        );
+    }
 
     fn champion(id: EntityId, team: TeamOrNeutral, subtype: &str) -> EntitySnapshot {
         EntitySnapshot {

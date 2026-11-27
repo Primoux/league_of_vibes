@@ -281,9 +281,10 @@ impl<'w> Fx<'w> {
         self.world.resource::<FxRuntime>().active_effects()
     }
 
-    /// Coordonnées de jeu → monde.
+    /// Coordonnées de jeu → monde, posées sur le relief du terrain (rivière creusée), `h` au-dessus du
+    /// sol : télégraphes, impacts et zones suivent le lit de la rivière comme les unités (#274).
     pub fn world_pos(p: GameVec2, h: f32) -> Vec3 {
-        Vec3::new(p.x as f32 * RENDER_SCALE, h, -(p.y as f32) * RENDER_SCALE)
+        crate::render::to_ground(bevy::math::Vec2::new(p.x as f32, p.y as f32), h)
     }
 
     /// Distance de jeu → monde.
@@ -694,7 +695,12 @@ mod tests {
     #[test]
     fn coordonnees_de_jeu_vers_monde() {
         let p = Fx::world_pos(GameVec2 { x: 500.0, y: 200.0 }, 1.0);
-        assert!((p - Vec3::new(5.0, 1.0, -2.0)).length() < 1e-6);
+        // `h` se compte au-dessus du sol, qui suit le relief du terrain (#274)
+        let ground = crate::render::ground_height(500.0, 200.0);
+        assert!((p - Vec3::new(5.0, ground + 1.0, -2.0)).length() < 1e-6);
+        // au milieu de la rivière, le sol est creusé
+        let river = Fx::world_pos(GameVec2 { x: 6000.0, y: 6000.0 }, 0.0);
+        assert!(river.y < -0.25, "{river}");
         assert!((Fx::scale(250.0) - 2.5).abs() < 1e-6);
     }
 }
