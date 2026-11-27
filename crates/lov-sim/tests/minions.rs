@@ -1,10 +1,7 @@
 //! Tests des sbires : port de `packages/server/test/minions.test.ts`.
 //!
 //! Le test d'endurance « une partie sans joueurs reste défendable durant trente minutes simulées »
-//! utilise en TypeScript `createSystems()` (la liste complète). Le registre `systems/registry.rs`
-//! n'existe pas encore et plusieurs systèmes (abilities, summoners, leveling, economy, jungle,
-//! objectives) ne sont pas portés : la version Rust fait tourner les systèmes portés, dans l'ordre
-//! canonique (voir son commentaire), et devra être rebranchée sur le registre.
+//! utilise, comme le TypeScript, la liste complète des systèmes (`systems/registry.rs`).
 
 mod common;
 
@@ -12,13 +9,10 @@ use common::{champ, v};
 use lov_shared::constants::{TIMERS, scaled};
 use lov_shared::types::{DamageType, EntityId, EntityKind, Lane, Team, TeamOrNeutral};
 use lov_sim::combat::damage::{DamageOpts, apply_damage as core_damage};
-use lov_sim::systems::buffs::buffs_system;
 use lov_sim::systems::combat::combat_system;
-use lov_sim::systems::input::input_system;
 use lov_sim::systems::minions::{MinionState, minions_system, spawn_wave};
 use lov_sim::systems::movement::movement_system;
 use lov_sim::systems::structures::structures_system;
-use lov_sim::systems::vision::vision_system;
 use lov_sim::world_ai::runtime::{DamageRequest, apply_damage, stats};
 use lov_sim::{Entity, System, World};
 
@@ -238,21 +232,12 @@ fn ne_double_pas_les_attaques_quand_le_combat_central_est_present() {
     assert!(!world.get(inner).unwrap().dead);
 }
 
-/// `une partie sans joueurs reste défendable durant trente minutes simulées`. Systèmes portés
-/// seulement, dans l'ordre de `systems/index.ts` (input, buffs, movement, combat, minions, structures,
-/// vision) : abilities, summoners, jungle, objectives, leveling et economy ne sont pas encore portés.
-/// Même scénario que le TS : 3600 pas de 0,5 s, aucune partie ne doit se terminer.
+/// `une partie sans joueurs reste défendable durant trente minutes simulées`, avec la liste complète
+/// des systèmes (`createSystems()` du TS, le registre `create_systems`). Même scénario que le TS :
+/// 3600 pas de 0,5 s, aucune partie ne doit se terminer.
 #[test]
 fn une_partie_sans_joueurs_reste_defendable_durant_trente_minutes_simulees() {
-    let mut systems = vec![
-        input_system(),
-        buffs_system(),
-        movement_system(),
-        combat_system(),
-        minions_system(true),
-        structures_system(true),
-        vision_system(),
-    ];
+    let mut systems = lov_sim::systems::registry::create_systems();
     let mut world = World::new(1);
     world.init(&mut systems);
     for _ in 0..3600 {
@@ -263,6 +248,6 @@ fn une_partie_sans_joueurs_reste_defendable_durant_trente_minutes_simulees() {
     assert_eq!(world.winner, None);
     assert!(world.query(Some(EntityKind::Nexus)).all(|e| !e.dead));
     assert!(world.len() < 1000, "{}", world.len());
-    // Le pas de 0,5 s accélère seulement ce scénario d'endurance ; le tick réel est celui de
-    // minions.performance.test.ts (non porté, voir le rapport).
+    // Le pas de 0,5 s accélère seulement ce scénario d'endurance ; le tick réel est mesuré par le test
+    // de performance de `lov-server`.
 }
