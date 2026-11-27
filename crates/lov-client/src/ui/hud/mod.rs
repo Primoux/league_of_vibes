@@ -1,9 +1,9 @@
 //! HUD en partie : portage de `packages/client/src/ui/hud/` (area `ui-hud`).
 //!
 //! Construit une fois en entrant en partie (`Screen::Game`), puis mis à jour à chaque image : chaque
-//! élément dynamique porte un marqueur ([`HudText`], [`HudFill`], [`HudImage`], [`HudShow`],
-//! [`HudTint`]) que les systèmes remplissent à partir d'un modèle calculé depuis l'état du jeu. Rien n'est
-//! recréé tant que la partie dure ; un texte ou une couleur n'est réécrit que s'il change.
+//! élément dynamique porte un marqueur (texte, largeur, image, visibilité, couleur) que les systèmes de son
+//! module remplissent depuis l'état du jeu. Rien n'est recréé tant que la partie dure, hors listes
+//! courtes (fil des éliminations) ; un texte ou une couleur n'est réécrit que s'il change.
 
 use bevy::prelude::*;
 
@@ -11,6 +11,8 @@ use super::Screen;
 use super::UiFonts;
 
 pub mod bottom;
+pub mod minimap;
+pub mod overlays;
 
 /// Racine du HUD (plein écran, transparente aux clics).
 #[derive(Component)]
@@ -82,6 +84,10 @@ pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(bottom::BottomBarPlugin);
+        app.add_plugins((
+            bottom::BottomBarPlugin,
+            overlays::OverlaysPlugin,
+            minimap::MinimapPlugin,
+        ));
     }
 }
