@@ -343,7 +343,7 @@ fn mouse_orders(
 }
 
 #[allow(clippy::too_many_arguments)] // un système Bevy : ses paramètres sont ses accès au monde
-fn key_orders(
+pub(crate) fn key_orders(
     mut events: MessageReader<KeyboardInput>,
     keys: Res<ButtonInput<KeyCode>>,
     state: Res<GameState>,
