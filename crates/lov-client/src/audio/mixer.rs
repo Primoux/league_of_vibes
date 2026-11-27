@@ -11,6 +11,7 @@ use std::collections::VecDeque;
 
 use lov_shared::types::Vec2;
 
+use super::music::{BusCommand, MusicBus};
 use super::synth::Voice;
 
 /// Canal de mixage (`AudioChannel`).
@@ -164,10 +165,15 @@ impl Sfx {
 /// Effets actifs au-delà desquels la liste réalloue : de quoi couvrir la polyphonie et les autres canaux.
 const ACTIVE_CAPACITY: usize = 128;
 
-/// Mélangeur du fil audio : additionne les effets actifs, applique les volumes de canal, sort en stéréo.
+/// Bus de musique au plus (le web en crée deux : la musique et les jingles d'élimination).
+pub const MAX_BUSES: usize = 4;
+
+/// Mélangeur du fil audio : additionne les bus de musique et les effets actifs, applique les volumes de
+/// canal, sort en stéréo.
 #[derive(Debug)]
 pub struct Mixer {
     active: Vec<Sfx>,
+    buses: Vec<(Channel, Box<MusicBus>)>,
     volumes: Volumes,
 }
 
@@ -175,6 +181,7 @@ impl Default for Mixer {
     fn default() -> Self {
         Self {
             active: Vec::with_capacity(ACTIVE_CAPACITY),
+            buses: Vec::with_capacity(MAX_BUSES),
             volumes: Volumes::default(),
         }
     }
@@ -183,6 +190,20 @@ impl Default for Mixer {
 impl Mixer {
     pub fn play(&mut self, sfx: Sfx) {
         self.active.push(sfx);
+    }
+
+    /// Branche un bus de musique sur un canal ; au-delà de [`MAX_BUSES`], il est ignoré.
+    pub fn add_bus(&mut self, channel: Channel, bus: impl Into<Box<MusicBus>>) {
+        if self.buses.len() < MAX_BUSES {
+            self.buses.push((channel, bus.into()));
+        }
+    }
+
+    /// Transmet une commande au bus `id` (ignorée s'il n'existe pas).
+    pub fn bus_command(&mut self, id: u32, cmd: BusCommand) {
+        if let Some((_, bus)) = self.buses.iter_mut().find(|(_, b)| b.id() == id) {
+            bus.command(cmd);
+        }
     }
 
     pub fn set_volumes(&mut self, v: Volumes) {
@@ -199,15 +220,18 @@ impl Mixer {
         for ch in AUDIO_CHANNELS {
             gains[ch.index()] = self.volumes.gain(ch);
         }
+        out.fill(0.0);
+        for (ch, bus) in &mut self.buses {
+            bus.render_add(out, gains[ch.index()]);
+        }
         for frame in out.as_chunks_mut::<2>().0 {
             let mut s = 0.0;
             for sfx in &mut self.active {
                 s += sfx.next() * gains[sfx.channel.index()];
             }
             // Comme la sortie WebAudio : écrêtage à ±1, sans compression.
-            let s = s.clamp(-1.0, 1.0);
-            frame[0] = s;
-            frame[1] = s;
+            frame[0] = (frame[0] + s).clamp(-1.0, 1.0);
+            frame[1] = (frame[1] + s).clamp(-1.0, 1.0);
         }
         self.active.retain(|sfx| !sfx.done());
     }
