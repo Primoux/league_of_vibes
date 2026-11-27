@@ -132,11 +132,15 @@ fn update_pointer(
     camera: Single<(&Camera, &GlobalTransform), With<MainCamera>>,
     state: Res<GameState>,
     keys: Res<ButtonInput<KeyCode>>,
+    over_ui: Option<Res<crate::ui::PointerOverUi>>,
     mut input: ResMut<PlayerInput>,
 ) {
     input.champions_only = keys.pressed(KeyCode::Backquote);
     let (camera, transform) = *camera;
-    let Some(ray) = cursor_ray(&window, camera, transform).filter(|_| in_game(&state)) else {
+    // souris sur un panneau du HUD : pas de sol ni d'unité visés à travers
+    let over_ui = over_ui.is_some_and(|o| o.0);
+    let Some(ray) = cursor_ray(&window, camera, transform).filter(|_| in_game(&state) && !over_ui)
+    else {
         input.cursor = None;
         input.hover = None;
         return;
