@@ -49,6 +49,10 @@ pub struct CameraShake {
     pub duration: f32,
 }
 
+/// Nombre maximal de passes de [`FxRuntime::reset`] : chaque passe termine les effets ajoutés par les
+/// `end` de la précédente.
+const RESET_ROUNDS: usize = 8;
+
 /// Teinte vers laquelle tirent les zones au sol d'un ennemi.
 const ENEMY_TINT: Vec3 = Vec3::new(2.4, 0.25, 0.2);
 
@@ -161,22 +165,26 @@ impl FxRuntime {
 
     /// Termine tous les effets en cours (leurs entités retournent aux pools) et vide le minuteur et les
     /// auras : entre deux parties, rien ne doit survivre (le web recréait le runtime à chaque `installFx`).
+    ///
+    /// Un `end` peut lui-même ajouter un effet qui détient un élément d'un pool (la fin d'une télégraphie
+    /// lance le fondu qui rend son décal, la fin d'une invisibilité lance un éclat) : on termine donc en
+    /// boucle, tant que de nouveaux effets apparaissent, avant de vider le minuteur et les auras.
     pub fn reset(world: &mut World) {
-        let effects = {
-            let mut rt = world.resource_mut::<FxRuntime>();
-            rt.scheduler.clear();
-            rt.auras.clear();
-            rt.enemy_context = false;
-            std::mem::take(&mut rt.effects)
-        };
-        let mut fx = Fx::new(world);
-        for mut e in effects {
-            e.end(&mut fx);
+        world.resource_mut::<FxRuntime>().enemy_context = false;
+        for _ in 0..RESET_ROUNDS {
+            let effects = std::mem::take(&mut world.resource_mut::<FxRuntime>().effects);
+            if effects.is_empty() {
+                break;
+            }
+            let mut fx = Fx::new(world);
+            for mut e in effects {
+                e.end(&mut fx);
+            }
         }
-        // un `end` a pu planifier ou ajouter quelque chose : on le jette aussi
         let mut rt = world.resource_mut::<FxRuntime>();
-        rt.scheduler.clear();
+        // au-delà de la borne (effets qui se relancent sans fin), on jette ce qui reste
         rt.effects.clear();
+        rt.scheduler.clear();
         rt.auras.clear();
     }
 
