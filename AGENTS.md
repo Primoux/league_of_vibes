@@ -1,6 +1,6 @@
 # AGENTS.md — règles de contribution (humains et IA)
 
-Tu contribues à **League of Vibes**, un MOBA 4v4 navigateur aux mécaniques de League of Legends.
+Tu contribues à **League of Vibes**, un MOBA 4v4 natif (Rust, Bevy) aux mécaniques de League of Legends.
 Plusieurs personnes y travaillent, chacune sur sa machine, chacune avec ses propres IA. Ces règles existent
 pour qu'on puisse être nombreux **sans se marcher dessus** et sans faire exploser la file de relecture.
 
@@ -9,7 +9,7 @@ pour qu'on puisse être nombreux **sans se marcher dessus** et sans faire explos
 1. Lis **`PLAN.md`** : le design du jeu, l'architecture, les contrats.
 2. Prépare ta machine, une seule fois : `scripts/setup.sh <ton-pseudo>`.
    (Écrit `.agent` — non versionné, c'est l'identité de ce clone, pour tes IA — installe et teste.)
-3. `npm install && npm run typecheck && npm test` doivent passer **avant** que tu commences.
+3. `cargo test --workspace` doit passer **avant** que tu commences.
 4. Prends une tâche : voir §1.
 
 Il n'y a **pas** de fichier `YOUR_PLAN.md`, pas de branche réservée par personne, pas de dossier possédé à vie.
@@ -50,14 +50,14 @@ Le code stocke **un fichier par champion** à chaque étage, ce qui permet de li
 bout sans croiser personne :
 
 ```
-packages/shared/src/data/champions/<nom>.ts          stats, sorts, coûts
-packages/server/src/abilities/champions/<nom>.ts     logique serveur
-packages/client/src/render/champions/models/<nom>.ts  modèle 3D
-packages/client/src/fx/champions/<nom>.ts            FX et sons
+crates/lov-shared/src/data/champions/<nom>.rs          stats, sorts, coûts
+crates/lov-sim/src/abilities/champions/<nom>.rs        logique serveur
+crates/lov-client/src/render/champions/models/<nom>.rs  modèle 3D
+crates/lov-client/src/fx/champions/<nom>.rs            FX
 ```
 
 C'est le découpage à privilégier : vingt contributeurs peuvent livrer vingt champions en parallèle sans un
-seul conflit. Une PR `champion` ne couvre **qu'un** champion (la CI le vérifie) ; seuls les `index.ts` de
+seul conflit. Une PR `champion` ne couvre **qu'un** champion (la CI le vérifie) ; seuls les `mod.rs` de
 registre sont partagés, en ajout d'une ligne.
 
 Même logique pour les objets, les monstres de jungle, les écrans d'UI : préfère une tranche complète et
@@ -66,8 +66,6 @@ Même logique pour les objets, les monstres de jungle, les écrans d'UI : préf�
 ## 3. Contrats partagés : le seul point de sérialisation
 
 ```
-packages/shared/src/protocol.ts   types.ts   schema.ts   constants.ts   map.ts
-packages/server/src/systems/index.ts
 crates/lov-shared/   Cargo.toml, src/lib.rs, protocol.rs, types.rs, schema.rs, constants.rs, map.rs, math.rs
 crates/lov-sim/src/systems/registry.rs
 ```
@@ -85,15 +83,17 @@ Une API dont tu dépends n'existe pas encore ? Mocke-la chez toi, ou crée-la av
 `PLAN.md` et une implémentation minimale, et dis-le dans ta PR.
 
 **Communication entre domaines**, plutôt que d'éditer le code d'un autre :
-- serveur : `EventBus` (`world.events.on/emit`), `entity.data.<domaine>`, les API de `PLAN.md §2.1` (`applyDamage`, `addBuff`…) ;
-- client : le `store` (`client/src/state.ts`) et le `fxBus` (`client/src/fx/FxBus.ts`).
+- simulation : l'`EventBus` (`world.events`, `world.emit`), les tables typées `entity.data`, les API de
+  `PLAN.md §2.1` (`apply_damage`, `add_buff`…) ;
+- client : l'état réseau (`net::GameState`), l'état des entrées (`input::PlayerInput`), les messages
+  `ServerEvent` et le bus des FX (`fx/bus.rs`, `register_fx`).
 
 ## 4. Git
 
 ```bash
 git fetch origin && git switch -c <area>/<slug> origin/main   # toujours repartir d'un main à jour
 # … travaille, commits petits et fréquents …
-npm run typecheck && npm test && npm run build                # obligatoire, vert
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace   # vert
 git push -u origin <area>/<slug>
 gh pr create --fill                                           # remplis le template
 ```
@@ -110,25 +110,22 @@ gh pr create --fill                                           # remplis le templ
 
 ## 5. Qualité
 
-- TypeScript strict. Pas de `any` sans commentaire qui le justifie. Pas de `// @ts-ignore`.
-- `npm run typecheck && npm test` verts avant chaque push ; le client doit builder (`npm run build`).
-- Logique de jeu testée en headless avec vitest (`packages/*/test/`) : crée un `World`, ajoute des entités,
-  fais des `step()`, vérifie. Toute règle de jeu que tu ajoutes vient avec son test.
+- `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`
+  verts avant chaque push. Pas de `unsafe` (refusé par le workspace), pas de `#[allow(...)]` sans
+  commentaire qui le justifie, pas d'`unwrap()` sur une donnée venue du réseau.
+- Logique de jeu testée en headless dans `lov-sim` (`crates/lov-sim/tests/`) : crée un `World`, ajoute des
+  entités, fais des `step()`, vérifie. Toute règle de jeu que tu ajoutes vient avec son test.
 - **On n'affaiblit ni ne supprime jamais le test d'un autre** pour faire passer sa PR. Si un test d'autrui
   casse à cause de toi, c'est ton code ou le contrat qui doit changer — dis-le dans la PR.
-- Côté client, ajoute une page de démo quand c'est utile (`?fxlab`, `?uilab`…) pour tester sans serveur.
-- Performances : pas d'allocation inutile par tick ou par frame, réutilise les objets.
-- Pas de nouvelle dépendance npm ou crate sans la justifier dans la PR. Pas de framework concurrent
-  (pas de React, pas de Babylon…) : côté Rust, le moteur est Bevy et le serveur tokio + axum, rien d'autre.
-- Rust : `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`
-  verts avant chaque push qui touche `crates/`. Pas de `unsafe` (refusé par le workspace), pas de
-  `#[allow(...)]` sans commentaire qui le justifie, pas d'`unwrap()` sur une donnée venue du réseau.
+- `lov-sim` ne lit ni l'horloge ni un aléatoire non semé : le temps et le générateur sont injectés.
+  On n'ajoute pas de champ à `Entity` sans PR `contract:`.
+- Côté client, ajoute une scène de démo quand c'est utile (`LOV_FXLAB`, `LOV_SPELLLAB`, `LOV_UILAB`,
+  `LOV_VIEWLAB`…) pour tester sans serveur ; `LOV_SCREENSHOT` en garde une capture.
+- Performances : pas d'allocation inutile par tick ou par image, réutilise les entités et les objets.
+- Pas de nouvelle crate sans la justifier dans la PR. Pas de framework concurrent : le moteur est Bevy,
+  le serveur tokio + axum, rien d'autre.
 
-## 5 bis. Migration vers Rust (en cours)
-
-Le jeu devient une **application native** : client et serveur sont réécrits en Rust dans `crates/`,
-à côté de `packages/` jusqu'à la bascule. Le navigateur vole des raccourcis, laisse sortir la souris,
-plafonne le framerate, et ne se distribue pas comme un jeu.
+## 5 bis. Le dépôt
 
 ```
 crates/lov-shared   protocole, types, constantes, carte, données      ← contrats (PR « contract: »)
@@ -137,27 +134,16 @@ crates/lov-server   WebSocket, salles, draft, snapshots (tokio + axum)
 crates/lov-client   rendu, FX, interface, audio, entrées (Bevy)
 ```
 
-- **Le protocole JSON v2 ne bouge pas pendant la migration.** Le client Rust joue contre le serveur Node,
-  le client web contre le serveur Rust : chaque moitié se valide contre l'autre, le jeu reste jouable.
-- **Le TypeScript est gelé, entièrement** : plus aucune PR sur `packages/`, même pour corriger un bug.
-  Il reste la référence du portage, rien de plus. Un bug ou une règle de jeu à changer se traite dans
-  le portage Rust du système concerné ; les anciennes issues web sont fermées avec le label `web-gelé`.
-- **Où en est le portage, et quoi prendre** : l'issue épinglée #86 liste chaque morceau, coché ou non,
-  avec son issue. C'est le point d'entrée pour aider.
-- **Les areas gardent leurs noms** et couvrent en plus les chemins Rust équivalents (`.github/areas.json`).
-  La tranche verticale d'un champion existe à l'identique :
-  `lov-shared/src/data/champions/<nom>.rs`, `lov-sim/src/abilities/champions/<nom>.rs`,
-  `lov-client/src/render/champions/models/<nom>.rs`, `lov-client/src/fx/champions/<nom>.rs`.
-- Les données (`lov-shared/src/data/<domaine>.rs`) se portent dans la PR de l'area qui possède leur
-  comportement ; chaque PR ajoute sa ligne `pub mod …;` au registre `data/mod.rs`, partagé comme un `index.ts`.
-- Les systèmes (`lov-sim/src/systems/<nom>.rs`) déclarent de même leur ligne `pub mod …;` dans
-  `systems/mod.rs`. Le contrat, c'est **l'ordre d'exécution** : la liste de `systems/registry.rs`,
-  équivalent de `systems/index.ts`, qui ne change que par PR `contract:`.
-- **Porter un système serveur, c'est porter ses tests** : les fichiers de `packages/server/test/` qui le
-  couvrent arrivent dans la même PR, sans être affaiblis. Un bug connu du TS que le test révèle se dit dans la PR.
-- `lov-sim` ne lit ni l'horloge ni un aléatoire non semé : le temps et le générateur sont injectés.
-  `entity.data.<domaine>` devient une table typée par domaine ; on n'ajoute toujours pas de champ à `Entity`
-  sans PR `contract:`.
+- Le jeu a été porté de TypeScript (navigateur, Node) vers Rust ; la version TypeScript a été retirée à la
+  bascule (#122). Elle reste dans l'historique git, et les commentaires « Portage de `packages/…` »
+  y renvoient.
+- Les données (`lov-shared/src/data/<domaine>.rs`) appartiennent à l'area qui possède leur comportement ;
+  chaque module ajoute sa ligne `pub mod …;` au registre `data/mod.rs`.
+- Les systèmes (`lov-sim/src/systems/<nom>.rs`) déclarent leur ligne `pub mod …;` dans `systems/mod.rs`.
+  Le contrat, c'est **l'ordre d'exécution** : la liste de `systems/registry.rs`, qui ne change que par
+  PR `contract:`.
+- Publication : `.github/workflows/build-natif.yml` construit client et serveur pour Windows, Linux et
+  macOS ; une étiquette `v*` publie une release.
 
 ## 6. Contenu et propriété intellectuelle
 

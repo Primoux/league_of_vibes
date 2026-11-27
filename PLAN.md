@@ -11,26 +11,29 @@ larves, Colosse du Rift (≈ héraut), Léviathan (≈ baron), sorts d'invocateu
 
 - **8 joueurs humains en ligne** (pas de bots). Un mode dev (`?dev=1` côté client, `DEV_LOBBY=1` côté serveur) permet de lancer une partie avec moins de joueurs pour tester.
 - **10 champions originaux**. Chaque champion n'est pris qu'une fois par partie.
-- **Rendu 3D Three.js** en vue isométrique, low-poly stylisé, **FX soignés** (c'est un critère de qualité majeur).
+- **Rendu 3D (Bevy)** en vue isométrique, low-poly stylisé, **FX soignés** (c'est un critère de qualité majeur).
 - **Propriété intellectuelle** : on reprend les *règles*, jamais les noms, champions, visuels, sons ou la carte de Riot. Aucun nom « League of Legends », « Baron Nashor », « Rift Herald », « Voidgrubs », « Summoner's Rift » dans le jeu. Assets procéduraux ou CC0 uniquement.
 
 ## 2. Architecture
 
-> **Migration en cours vers une application native en Rust** (client Bevy, serveur tokio + axum, dans `crates/`).
-> Ce qui suit décrit l'implémentation TypeScript de référence, que le portage reproduit système par système
-> en gardant le protocole JSON v2 à l'identique. Organisation et règles : `AGENTS.md §5 bis`.
+> Le jeu est une **application native en Rust** (client Bevy, serveur tokio + axum). Il a été porté
+> système par système d'une première version TypeScript, retirée à la bascule (#122) ; les chemins de ce
+> document qui la citent (`shared/src/…ts`, `server/src/…ts`, `client/src/…ts`) correspondent à leurs
+> équivalents Rust : `crates/lov-shared/src/…rs`, `crates/lov-sim/src/…rs`, `crates/lov-client/src/…rs`.
+> Organisation et règles : `AGENTS.md §5 bis`.
 
 ```
-packages/
-  shared/   types, protocole, schémas, données (champions, objets, sorts, carte, constantes) — source de vérité
-  server/   Node + ws : serveur AUTORITAIRE (toute la logique de jeu tourne ici)
-  client/   Vite + Three.js (rendu, FX) + Preact (UI en overlay DOM)
+crates/
+  lov-shared/   types, protocole, schémas, données (champions, objets, sorts, carte, constantes) — source de vérité
+  lov-sim/      simulation AUTORITAIRE, sans E/S (toute la logique de jeu tourne ici)
+  lov-server/   tokio + axum : WebSocket, salles, draft, boucle de simulation, snapshots
+  lov-client/   Bevy : rendu, FX, interface, audio, entrées
 ```
 
 - **Serveur autoritaire** : le client n'envoie que des intentions (`ClientMsg` dans `shared/src/protocol.ts`). Le serveur simule à **30 ticks/s** et envoie des **snapshots à 20 Hz** (`Snapshot`) contenant les entités visibles par l'équipe du joueur, l'état privé du joueur (`SelfState`) et les **événements** du tick (`GameEvent`).
 - **Client** : interpole les entités avec ~100 ms de retard, prédit localement le déplacement du joueur, joue les FX/sons à partir des `GameEvent`.
-- **Unités** : valeurs « LoL-like » (portée AA mêlée 125–200, distance 525–650, vitesse 330–350, tours portée 750…). Carte 12 000 × 12 000. Rendu Three.js : 1 unité de jeu = 0,01 unité 3D ; coordonnée jeu `(x, y)` → monde `(x*0.01, h, -y*0.01)` (voir `toWorld` dans `client/src/render/GameRenderer.ts`).
-- **Lancement** : `npm install`, `npm run dev` (serveur :3000 + Vite :5173 avec proxy `/ws`). Production : `npm run build && npm start` (le serveur sert `client/dist`).
+- **Unités** : valeurs « LoL-like » (portée AA mêlée 125–200, distance 525–650, vitesse 330–350, tours portée 750…). Carte 12 000 × 12 000. Rendu : 1 unité de jeu = 0,01 unité 3D ; coordonnée jeu `(x, y)` → monde `(x*0.01, h, -y*0.01)` (voir `to_world` dans `crates/lov-client/src/render/mod.rs`).
+- **Lancement** : `cargo run -p lov-server` (serveur :3000, WebSocket `/ws`), puis `cargo run -p lov-client`.
 
 ### 2.1 Simulation serveur
 - `World` (`server/src/world.ts`) : map d'entités, `EventBus`, file de commandes joueurs `world.commands` (lisible par tous les systèmes pendant le tick, vidée à la fin).

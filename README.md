@@ -1,9 +1,9 @@
 # League of Vibes
 
-MOBA 4v4 jouable dans le navigateur. Draft, trois voies, jungle, objectifs neutres, boutique, brouillard de guerre :
+MOBA 4v4 natif pour Windows, Linux et macOS. Draft, trois voies, jungle, objectifs neutres, boutique, brouillard de guerre :
 les mécaniques du genre, avec un univers, des champions et des assets originaux.
 
-Rendu 3D Three.js, interface Preact, serveur autoritaire Node. Le jeu est construit par plusieurs contributeurs,
+Écrit en Rust : client Bevy (rendu, effets, interface, audio), serveur autoritaire tokio + axum. Le jeu est construit par plusieurs contributeurs,
 chacun sur sa machine avec ses propres IA : la marche à suivre est dans [CONTRIBUTING.md](CONTRIBUTING.md).
 
 > Projet de fans, non affilié à Riot Games. Aucun nom, visuel, son ou texte de Riot n'est utilisé.
@@ -12,17 +12,21 @@ chacun sur sa machine avec ses propres IA : la marche à suivre est dans [CONTRI
 
 ## Démarrer
 
-Node 24, la version de `.nvmrc` et de la CI.
+**Jouer** : télécharge l'archive de ton système dans les [releases](../../releases), lance `lov-server`
+sur une machine (ou utilise un serveur hébergé), écris son adresse dans `serveur.txt` à côté de
+`lov-client` (ex. `192.168.1.20:3000`), puis lance `lov-client`.
+
+**Développer** : Rust, avec la version de `rust-toolchain.toml` (rustup l'installe tout seul). Sous Linux,
+Bevy demande `libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev`.
 
 ```bash
-npm install
-npm run dev     # serveur sur :3000, client Vite sur :5173
+DEV_LOBBY=1 cargo run -p lov-server            # serveur sur :3000
+cargo run -p lov-client                        # client (autant de fois que de joueurs)
 ```
 
-Ouvre <http://localhost:5173/?dev=1> dans deux onglets : crée une salle dans le premier, rejoins-la avec le code dans
-le second, puis lance la partie. Le paramètre `?dev=1` autorise une salle de moins de 8 joueurs.
-
-Pour la version de production : `npm run build && npm start`, puis <http://localhost:3000>.
+Crée une salle dans un client, rejoins-la avec le code dans un autre, puis lance la partie. `DEV_LOBBY=1`
+autorise une salle de moins de 8 joueurs. Avec `LOV_AUTOPLAY=1`, le client crée une salle de dev et la lance
+seul.
 
 ## Le jeu
 
@@ -92,19 +96,16 @@ L'ultime respecte les murs, les limites de carte et les collisions : il ne touch
 derrière la cible n'est possible. Ténacité et Purification fonctionnent ; contrôle dur/silence du lanceur,
 ordre d'arrêt/déplacement, mort, stase ou rupture de proximité terminent le canal et son stun.
 
-Portrait, modèle et moulinet : `?modellab&champ=touilleur`. Sorts réellement simulés :
-`?fxlab&champ=touilleur&close=1`. [Aperçu du portrait et du modèle](docs/previews/touilleur.webp).
+Modèle et animations : `LOV_VIEWLAB=1`. Sorts réellement simulés : `LOV_SPELLLAB=touilleur`. [Aperçu du portrait et du modèle](docs/previews/touilleur.webp).
 
 ## Développement
 
 | Commande | Rôle |
 |---|---|
-| `npm run dev` | Serveur (tsx watch) et client (Vite) |
-| `npm run dev:server` / `npm run dev:client` | L'un ou l'autre seul |
-| `npm run typecheck` | TypeScript strict sur les trois paquets |
-| `npm test` | Tests vitest, simulation sans navigateur |
-| `npm run build` | Build du client dans `packages/client/dist` |
-| `npm start` | Serveur de production, qui sert aussi le client construit |
+| `cargo run -p lov-server` / `cargo run -p lov-client` | Serveur, client |
+| `cargo test --workspace` | Tests, simulation sans fenêtre |
+| `cargo clippy --workspace --all-targets -- -D warnings` | Lints, comme la CI |
+| `cargo build --release -p lov-client -p lov-server` | Exécutables de production |
 
 ### Variables du serveur
 
@@ -115,33 +116,39 @@ Portrait, modèle et moulinet : `?modellab&champ=touilleur`. Sorts réellement s
 | `SKIP_DRAFT=1` | Pas de draft : champions attribués automatiquement, la partie démarre directement |
 | `LOV_PERF=1` | Journal toutes les 10 s : durée des ticks, snapshots, débit par client, retard de la boucle |
 
-Exemple : `SKIP_DRAFT=1 DEV_LOBBY=1 npm run dev:server`.
+### Variables du client
 
-### Pages de démo
-
-Elles s'ouvrent sur le client seul (`npm run dev:client`), sans serveur.
-
-| URL | Contenu |
+| Variable | Effet |
 |---|---|
-| `?fxlab` | Sorts et effets, pilotés par la vraie simulation du serveur. `&champ=<id>` choisit le champion |
-| `?modellab` | Modèles 3D et animations, à côté du portrait de référence. `&champ=<id>` |
-| `?melenchonlab` | Vitrine du modèle de Mélenchon |
-| `?maplab` | Carte seule |
-| `?uilab=home`, `?uilab=draft`, `?uilab=game` | Écrans et HUD avec des données factices |
+| `LOV_URL` | Adresse du serveur (`ws://localhost:3000/ws` par défaut, ou `serveur.txt` à côté de l'exécutable) |
+| `LOV_AUTOPLAY=1` | Connexion, salle de dev et lancement automatiques |
+| `LOV_DEBUG=1` | Ligne de debug (état, unités, snapshots) |
+| `LOV_SCREENSHOT=chemin.png` | Capture quelques secondes après l'entrée en jeu |
+
+### Scènes de démo (sans serveur)
+
+| Variable | Contenu |
+|---|---|
+| `LOV_SPELLLAB=<champion>` ou `all` | Sorts lancés en boucle sur la vraie simulation ; `LOV_LAB_SHOTS=<dossier>` garde des captures |
+| `LOV_FXLAB=1` | Particules, décals, rubans et matériaux des effets |
+| `LOV_VIEWLAB=1` | Tous les modèles et leurs animations |
+| `LOV_UILAB=<écran>` | Écrans et HUD avec des données factices : `accueil`, `salon`, `draft`, `chargement`, `jeu`, `boutique`, `scores`, `reglages`, `fin` |
+| `LOV_AUDIOLAB=1` | Galerie des sons synthétisés |
+| `LOV_STRESS=<n>` | Scène de charge de n unités |
 
 Les identifiants de champion sont les noms en minuscules (`nyx`, `grondak`…), plus `master67`, `melenchon` et `touilleur`.
 
 ### Test de charge
 
 ```bash
-npx tsx scripts/bots.ts --url ws://localhost:3000/ws --bots 8 --seconds 30
+cargo run --release -p lov-server --example bots -- --url ws://localhost:3000/ws --bots 8 --seconds 30
 ```
 
-Huit bots WebSocket rejoignent une salle et jouent. La CI lance ce script à chaque PR.
+Huit bots WebSocket rejoignent une salle, passent le draft et jouent. La CI le lance à chaque PR.
 
 ## Déploiement
 
-Le serveur sert le client construit et le WebSocket sur le même port. `GET /health` renvoie
+Le serveur écoute le WebSocket sur `/ws`. `GET /health` renvoie
 `{ ok, uptime, rooms, players }`.
 
 Une partie vit en mémoire dans un seul processus : déploie **une seule instance**, sans répartition de charge.
@@ -153,17 +160,17 @@ docker run -p 3000:3000 league-of-vibes
 
 - **Fly.io** : `fly launch` détecte le Dockerfile. Règle `internal_port = 3000`, un health check HTTP sur `/health`,
   `min_machines_running = 1` et `auto_stop_machines = false`, sinon la machine s'arrête en pleine partie.
-- **Render** : *Web Service* avec le runtime Docker, health check `/health`. En runtime Node : build
-  `npm ci && npm run build`, start `npm start`.
+- **Render** : *Web Service* avec le runtime Docker, health check `/health`.
 - **Reverse proxy** (nginx, Caddy) : transmets l'upgrade WebSocket sur `/ws`.
 
 ## Contribuer
 
 | Chemin | Contenu |
 |---|---|
-| `packages/shared` | Types, protocole, données de jeu (champions, objets, monstres, structures) |
-| `packages/server` | Simulation autoritaire, salles, draft, réseau |
-| `packages/client` | Rendu, effets, audio, interface |
+| `crates/lov-shared` | Types, protocole, données de jeu (champions, objets, monstres, structures) |
+| `crates/lov-sim` | Simulation autoritaire : monde, systèmes, combat, sorts |
+| `crates/lov-server` | Salles, draft, réseau |
+| `crates/lov-client` | Rendu, effets, audio, interface, entrées |
 | [`PLAN.md`](PLAN.md) | Design complet du jeu, architecture, contrats |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | **Comment bosser sur le dépôt**, de bout en bout |
 | [`AGENTS.md`](AGENTS.md) | Les règles de collaboration, en référence |

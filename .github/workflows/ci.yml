@@ -11,28 +11,21 @@ concurrency:
 
 jobs:
   check:
+    # Vérifications rapides : format du code Rust, garde-fou des areas et couverture du dépôt.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - name: Test de charge (8 bots WebSocket)
-        run: |
-          PORT=3000 npx tsx packages/server/src/index.ts > server.log 2>&1 &
-          for i in $(seq 1 30); do curl -sf http://localhost:3000/health && break; sleep 1; done
-          timeout 120 npx tsx scripts/bots.ts --url ws://localhost:3000/ws --bots 8 --seconds 15
-      - name: Logs serveur
-        if: always()
-        run: cat server.log || true
+      - name: Toolchain épinglé (rust-toolchain.toml)
+        run: rustup toolchain install
+      - run: cargo fmt --all --check
+      - run: node --test scripts/check-areas.test.ts
+      - run: node scripts/check-areas.mjs --audit
 
   rust:
-    # Workspace Rust (`crates/`), en migration à côté des paquets TypeScript.
+    # Le jeu : client natif (Bevy) et serveur (tokio + axum), dans `crates/`.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,19 +37,12 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - name: Test de charge du serveur Rust (8 bots WebSocket)
-        # Partie lancée sans draft : les bots choisissent dans la liste TypeScript des champions, pas
-        # encore tous portés en Rust. Le draft est couvert par les tests de lov-server.
+      - name: Test de charge du serveur (8 bots WebSocket, draft compris)
         run: |
-          cargo build -p lov-server
-          PORT=3001 DEV_LOBBY=1 SKIP_DRAFT=1 CLIENT_DIST=/nonexistent target/debug/lov-server > server-rust.log 2>&1 &
+          cargo build -p lov-server --example bots
+          PORT=3001 DEV_LOBBY=1 target/debug/lov-server > server-rust.log 2>&1 &
           for i in $(seq 1 30); do curl -sf http://localhost:3001/health && break; sleep 1; done
-          timeout 120 npx tsx scripts/bots.ts --url ws://localhost:3001/ws --bots 8 --seconds 15
+          timeout 180 target/debug/examples/bots --url ws://localhost:3001/ws --bots 8 --seconds 15
       - name: Logs du serveur Rust
         if: always()
         run: cat server-rust.log || true
@@ -121,7 +107,7 @@ jobs:
       - name: Taille de la PR
         run: |
           lines=$(git diff --numstat "origin/${{ github.base_ref }}...HEAD" -- . \
-            ':(exclude)package-lock.json' ':(exclude)Cargo.lock' ':(exclude)*.webp' ':(exclude)*.png' \
+            ':(exclude)Cargo.lock' ':(exclude)*.webp' ':(exclude)*.png' \
             | awk '{a+=$1; d+=$2} END {print a+d+0}')
           echo "Lignes modifiées (hors lock et binaires) : $lines"
           if [ "$lines" -gt 800 ]; then

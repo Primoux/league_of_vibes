@@ -1,8 +1,8 @@
 //! Point d'entrée serveur (port de `packages/server/src/index.ts`) : HTTP (sert le build client) +
 //! WebSocket sur `/ws`. Logique dans `server.rs`.
 //!
-//! Variables d'environnement : `PORT` (3000), `DEV_LOBBY=1`, `SKIP_DRAFT=1`, et `CLIENT_DIST` (dossier du
-//! build client, `packages/client/dist` par défaut : le TS le déduisait de l'emplacement du source).
+//! Variables d'environnement : `PORT` (3000), `DEV_LOBBY=1`, `SKIP_DRAFT=1`, et `CLIENT_DIST` (dossier de
+//! fichiers statiques à servir en HTTP, facultatif : le jeu est un client natif).
 
 use lov_server::room::GameRooms;
 use lov_server::server::{GameServerOptions, create_game_server};
@@ -23,14 +23,14 @@ async fn main() -> ExitCode {
     };
     let dev_lobby = std::env::var("DEV_LOBBY").is_ok_and(|v| v == "1");
     let skip_draft = std::env::var("SKIP_DRAFT").is_ok_and(|v| v == "1");
-    let client_dist = std::env::var_os("CLIENT_DIST")
-        .map_or_else(|| PathBuf::from("packages/client/dist"), PathBuf::from);
+    // Fichiers statiques servis en HTTP, s'il y en a (le jeu est un client natif : par défaut, aucun).
+    let client_dist = std::env::var_os("CLIENT_DIST").map(PathBuf::from);
 
     let opts = GameServerOptions {
         port,
         dev_lobby,
         skip_draft,
-        client_dist: Some(client_dist),
+        client_dist,
         ..GameServerOptions::default()
     };
     let server = match create_game_server(opts, Arc::new(GameRooms::default())).await {

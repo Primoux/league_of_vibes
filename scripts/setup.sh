@@ -21,21 +21,19 @@ if [ -z "$(git config user.email)" ]; then
   echo "  Règle-le avec l'adresse de ton compte : git config --global user.email \"toi@exemple.com\""
 fi
 
-if command -v node >/dev/null; then
-  want="$(cat .nvmrc)"; have="$(node -v | sed 's/^v//;s/\..*//')"
-  [ "$have" = "$want" ] || echo "⚠ Node $have installé, $want attendu (.nvmrc) — la CI tourne en $want."
+# Le jeu est en Rust. rustup lit rust-toolchain.toml et installe la bonne version.
+if ! command -v cargo >/dev/null; then
+  echo "⚠ Rust n'est pas installé : installe rustup (https://rustup.rs), puis relance ce script." >&2
+  exit 1
 fi
+if [ "$(uname)" = Linux ]; then
+  echo "Linux : Bevy a besoin de libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev (paquets apt)."
+fi
+cargo test --workspace
 
-npm install
-npm run typecheck
-npm test
-
-# Workspace Rust (migration en cours). rustup lit rust-toolchain.toml et installe la bonne version.
-if command -v cargo >/dev/null; then
-  cargo test --workspace
-else
-  echo "⚠ Rust n'est pas installé : le workspace crates/ ne sera pas testé sur cette machine."
-  echo "  Installe rustup (https://rustup.rs), puis relance ce script."
+# Node ne sert plus qu'aux scripts du dépôt (garde-fou des areas, labels).
+if command -v node >/dev/null; then
+  node --test scripts/check-areas.test.ts
 fi
 echo
 echo "Prêt. Prends une issue libre : gh issue list --label 'bonne première tâche'"

@@ -1,12 +1,15 @@
 name: Build natif
-# Compile le client natif (crates/lov-client) pour Windows, Linux et macOS et publie les exécutables
-# en artefacts du run, à télécharger depuis l'onglet Actions.
+# Compile le jeu pour Windows, Linux et macOS : le client (crates/lov-client) et le serveur
+# (crates/lov-server), en archives prêtes à lancer.
 #
-# Déclenché à la main (Actions → Build natif → Run workflow, sur la branche voulue), et tout seul
-# quand une PR modifie ce fichier, pour que le workflow se valide lui-même.
-# Sert à mesurer les FPS sur de vraies machines : sous WSL, le rendu passe par le processeur.
+# - À la main (Actions → Build natif → Run workflow) : archives en artefacts du run.
+# - Sur une étiquette `v*` (ex. `git tag v0.3.0 && git push origin v0.3.0`) : publie aussi une
+#   release GitHub avec les trois archives.
+# - Quand une PR modifie ce fichier, pour que le workflow se valide lui-même.
 on:
   workflow_dispatch:
+  push:
+    tags: ['v*']
   pull_request:
     paths: ['.github/workflows/build-natif.yml']
 
@@ -20,9 +23,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: windows-latest, name: windows, bin: lov-client.exe }
-          - { os: ubuntu-latest, name: linux, bin: lov-client }
-          - { os: macos-latest, name: macos, bin: lov-client }
+          - { os: windows-latest, name: windows, exe: .exe }
+          - { os: ubuntu-latest, name: linux, exe: '' }
+          - { os: macos-latest, name: macos, exe: '' }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -34,10 +37,41 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: release
-      - run: cargo build --release -p lov-client
+      - run: cargo build --release --locked -p lov-client -p lov-server
+      - name: Archive
+        shell: bash
+        run: |
+          dir=league-of-vibes-${{ matrix.name }}
+          mkdir "$dir"
+          cp target/release/lov-client${{ matrix.exe }} target/release/lov-server${{ matrix.exe }} "$dir/"
+          cp README.md ASSETS.md "$dir/"
+          printf '%s\n' "# Adresse du serveur de jeu (une ligne). Hôte:port suffit, ex. 192.168.1.20:3000." \
+            "# Le serveur est fourni dans cette archive : lance lov-server pour héberger une partie." \
+            "ws://localhost:3000/ws" > "$dir/serveur.txt"
+          if [ "${{ runner.os }}" = Windows ]; then
+            7z a "$dir.zip" "$dir" > /dev/null
+          else
+            tar czf "$dir.tar.gz" "$dir"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: league-of-vibes-${{ matrix.name }}
-          path: target/release/${{ matrix.bin }}
+          path: league-of-vibes-${{ matrix.name }}.*
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "League of Vibes $GITHUB_REF_NAME" --generate-notes

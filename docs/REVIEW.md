@@ -31,7 +31,7 @@ exact que tu merges.
 3. **Tests non affaiblis** : les tests des autres areas passent toujours, sans avoir été assouplis,
    `skip`és ou supprimés pour faire passer la PR. `git diff origin/main...HEAD -- '**/test/**'` le montre vite.
 4. **Qualité** (`AGENTS.md §5`) : pas de `any` non justifié, pas de `@ts-ignore`, pas d'allocation par tick
-   ou par frame dans les boucles chaudes, pas de dépendance npm non justifiée. Côté Rust : pas d'`unwrap()`
+   ou par frame dans les boucles chaudes, pas de crate non justifiée. Côté Rust : pas d'`unwrap()`
    hors tests sur une donnée venue du réseau, pas de `#[allow(...)]` sans commentaire, et `lov-sim` ne lit
    ni l'horloge ni un aléatoire non semé (`Instant::now`, `SystemTime`, `thread_rng` dans un diff de
    `lov-sim` = changement demandé).
@@ -63,7 +63,6 @@ cargo test -p lov-sim -p lov-shared                      # ~1 min ; ajoute -p lo
 Évite `cargo test --workspace` en local pour une PR qui ne touche pas `lov-client` : il recompile tout Bevy
 (un quart d'heure à froid) pour rien. La CI, elle, teste tout le workspace.
 
-Le TypeScript est gelé : `npm ci && npm test` ne sert que si une PR touche `packages/`, ce qui est déjà un refus.
 
 ## Décision
 
@@ -111,9 +110,6 @@ Le TypeScript est gelé : `npm ci && npm test` ne sert que si une PR touche `pac
   parallèle trahit un état global partagé entre tests (registre `static`, `register_*` sans portée par
   monde, ids d'entités identiques d'un `World` à l'autre) : ouvre une issue pour l'auteur du test, et ne
   bloque pas la PR.
-- **Échec du job `check` dans `packages/` sur une PR qui ne touche que `crates/`** : ce sont les tests TS
-  gelés, dont certains sont instables (timeouts de `minions*.test.ts`). Relance le job
-  (`gh run rerun <id> --failed`) ; ce n'est pas une raison de refuser la PR.
 
 ## Garder la file courte
 
