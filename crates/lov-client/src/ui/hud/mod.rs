@@ -13,6 +13,7 @@ use super::UiFonts;
 pub mod bottom;
 pub mod minimap;
 pub mod overlays;
+pub mod shop;
 
 /// Racine du HUD (plein écran, transparente aux clics).
 #[derive(Component)]
@@ -88,6 +89,7 @@ impl Plugin for HudPlugin {
             bottom::BottomBarPlugin,
             overlays::OverlaysPlugin,
             minimap::MinimapPlugin,
+            shop::ShopPlugin,
         ));
     }
 }
