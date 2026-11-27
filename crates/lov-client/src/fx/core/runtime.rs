@@ -11,7 +11,6 @@
 //! - le tremblement de caméra est publié en message [`CameraShake`] : la caméra ne l'applique pas encore ;
 //! - les sprites ne désactivent pas le test de profondeur (`depthTest: false` du web) : le matériau
 //!   standard de Bevy ne le permet pas ;
-//! - le runtime n'est pas remis à zéro entre deux parties (le web le recrée à chaque `installFx`) ;
 //! - un effet ajouté par une tâche du minuteur fait sa première mise à jour à l'image suivante.
 
 use std::collections::HashMap;
@@ -49,6 +48,10 @@ pub struct CameraShake {
     pub intensity: f32,
     pub duration: f32,
 }
+
+/// Nombre maximal de passes de [`FxRuntime::reset`] : chaque passe termine les effets ajoutés par les
+/// `end` de la précédente.
+const RESET_ROUNDS: usize = 8;
 
 /// Teinte vers laquelle tirent les zones au sol d'un ennemi.
 const ENEMY_TINT: Vec3 = Vec3::new(2.4, 0.25, 0.2);
@@ -158,6 +161,31 @@ impl FxRuntime {
 
     pub fn pending_tasks(&self) -> usize {
         self.scheduler.pending()
+    }
+
+    /// Termine tous les effets en cours (leurs entités retournent aux pools) et vide le minuteur et les
+    /// auras : entre deux parties, rien ne doit survivre (le web recréait le runtime à chaque `installFx`).
+    ///
+    /// Un `end` peut lui-même ajouter un effet qui détient un élément d'un pool (la fin d'une télégraphie
+    /// lance le fondu qui rend son décal, la fin d'une invisibilité lance un éclat) : on termine donc en
+    /// boucle, tant que de nouveaux effets apparaissent, avant de vider le minuteur et les auras.
+    pub fn reset(world: &mut World) {
+        world.resource_mut::<FxRuntime>().enemy_context = false;
+        for _ in 0..RESET_ROUNDS {
+            let effects = std::mem::take(&mut world.resource_mut::<FxRuntime>().effects);
+            if effects.is_empty() {
+                break;
+            }
+            let mut fx = Fx::new(world);
+            for mut e in effects {
+                e.end(&mut fx);
+            }
+        }
+        let mut rt = world.resource_mut::<FxRuntime>();
+        // au-delà de la borne (effets qui se relancent sans fin), on jette ce qui reste
+        rt.effects.clear();
+        rt.scheduler.clear();
+        rt.auras.clear();
     }
 
     /// Avance le temps, le minuteur et les effets (`update` du web, hors particules et rubans qui ont leurs
@@ -566,6 +594,28 @@ mod tests {
         FxRuntime::update(&mut w, 0.3);
         assert_eq!(hits.load(Ordering::Relaxed), 11);
         assert!((w.resource::<FxRuntime>().time - 1.2).abs() < 1e-5);
+    }
+
+    #[test]
+    fn la_remise_a_zero_termine_tout() {
+        let mut w = world();
+        let ended = Arc::new(AtomicU32::new(0));
+        let mut fx = Fx::new(&mut w);
+        fx.add(Countdown {
+            left: 100,
+            ended: ended.clone(),
+        });
+        fx.after(1.0, |_| panic!("tâche d'une partie précédente"));
+        fx.set_aura("a", |_| {});
+        FxRuntime::reset(&mut w);
+        assert_eq!(
+            ended.load(Ordering::Relaxed),
+            1,
+            "`end` appelé : pools rendus"
+        );
+        let rt = w.resource::<FxRuntime>();
+        assert_eq!((rt.active_effects(), rt.pending_tasks()), (0, 0));
+        FxRuntime::update(&mut w, 2.0);
     }
 
     #[test]

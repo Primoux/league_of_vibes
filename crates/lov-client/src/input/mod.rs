@@ -137,10 +137,13 @@ fn update_pointer(
 ) {
     input.champions_only = keys.pressed(KeyCode::Backquote);
     let (camera, transform) = *camera;
-    // souris sur un panneau du HUD : pas de sol ni d'unité visés à travers
-    let over_ui = over_ui.is_some_and(|o| o.0);
-    let Some(ray) = cursor_ray(&window, camera, transform).filter(|_| in_game(&state) && !over_ui)
-    else {
+    // souris sur un panneau du HUD : on garde le sol et l'unité de l'image précédente (objets actifs,
+    // balise et sorts au clavier visent la dernière position au sol, comme `cursorGame` du web) ; les
+    // clics, eux, sont ignorés par `mouse_orders`
+    if over_ui.is_some_and(|o| o.0) {
+        return;
+    }
+    let Some(ray) = cursor_ray(&window, camera, transform).filter(|_| in_game(&state)) else {
         input.cursor = None;
         input.hover = None;
         return;
@@ -280,6 +283,7 @@ fn mouse_orders(
     state: Res<GameState>,
     conn: Res<Connection>,
     time: Res<Time>,
+    over_ui: Option<Res<crate::ui::PointerOverUi>>,
     mut input: ResMut<PlayerInput>,
 ) {
     if buttons.just_released(MouseButton::Right) {
@@ -289,8 +293,10 @@ fn mouse_orders(
         input.right_held = false;
         return;
     }
+    // un clic sur le HUD lui appartient : ni ordre, ni annulation du ciblage en cours
+    let over_ui = over_ui.is_some_and(|o| o.0);
     let alt = keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
-    if buttons.just_pressed(MouseButton::Left) {
+    if buttons.just_pressed(MouseButton::Left) && !over_ui {
         if alt {
             if let Some(pos) = input.cursor {
                 let kind = if enemy_hover(&state, &input).is_some() {
@@ -309,7 +315,7 @@ fn mouse_orders(
             confirm(Targeting::AttackMove, &state, &mut input, &conn);
         }
     }
-    if buttons.just_pressed(MouseButton::Right) {
+    if buttons.just_pressed(MouseButton::Right) && !over_ui {
         set_targeting(&mut input, None);
         if let Some(target_id) = enemy_hover(&state, &input) {
             conn.send(ClientMsg::Attack { target_id });
@@ -569,6 +575,46 @@ mod tests {
         };
         let (conn, sent) = Connection::for_tests();
         (state, input, conn, sent)
+    }
+
+    /// Un clic (gauche ou droit) sur un panneau du HUD pendant un ciblage n'envoie rien et garde le
+    /// ciblage ; hors du HUD, le même clic lance le sort.
+    #[test]
+    fn un_clic_sur_l_interface_n_envoie_rien_et_garde_le_ciblage() {
+        use bevy::ecs::system::RunSystemOnce;
+        let (state, mut input, conn, sent) = setup();
+        // W de Grondak : sans cible, lancé au clic
+        set_targeting(&mut input, Some(Targeting::Ability(AbilitySlot::W)));
+        let mut world = World::new();
+        let mut buttons = ButtonInput::<MouseButton>::default();
+        buttons.press(MouseButton::Left);
+        buttons.press(MouseButton::Right);
+        world.insert_resource(buttons);
+        world.insert_resource(ButtonInput::<KeyCode>::default());
+        world.insert_resource(state);
+        world.insert_resource(conn);
+        world.insert_resource(Time::<()>::default());
+        world.insert_resource(input);
+        world.insert_resource(crate::ui::PointerOverUi(true));
+        assert!(world.run_system_once(mouse_orders).is_ok());
+        assert!(sent.try_recv().is_err(), "aucun ordre parti");
+        assert_eq!(
+            world.resource::<PlayerInput>().targeting,
+            Some(Targeting::Ability(AbilitySlot::W))
+        );
+        // hors du HUD, le clic gauche lance le sort
+        world.insert_resource(crate::ui::PointerOverUi(false));
+        let mut buttons = ButtonInput::<MouseButton>::default();
+        buttons.press(MouseButton::Left);
+        world.insert_resource(buttons);
+        assert!(world.run_system_once(mouse_orders).is_ok());
+        assert!(matches!(
+            sent.try_recv(),
+            Ok(ClientMsg::Cast {
+                slot: AbilitySlot::W,
+                ..
+            })
+        ));
     }
 
     #[test]
