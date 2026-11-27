@@ -21,4 +21,4 @@ uuid = { version = "1.29.2", features = ["v4"] }
 # Déjà dans Cargo.lock (dépendance de Bevy) : mesure la bande passante compressée dans le test de perf.
 flate2 = "1.1.11"
 futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
-tokio-tungstenite = "0.29.0"
+tokio-tungstenite = "0.30.0"
