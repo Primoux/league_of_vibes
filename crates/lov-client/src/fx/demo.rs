@@ -7,7 +7,7 @@
 //! `F9` bascule le post-traitement (qualité haute / basse) ; `LOV_POST=low` démarre en qualité basse.
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 3 s (`LOV_SCREENSHOT_AT=4.5` pour choisir l'instant).
 //!
-//! Tout au fond, un sort factice parcourt la chaîne complète des FX de sorts : un `ServerEvent` de zone,
+//! À droite de la grille, un sort factice parcourt la chaîne complète des FX de sorts : un `ServerEvent` de zone,
 //! toutes les 2,5 s, passe par le bus et le dispatcher jusqu'à un handler enregistré (`register_fx`), qui
 //! compose les primitives du runtime : décal de télégraphie (`add`), puis éclat (sprite) et traînée (ruban)
 //! à l'explosion (`after`). C'est l'exemple à suivre pour écrire le FX d'un sort.
@@ -47,27 +47,49 @@ impl Plugin for FxDemoPlugin {
                 ..default()
             });
         }
-        app.add_systems(
-            Update,
-            (
-                replay,
-                decals,
-                ribbons,
-                materials,
-                toggle_post,
-                screenshot,
-                log_stats,
-                cast_demo_spell,
-            ),
-        )
-        .register_fx(
-            DEMO_KEY,
-            FxHandlers {
-                area: Some(demo_area),
-                ..default()
-            },
-        );
+        app.add_systems(Startup, spawn_ground)
+            .add_systems(
+                Update,
+                (
+                    replay,
+                    decals,
+                    ribbons,
+                    materials,
+                    toggle_post,
+                    screenshot,
+                    log_stats,
+                    cast_demo_spell,
+                ),
+            )
+            .register_fx(
+                DEMO_KEY,
+                FxHandlers {
+                    area: Some(demo_area),
+                    ..default()
+                },
+            );
     }
+}
+
+/// Sol de la démo, comme le fxlab du web (disque `#35512d` de rayon 30) : sous les FX additifs, le dallage
+/// clair de la base les rendait presque invisibles.
+fn spawn_ground(
+    mut commands: Commands,
+    rig: Res<CameraRig>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    commands.spawn((
+        Name::new("fxlab-sol"),
+        Mesh3d(meshes.add(Circle::new(30.0))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb_u8(0x35, 0x51, 0x2d),
+            perceptual_roughness: 0.95,
+            ..default()
+        })),
+        Transform::from_translation(rig.focus + Vec3::Y * 0.01)
+            .with_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
+    ));
 }
 
 const PERIOD: f32 = 1.4;
@@ -613,8 +635,9 @@ fn log_stats(
 
 // ------------------------------------------------------------------- chaîne complète des FX de sorts
 
-/// fxKey du sort factice (palette par défaut : aucun champion ne s'appelle `fxlab`).
-const DEMO_KEY: &str = "fxlab_demo";
+/// fxKey du sort factice : préfixe `ilyra`, pour une palette de champion vive (la palette par défaut est
+/// presque blanche).
+const DEMO_KEY: &str = "ilyra_fxlab";
 const DEMO_PERIOD: f32 = 2.5;
 const FLASH_LIFE: f32 = 0.3;
 const SPIRAL_LIFE: f32 = 0.8;
@@ -630,7 +653,7 @@ fn cast_demo_spell(
         return;
     }
     *next = time.elapsed_secs() + DEMO_PERIOD;
-    let p = crate::render::to_game(rig.focus + Vec3::new(0.0, 0.0, -4.5 * SPACING));
+    let p = crate::render::to_game(rig.focus + Vec3::new(3.3 * SPACING, 0.0, 0.0));
     events.write(ServerEvent(GameEvent::AreaEffect {
         source: 0,
         fx_key: DEMO_KEY.into(),
