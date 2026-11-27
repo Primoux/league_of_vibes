@@ -1,4 +1,8 @@
-//! Labo des sorts, sans serveur : `LOV_SPELLLAB=<champion>` (ou `all`) `cargo run -p lov-client`.
+//! Labo des sorts, sans serveur :
+//! `LOV_SPELLLAB=<champion>` (ou `all`) `cargo run -p lov-client --features spelllab`.
+//!
+//! Outil de développement, compilé seulement avec la feature `spelllab` : le jeu livré n'embarque pas
+//! la simulation.
 //!
 //! Équivalent du `labSim.ts` du fxlab web : la **vraie** simulation (`lov-sim`, systèmes d'entrées, buffs,
 //! invocateurs, sorts, déplacement, combat, progression) tourne dans le client. Un champion bleu de
@@ -49,6 +53,8 @@ pub fn enabled() -> bool {
 const CAST_EVERY: f64 = 2.4;
 /// Instants des captures après chaque sort (s).
 const SHOTS: [f64; 2] = [0.35, 0.9];
+/// Sorts ciblés qui visent un allié (les autres visent l'ennemi), comme `ALLY_TARGETED` du fxlab web.
+const ALLY_TARGETED: [&str; 3] = ["ilyra_e", "solenne_w", "solenne_e"];
 const SLOTS: [AbilitySlot; 4] = [
     AbilitySlot::Q,
     AbilitySlot::W,
@@ -101,6 +107,8 @@ pub struct SpellLab {
     shots_due: Vec<(f64, String)>,
     /// Compteurs du dispatcher au lancement (pour la part des FX dédiés).
     stats_at_cast: (u32, u32),
+    /// Un tick a eu lieu depuis la dernière reconstruction des snapshots.
+    dirty: bool,
 }
 
 fn event_name(e: &GameEvent) -> &'static str {
@@ -211,6 +219,7 @@ impl SpellLab {
             shots,
             shots_due: Vec::new(),
             stats_at_cast: (0, 0),
+            dirty: true,
         })
     }
 
@@ -253,28 +262,30 @@ impl SpellLab {
         if let Some(a) = spawn(&mut self.world, "lab-lanceur", &id, Team::Blue, CASTER_AT) {
             self.caster = a;
         }
+        // les montées de niveau de `grant_xp` ne sont pas des FX à montrer (comme au démarrage)
+        self.world.events.drain();
         self.reset();
     }
 
     fn cast(&mut self) {
         self.refresh();
         let slot = SLOTS[self.slot];
-        let enemy_pos = self.world.get(self.enemy.id).map_or(ENEMY_AT, |e| e.pos);
-        let ally_pos = self.world.get(self.ally.id).map_or(ALLY_AT, |e| e.pos);
-        // sur l'ennemi d'abord ; un sort refusé (ciblage allié) est relancé sur l'allié
-        let on_enemy = CastCommand {
-            slot,
-            target_id: Some(self.enemy.id),
-            target_pos: Some(enemy_pos),
+        // l'allié pour les sorts de la liste, l'ennemi sinon (comme le fxlab web) : un sort hors de portée
+        // met un déplacement en file, il ne faut donc pas déduire la cible d'un refus
+        let on_ally = champion_def(self.champion_id())
+            .is_some_and(|d| ALLY_TARGETED.contains(&d.abilities.get(slot).id.as_str()));
+        let (target, fallback) = if on_ally {
+            (self.ally.id, ALLY_AT)
+        } else {
+            (self.enemy.id, ENEMY_AT)
         };
-        if !cast_ability(&mut self.world, self.caster.id, &on_enemy, true) {
-            let on_ally = CastCommand {
-                slot,
-                target_id: Some(self.ally.id),
-                target_pos: Some(ally_pos),
-            };
-            cast_ability(&mut self.world, self.caster.id, &on_ally, true);
-        }
+        let target_pos = self.world.get(target).map_or(fallback, |e| e.pos);
+        let command = CastCommand {
+            slot,
+            target_id: Some(target),
+            target_pos: Some(target_pos),
+        };
+        cast_ability(&mut self.world, self.caster.id, &command, true);
         let name = format!("{}_{}", self.champion_id(), slot_name(slot));
         if let Some(dir) = &self.shots {
             for (k, at) in SHOTS.iter().enumerate() {
@@ -298,6 +309,7 @@ impl SpellLab {
         }
         self.world.step(&mut self.systems);
         self.clock += TICK_DT;
+        self.dirty = true;
         // la cible et l'allié restent en vie (le labo montre les FX, pas la mort)
         for id in [self.enemy.id, self.ally.id] {
             if let Some(e) = self.world.get_mut(id)
@@ -412,9 +424,13 @@ fn run_lab(
     // snapshots et positions interpolées entre les deux derniers ticks
     let k = lab.acc / TICK_DT;
     let lab = &mut *lab;
-    state.buffer.entities.clear();
-    for e in lab.world.iter() {
-        state.buffer.entities.insert(e.id, snapshot(e, &lab.world));
+    // les snapshots ne changent qu'avec un tick : inutile de les reconstruire à chaque image
+    if lab.dirty {
+        lab.dirty = false;
+        state.buffer.entities.clear();
+        for e in lab.world.iter() {
+            state.buffer.entities.insert(e.id, snapshot(e, &lab.world));
+        }
     }
     for a in [&lab.caster, &lab.enemy, &lab.ally] {
         if let Some(e) = lab.world.get(a.id) {
@@ -438,4 +454,58 @@ fn run_lab(
             .observe(save_to_disk(path.clone()));
         false
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Lance le sort courant puis fait tourner la simulation `CAST_EVERY` secondes.
+    fn cast_and_run(lab: &mut SpellLab) -> Vec<GameEvent> {
+        lab.reset();
+        lab.cast();
+        let mut events = Vec::new();
+        for _ in 0..(CAST_EVERY / TICK_DT) as usize {
+            events.extend(lab.step());
+        }
+        events
+    }
+
+    #[test]
+    fn chaque_sort_de_chaque_champion_part_sur_la_simulation() {
+        let champions: Vec<String> = CHAMPIONS.iter().map(|c| c.id.clone()).collect();
+        let mut lab = SpellLab::new(champions.clone(), None).expect("labo");
+        let mut silent = Vec::new();
+        for (k, champion) in champions.iter().enumerate() {
+            if k > 0 {
+                lab.next_champion();
+            }
+            assert_eq!(lab.champion_id(), champion);
+            for slot in SLOTS {
+                let events = cast_and_run(&mut lab);
+                let cast = events.iter().any(|e| {
+                    matches!(e, GameEvent::AbilityCast { source, slot: s, .. }
+                        if *source == lab.caster.id && *s == slot)
+                });
+                if !cast {
+                    silent.push(format!("{champion}_{}", slot_name(slot)));
+                }
+            }
+        }
+        assert!(silent.is_empty(), "sorts sans abilityCast : {silent:?}");
+    }
+
+    #[test]
+    fn changer_de_champion_ne_rejoue_pas_les_montees_de_niveau() {
+        let champions = vec!["ilyra".to_owned(), "solenne".to_owned()];
+        let mut lab = SpellLab::new(champions, None).expect("labo");
+        lab.next_champion();
+        let events = lab.step();
+        assert!(
+            !events
+                .iter()
+                .any(|e| matches!(e, GameEvent::LevelUp { .. })),
+            "montées de niveau rejouées : {events:?}"
+        );
+    }
 }

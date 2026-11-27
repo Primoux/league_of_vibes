@@ -27,6 +27,7 @@ pub mod dispatcher;
 pub mod effects;
 #[allow(dead_code)]
 pub mod keys;
+#[cfg(feature = "spelllab")]
 pub mod lab;
 pub mod particles;
 pub mod post;

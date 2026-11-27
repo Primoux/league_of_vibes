@@ -11,7 +11,12 @@ workspace = true
 [dependencies]
 lov-shared = { path = "../lov-shared" }
 # Labo des sorts (`LOV_SPELLLAB`) : la vraie simulation tourne dans le client, comme le fxlab web
-# importait celle du serveur. Le jeu lui-même ne s'en sert pas : il reçoit les snapshots du serveur.
-lov-sim = { path = "../lov-sim" }
+# importait celle du serveur. Optionnelle : le jeu livré ne l'embarque pas (il reçoit les snapshots du
+# serveur). `cargo run -p lov-client --features spelllab`.
+lov-sim = { path = "../lov-sim", optional = true }
 bevy = { version = "0.20.1", features = ["bevy_dev_tools", "render_dev_tools", "webp"] }
 tungstenite = "0.30.0"
+
+[features]
+# Labo des sorts : compile `fx::lab` et la simulation `lov-sim` dans le client (outil de développement).
+spelllab = ["dep:lov-sim"]
