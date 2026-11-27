@@ -16,6 +16,7 @@ pub mod bus;
 // les appellent.
 #[allow(dead_code)]
 pub mod core;
+pub mod defaults;
 pub mod demo;
 #[allow(dead_code)]
 pub mod dispatcher;
@@ -30,6 +31,7 @@ pub mod post;
 #[allow(dead_code)]
 pub mod registry;
 pub mod shaders;
+pub mod summoners;
 // Indicateurs de visée : l'API manuelle (`show_ability`…) sert aux démos et aux tests ; la partie les
 // pilote elle-même depuis l'état de l'input.
 #[allow(dead_code)]
@@ -44,6 +46,8 @@ pub use dispatcher::FxDispatcher;
 pub use registry::FxRegistry;
 
 use crate::net::{ServerEvent, now_ms};
+use lov_shared::types::EntityId;
+use post::{FxQuality, PostFxSettings};
 
 /// Pas de temps maximal des FX (s) : une image très lente ne téléporte pas les effets.
 const MAX_DT: f32 = 0.1;
@@ -72,7 +76,51 @@ impl Plugin for FxPlugin {
             PostUpdate,
             core::runtime::face_camera.before(bevy::transform::TransformSystems::Propagate),
         );
-        app.world_mut().get_resource_or_init::<FxRegistry>();
+        app.add_systems(Update, reset_between_games.before(collect_events));
+        app.world_mut()
+            .get_resource_or_init::<FxRegistry>()
+            .defaults = defaults::default_fx();
+        summoners::register(app);
+        if std::env::var("LOV_FX_QUALITY").as_deref() == Ok("low") {
+            app.add_systems(Startup, |world: &mut World| {
+                set_fx_quality(world, FxQuality::Low)
+            });
+        }
+    }
+}
+
+/// Qualité des FX (`setFxQuality`) : basse = sans post-traitement et moitié moins de particules.
+pub fn set_fx_quality(world: &mut World, q: FxQuality) {
+    if let Some(mut post) = world.get_resource_mut::<PostFxSettings>() {
+        post.quality = q;
+    }
+    if let Some(mut ps) = world.get_resource_mut::<particles::ParticleSystem>() {
+        ps.density = match q {
+            FxQuality::High => 1.0,
+            FxQuality::Low => 0.5,
+        };
+    }
+}
+
+/// Remet les FX à zéro quand on entre dans une partie ou qu'on la quitte : effets, auras, minuteur,
+/// projectiles en vol et statuts de la partie précédente disparaissent.
+fn reset_between_games(world: &mut World, mut last: Local<Option<(String, EntityId)>>) {
+    let game = world
+        .get_resource::<crate::net::GameState>()
+        .and_then(|s| s.game.as_ref());
+    let same = match (&*last, game) {
+        (Some((you, id)), Some(g)) => *you == g.you && *id == g.entity_id,
+        (None, None) => true,
+        _ => false,
+    };
+    if same {
+        return;
+    }
+    *last = game.map(|g| (g.you.clone(), g.entity_id));
+    FxRuntime::reset(world);
+    world.resource_mut::<FxDispatcher>().clear();
+    if let Some(mut s) = world.get_resource_mut::<world::status::ActiveStatuses>() {
+        s.clear();
     }
 }
 

@@ -11,7 +11,6 @@
 //! - le tremblement de caméra est publié en message [`CameraShake`] : la caméra ne l'applique pas encore ;
 //! - les sprites ne désactivent pas le test de profondeur (`depthTest: false` du web) : le matériau
 //!   standard de Bevy ne le permet pas ;
-//! - le runtime n'est pas remis à zéro entre deux parties (le web le recrée à chaque `installFx`) ;
 //! - un effet ajouté par une tâche du minuteur fait sa première mise à jour à l'image suivante.
 
 use std::collections::HashMap;
@@ -158,6 +157,27 @@ impl FxRuntime {
 
     pub fn pending_tasks(&self) -> usize {
         self.scheduler.pending()
+    }
+
+    /// Termine tous les effets en cours (leurs entités retournent aux pools) et vide le minuteur et les
+    /// auras : entre deux parties, rien ne doit survivre (le web recréait le runtime à chaque `installFx`).
+    pub fn reset(world: &mut World) {
+        let effects = {
+            let mut rt = world.resource_mut::<FxRuntime>();
+            rt.scheduler.clear();
+            rt.auras.clear();
+            rt.enemy_context = false;
+            std::mem::take(&mut rt.effects)
+        };
+        let mut fx = Fx::new(world);
+        for mut e in effects {
+            e.end(&mut fx);
+        }
+        // un `end` a pu planifier ou ajouter quelque chose : on le jette aussi
+        let mut rt = world.resource_mut::<FxRuntime>();
+        rt.scheduler.clear();
+        rt.effects.clear();
+        rt.auras.clear();
     }
 
     /// Avance le temps, le minuteur et les effets (`update` du web, hors particules et rubans qui ont leurs
@@ -566,6 +586,28 @@ mod tests {
         FxRuntime::update(&mut w, 0.3);
         assert_eq!(hits.load(Ordering::Relaxed), 11);
         assert!((w.resource::<FxRuntime>().time - 1.2).abs() < 1e-5);
+    }
+
+    #[test]
+    fn la_remise_a_zero_termine_tout() {
+        let mut w = world();
+        let ended = Arc::new(AtomicU32::new(0));
+        let mut fx = Fx::new(&mut w);
+        fx.add(Countdown {
+            left: 100,
+            ended: ended.clone(),
+        });
+        fx.after(1.0, |_| panic!("tâche d'une partie précédente"));
+        fx.set_aura("a", |_| {});
+        FxRuntime::reset(&mut w);
+        assert_eq!(
+            ended.load(Ordering::Relaxed),
+            1,
+            "`end` appelé : pools rendus"
+        );
+        let rt = w.resource::<FxRuntime>();
+        assert_eq!((rt.active_effects(), rt.pending_tasks()), (0, 0));
+        FxRuntime::update(&mut w, 2.0);
     }
 
     #[test]
