@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+    # `edited` : changer la base d'une PR (pile reciblée sur main) ou sa ligne `Areas:` relance la CI.
+    # Sans lui, les checks affichés restent ceux d'avant le reciblage.
+    types: [opened, synchronize, reopened, edited]
 
 # Plusieurs machines poussent en parallèle : on annule les runs dépassés d'une même branche.
 concurrency:

@@ -1,0 +1,21 @@
+# Notes de version générées par GitHub à chaque étiquette `v*` (build-natif.yml), rangées par label d'area.
+changelog:
+  exclude:
+    labels: [ignore-for-release]
+  categories:
+    - title: Champions
+      labels: [area:champion, area:render-champions]
+    - title: Gameplay (simulation, combat, sorts, objets, jungle, objectifs)
+      labels: [area:combat, area:abilities, area:items, area:systems, area:world-ai, area:nav]
+    - title: Réseau et serveur
+      labels: [area:net, area:client-net]
+    - title: Rendu et effets
+      labels: [area:render, area:render-map, area:fx-core, area:fx-effects]
+    - title: Interface
+      labels: [area:ui-core, area:ui-hud, area:ui-screens, area:input]
+    - title: Son et musique
+      labels: [area:audio]
+    - title: Outils, CI et documentation
+      labels: [area:infra, area:docs]
+    - title: Autres changements
+      labels: ["*"]
