@@ -394,7 +394,7 @@ const SERVER_FILE: &str = "serveur.txt";
 /// sinon le serveur local.
 pub fn server_url() -> String {
     if let Ok(url) = std::env::var("LOV_URL") {
-        return url;
+        return normalize_url(&url);
     }
     std::env::current_exe()
         .ok()
@@ -403,20 +403,35 @@ pub fn server_url() -> String {
         .unwrap_or_else(|| DEFAULT_URL.to_string())
 }
 
-/// Première ligne utile du fichier (commentaires `#` et lignes vides ignorés) ; `hôte:port` seul est
-/// complété en `ws://hôte:port/ws`.
+/// Première ligne utile du fichier (commentaires `#` et lignes vides ignorés), normalisée par
+/// [`normalize_url`].
 fn url_from_file(text: &str) -> Option<String> {
     let line = text
         .lines()
         .map(str::trim)
         .find(|l| !l.is_empty() && !l.starts_with('#'))?;
-    Some(if line.starts_with("ws://") || line.starts_with("wss://") {
-        line.to_owned()
-    } else {
-        format!("ws://{line}/ws")
-    })
+    Some(normalize_url(line))
 }
 
+/// Adresse WebSocket du serveur à partir de ce qu'un joueur peut écrire : `ws://` et `wss://` gardés,
+/// `http://` devient `ws://` et `https://` devient `wss://` (l'adresse d'un serveur hébergé copiée du
+/// navigateur), `hôte:port` seul passe en `ws://`. Sans chemin, on ajoute `/ws`, la route du serveur.
+fn normalize_url(raw: &str) -> String {
+    let raw = raw.trim();
+    let (scheme, rest) = match raw.split_once("://") {
+        Some((s, rest)) => match s.to_ascii_lowercase().as_str() {
+            "wss" | "https" => ("wss", rest),
+            _ => ("ws", rest),
+        },
+        None => ("ws", raw),
+    };
+    let rest = rest.trim_end_matches('/');
+    if rest.contains('/') {
+        format!("{scheme}://{rest}")
+    } else {
+        format!("{scheme}://{rest}/ws")
+    }
+}
 pub struct NetPlugin;
 
 impl Plugin for NetPlugin {
@@ -500,7 +515,14 @@ fn session(
     to_game: &Sender<ServerMsg>,
 ) -> Ended {
     // Lecture à délai court : la même boucle sert les envois et les réceptions.
-    if let MaybeTlsStream::Plain(stream) = socket.get_mut() {
+    // En `wss`, le délai se pose sur la socket TCP sous la couche TLS : rustls reprend proprement une
+    // lecture interrompue (`WouldBlock`/`TimedOut`) à l'appel suivant.
+    let tcp = match socket.get_mut() {
+        MaybeTlsStream::Plain(stream) => Some(stream),
+        MaybeTlsStream::Rustls(tls) => Some(tls.get_mut()),
+        _ => None,
+    };
+    if let Some(stream) = tcp {
         let _ = stream.set_read_timeout(Some(Duration::from_millis(2)));
         let _ = stream.set_nodelay(true);
     }
