@@ -1,9 +1,10 @@
 //! Audio du client natif : effets et musique entièrement synthétisés, aucun asset externe.
 //!
 //! Portage de `packages/client/src/audio/` (issue #118), en plusieurs PR :
-//! - ici : le moteur ([`synth`]), le mixage par canaux ([`mixer`]), les séries de kills
-//!   ([`kill_streaks`]) et la sortie vers la carte son ;
-//! - ensuite : la table événement de jeu → son (`sounds.ts`), puis la musique (`music/`).
+//! - le moteur ([`synth`]), le mixage par canaux ([`mixer`]), les séries de kills ([`kill_streaks`]) et
+//!   la sortie vers la carte son ;
+//! - le moteur de musique ([`music`]) : bus, réverbération, instruments, jingles d'élimination ;
+//! - ensuite : la table événement de jeu → son (`sounds.ts`), puis les thèmes et le séquenceur.
 //!
 //! Le client web pilote un `AudioContext` ; ici le jeu envoie des [`Sfx`] tout faits au fil audio par un
 //! canal, et un [`Mixer`] les rend dans une source Bevy sans fin ([`SynthStream`]). Rien n'est alloué ni
@@ -16,6 +17,10 @@ pub mod demo;
 pub mod kill_streaks;
 #[allow(dead_code)]
 pub mod mixer;
+// Le bus et les jingles servent à la table événement → son et aux thèmes (PR suivantes de #118) ; d'ici là,
+// seuls la démo et les tests en appellent une partie.
+#[allow(dead_code)]
+pub mod music;
 #[allow(dead_code)]
 pub mod synth;
 
@@ -31,6 +36,7 @@ use lov_shared::types::{EntityId, Vec2 as GameVec2};
 use crate::net::GameState;
 use crate::render::camera::CameraRig;
 use mixer::{Channel, Mixer, Sfx, SfxGate, Volumes, spatial_gain};
+use music::{BusCommand, MusicBus, MusicBusHandle};
 use synth::{NoiseOpts, SAMPLE_RATE, ToneOpts, Voice};
 
 /// Messages en attente au plus entre le jeu et le fil audio, qui les lit tous les 256 échantillons.
@@ -40,6 +46,9 @@ const COMMAND_QUEUE: usize = 256;
 enum Command {
     Play(Sfx),
     Volumes(Volumes),
+    /// Bus de musique construit côté jeu (ses allocations n'ont pas lieu sur le fil audio).
+    AddBus(Channel, Box<MusicBus>),
+    Bus(u32, BusCommand),
 }
 
 /// Options d'un effet (`SfxOpts`) : position pour la spatialisation, volume, canal (effets par défaut).
@@ -105,6 +114,8 @@ pub struct AudioManager {
     /// Horloge du gestionnaire (secondes), avancée chaque image : sert à la polyphonie.
     now: f64,
     seed: u32,
+    /// Identifiant du prochain bus de musique.
+    next_bus: u32,
 }
 
 // Volumes et positions d'entités servent aux paramètres et à la table événement → son (PR suivantes de #118).
@@ -121,6 +132,7 @@ impl AudioManager {
             },
             now: 0.0,
             seed: 0x5eed,
+            next_bus: 1,
         }
     }
 
@@ -169,6 +181,20 @@ impl AudioManager {
         sfx.voices = recipe.voices;
         self.send(Command::Play(sfx));
         true
+    }
+
+    /// Crée un bus de musique sur `channel` (`new MusicBus(ctx, dest)` dans un `sfx` du web). Gain global
+    /// à 0 : le jeu l'ouvre par [`BusCommand::Fade`] ou `SetMaster`.
+    pub fn music_bus(&mut self, channel: Channel) -> MusicBusHandle {
+        let (bus, handle) = MusicBus::new(self.next_bus);
+        self.next_bus += 1;
+        self.send(Command::AddBus(channel, Box::new(bus)));
+        handle
+    }
+
+    /// Envoie une commande (phrase, fondu, délai) à un bus de musique.
+    pub fn bus(&mut self, bus: &MusicBusHandle, cmd: BusCommand) {
+        self.send(Command::Bus(bus.id(), cmd));
     }
 
     /// Position d'une entité dans l'état courant, pour la spatialisation.
@@ -226,6 +252,8 @@ impl Stream {
                 match cmd {
                     Command::Play(sfx) => self.mixer.play(sfx),
                     Command::Volumes(v) => self.mixer.set_volumes(v),
+                    Command::AddBus(ch, bus) => self.mixer.add_bus(ch, bus),
+                    Command::Bus(id, cmd) => self.mixer.bus_command(id, cmd),
                 }
             }
         }

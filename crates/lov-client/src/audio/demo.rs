@@ -2,12 +2,16 @@
 //!
 //! Rejoue en boucle une galerie de sons, un toutes les 1,2 s, et écrit son nom dans la console : les
 //! quatre formes d'onde, glissements, filtres de bruit, une recette d'ult portée du client web, la
-//! spatialisation (le même coup de plus en plus loin) et une rafale qui bute sur la polyphonie.
+//! spatialisation (le même coup de plus en plus loin) et une rafale qui bute sur la polyphonie ; puis la
+//! galerie de musique : chaque instrument sur un bus du canal Musique, et les jingles d'élimination.
 
 use bevy::prelude::*;
 use lov_shared::types::Vec2 as GameVec2;
 
 use super::mixer::Channel;
+use super::music::instruments::*;
+use super::music::stings::{StingSide, first_blood_sting, kill_sting};
+use super::music::{BusCommand, MusicBusHandle, Score};
 use super::synth::{FilterKind, NoiseOpts, ToneOpts, Wave};
 use super::{AudioManager, Recipe, SfxOpts};
 
@@ -184,16 +188,129 @@ const GALLERY: &[Entry] = &[
     }),
 ];
 
-fn replay(time: Res<Time>, mut audio: ResMut<AudioManager>, mut next: Local<(f32, usize)>) {
-    let (due, index) = &mut *next;
-    if time.elapsed_secs() < *due {
+/// Une entrée de la galerie de musique : nom, durée avant la suivante, phrase jouée à l'instant `t`.
+type MusicEntry = (&'static str, f32, fn(&mut Score, f64));
+
+const MUSIC: &[MusicEntry] = &[
+    ("nappe (pad)", 2.4, |s, t| {
+        pad(s, &[57, 60, 64], t, 2.0, 0.05, 1.0)
+    }),
+    ("chœur", 2.4, |s, t| choir(s, &[69, 76], t, 2.0, 0.04)),
+    ("cordes en ostinato", 1.8, |s, t| {
+        for (i, n) in [64, 64, 67, 64, 71, 69, 67, 64].into_iter().enumerate() {
+            strings(s, n, t + i as f64 * 0.18, 0.16, 0.035);
+        }
+    }),
+    ("cuivres", 1.5, |s, t| {
+        brass(s, &[60, 64, 67], t, 0.5, 0.045);
+        brass(s, &[62, 65, 69], t + 0.6, 0.6, 0.045);
+    }),
+    ("basse", 1.8, |s, t| {
+        for (i, n) in [33, 33, 36, 31].into_iter().enumerate() {
+            bass(s, n, t + i as f64 * 0.4, 0.35, 0.12);
+        }
+    }),
+    ("cloches", 2.8, |s, t| {
+        for (i, n) in [76, 79, 83, 88].into_iter().enumerate() {
+            bell(s, n, t + i as f64 * 0.25, 0.05, 2.4);
+        }
+    }),
+    ("flûte", 2.0, |s, t| {
+        flute(s, 76, t, 0.5, 0.05);
+        flute(s, 79, t + 0.55, 1.0, 0.05);
+    }),
+    ("arpège pincé", 1.6, |s, t| {
+        for (i, n) in [60, 64, 67, 72, 76, 72, 67, 64].into_iter().enumerate() {
+            pluck(s, n, t + i as f64 * 0.12, 0.04);
+        }
+    }),
+    ("taiko et caisse claire", 1.8, |s, t| {
+        for i in 0..4 {
+            let at = t + f64::from(i) * 0.3;
+            taiko(s, at, 0.32, 1.0);
+            snare(s, at + 0.15, 0.12);
+        }
+    }),
+    ("montée de cymbale puis crash", 2.6, |s, t| {
+        swell(s, t, 0.8, 0.06);
+        crash(s, t + 0.8, 0.06);
+    }),
+    ("nappe douce et kalimba", 4.0, |s, t| {
+        soft_pad(s, &[57, 64], t, 3.0, 0.03, 1.0);
+        for (i, n) in [69, 72, 76, 74].into_iter().enumerate() {
+            kalimba(s, n, t + 0.4 + i as f64 * 0.45, 0.03);
+        }
+    }),
+    ("premier sang (allié)", 3.6, |s, t| {
+        first_blood_sting(s, t, StingSide::Ally)
+    }),
+    ("premier sang (ennemi)", 3.6, |s, t| {
+        first_blood_sting(s, t, StingSide::Enemy)
+    }),
+    ("kill simple (allié)", 1.8, |s, t| {
+        kill_sting(s, t, 0, StingSide::Ally)
+    }),
+    ("double kill (soi)", 2.0, |s, t| {
+        kill_sting(s, t, 2, StingSide::Own)
+    }),
+    ("triple kill (allié)", 2.6, |s, t| {
+        kill_sting(s, t, 4, StingSide::Ally)
+    }),
+    ("triple kill (ennemi)", 2.6, |s, t| {
+        kill_sting(s, t, 4, StingSide::Enemy)
+    }),
+    ("quadra kill (soi)", 3.0, |s, t| {
+        kill_sting(s, t, 6, StingSide::Own)
+    }),
+    ("penta kill (soi)", 3.6, |s, t| {
+        kill_sting(s, t, 8, StingSide::Own)
+    }),
+    ("série légendaire (soi)", 4.0, |s, t| {
+        kill_sting(s, t, 9, StingSide::Own)
+    }),
+];
+
+#[derive(Default)]
+struct Lab {
+    due: f32,
+    index: usize,
+    bus: Option<MusicBusHandle>,
+}
+
+fn replay(time: Res<Time>, mut audio: ResMut<AudioManager>, mut lab: Local<Lab>) {
+    if time.elapsed_secs() < lab.due {
         return;
     }
-    // la rafale occupe la polyphonie 2,5 s : on laisse l'entrée suivante démarrer après
-    let burst = *index % GALLERY.len() == GALLERY.len() - 1;
-    *due = time.elapsed_secs() + if burst { 3.0 } else { PERIOD };
-    let (name, play) = GALLERY[*index % GALLERY.len()];
-    info!("audiolab : {name}");
-    play(&mut audio);
-    *index += 1;
+    let i = lab.index % (GALLERY.len() + MUSIC.len());
+    lab.index += 1;
+    let Some(&(name, period, play)) = i.checked_sub(GALLERY.len()).and_then(|m| MUSIC.get(m))
+    else {
+        // la rafale occupe la polyphonie 2,5 s : on laisse l'entrée suivante démarrer après
+        let burst = i == GALLERY.len() - 1;
+        lab.due = time.elapsed_secs() + if burst { 3.0 } else { PERIOD };
+        let (name, play) = GALLERY[i];
+        info!("audiolab : {name}");
+        play(&mut audio);
+        return;
+    };
+    lab.due = time.elapsed_secs() + period;
+    info!("audiolab : musique — {name}");
+    let bus = match &lab.bus {
+        Some(bus) => bus.clone(),
+        None => {
+            let bus = audio.music_bus(Channel::Music);
+            audio.bus(
+                &bus,
+                BusCommand::Fade {
+                    to: 0.95,
+                    seconds: 0.3,
+                },
+            );
+            lab.bus = Some(bus.clone());
+            bus
+        }
+    };
+    let mut score = Score::new();
+    play(&mut score, bus.current_time() + 0.05);
+    audio.bus(&bus, BusCommand::Play(score));
 }
