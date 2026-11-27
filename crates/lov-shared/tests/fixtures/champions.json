@@ -1,0 +1,2733 @@
+{
+  "grondak": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          14.0,
+          13.0,
+          12.0,
+          11.0,
+          10.0
+        ],
+        "cost": [
+          70.0
+        ],
+        "damage": {
+          "base": [
+            60.0,
+            95.0,
+            130.0,
+            165.0,
+            200.0
+          ],
+          "bonusHp": 0.05,
+          "type": "magic"
+        },
+        "description": "Charge vers un ennemi, lui inflige des dégâts magiques et l'étourdit 1 s.",
+        "fxKey": "grondak_e",
+        "id": "grondak_e",
+        "maxRank": 5,
+        "name": "Charge de roche",
+        "params": {
+          "stun": 1.0
+        },
+        "range": 550.0,
+        "slot": "E",
+        "speed": 1400.0,
+        "targeting": "targetedDash"
+      },
+      "Q": {
+        "cooldown": [
+          9.0,
+          8.5,
+          8.0,
+          7.5,
+          7.0
+        ],
+        "cost": [
+          50.0,
+          55.0,
+          60.0,
+          65.0,
+          70.0
+        ],
+        "damage": {
+          "base": [
+            70.0,
+            115.0,
+            160.0,
+            205.0,
+            250.0
+          ],
+          "bonusAd": 0.8,
+          "type": "physical"
+        },
+        "description": "Frappe le sol en ligne : dégâts physiques et ralentissement de 40 % pendant 1,5 s.",
+        "fxKey": "grondak_q",
+        "id": "grondak_q",
+        "maxRank": 5,
+        "name": "Poing sismique",
+        "params": {
+          "slow": 0.4,
+          "slowDuration": 1.5
+        },
+        "range": 650.0,
+        "slot": "Q",
+        "speed": 1800.0,
+        "targeting": "skillshot",
+        "width": 160.0
+      },
+      "R": {
+        "castTime": 0.25,
+        "cooldown": [
+          130.0,
+          110.0,
+          90.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "damage": {
+          "ap": 0.7,
+          "base": [
+            200.0,
+            325.0,
+            450.0
+          ],
+          "bonusHp": 0.06,
+          "type": "magic"
+        },
+        "description": "Après 0,75 s, la terre s'effondre dans une large zone : dégâts magiques et projection 1,25 s.",
+        "fxKey": "grondak_r",
+        "id": "grondak_r",
+        "maxRank": 3,
+        "name": "Effondrement",
+        "params": {
+          "delay": 0.75,
+          "knockup": 1.25
+        },
+        "radius": 420.0,
+        "range": 700.0,
+        "slot": "R",
+        "targeting": "ground"
+      },
+      "W": {
+        "cooldown": [
+          16.0,
+          15.0,
+          14.0,
+          13.0,
+          12.0
+        ],
+        "cost": [
+          60.0
+        ],
+        "description": "Réduit les dégâts subis de 30 % pendant 3 s et provoque les ennemis proches pendant 1 s.",
+        "fxKey": "grondak_w",
+        "id": "grondak_w",
+        "maxRank": 5,
+        "name": "Rempart",
+        "params": {
+          "damageReduction": 0.3,
+          "duration": 3.0,
+          "taunt": 1.0
+        },
+        "radius": 325.0,
+        "range": 0.0,
+        "slot": "W",
+        "targeting": "self"
+      }
+    },
+    "attackWindup": 0.3,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 64.0,
+      "ap": 0.0,
+      "armor": 38.0,
+      "armorPen": 0.0,
+      "attackRange": 150.0,
+      "attackSpeed": 0.62,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 8.0,
+      "maxHp": 680.0,
+      "maxMana": 340.0,
+      "moveSpeed": 335.0,
+      "mr": 32.0
+    },
+    "class": "tank",
+    "difficulty": 1,
+    "id": "grondak",
+    "lore": "Un golem taillé dans la roche du Rift, réveillé par la magie de la rivière. Il protège ceux qui n'ont pas de murs.",
+    "name": "Grondak",
+    "palette": {
+      "accent": "#ffb347",
+      "primary": "#7a6a58",
+      "secondary": "#3d3a36"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Après 8 s sans subir de dégâts de champion, Grondak gagne un bouclier égal à 10 % de ses PV max.",
+      "fxKey": "grondak_p",
+      "id": "grondak_p",
+      "maxRank": 0,
+      "name": "Peau de granit",
+      "params": {
+        "outOfCombat": 8.0,
+        "shieldMaxHp": 0.1
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 3.5,
+      "armor": 4.8,
+      "attackSpeed": 0.02,
+      "maxHp": 110.0,
+      "maxMana": 40.0,
+      "mr": 2.05
+    },
+    "ranged": false,
+    "resource": "mana",
+    "roles": [
+      "top",
+      "jungle"
+    ],
+    "title": "le Rempart de Granit"
+  },
+  "tharox": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          8.0,
+          7.5,
+          7.0,
+          6.5,
+          6.0
+        ],
+        "cost": [
+          45.0
+        ],
+        "damage": {
+          "ap": 0.4,
+          "base": [
+            55.0,
+            90.0,
+            125.0,
+            160.0,
+            195.0
+          ],
+          "type": "magic"
+        },
+        "description": "Frappe le sol : dégâts magiques et ralentissement de 35 % autour de lui.",
+        "fxKey": "tharox_e",
+        "id": "tharox_e",
+        "maxRank": 5,
+        "name": "Piétinement",
+        "params": {
+          "slow": 0.35,
+          "slowDuration": 2.0
+        },
+        "radius": 375.0,
+        "range": 0.0,
+        "slot": "E",
+        "targeting": "self"
+      },
+      "Q": {
+        "cooldown": [
+          10.0,
+          9.5,
+          9.0,
+          8.5,
+          8.0
+        ],
+        "cost": [
+          50.0
+        ],
+        "damage": {
+          "base": [
+            60.0,
+            100.0,
+            140.0,
+            180.0,
+            220.0
+          ],
+          "bonusAd": 0.7,
+          "type": "physical"
+        },
+        "description": "Fonce sur une courte distance ; le premier ennemi touché subit des dégâts et est repoussé.",
+        "fxKey": "tharox_q",
+        "id": "tharox_q",
+        "maxRank": 5,
+        "name": "Défenses",
+        "params": {
+          "knockback": 250.0
+        },
+        "range": 450.0,
+        "slot": "Q",
+        "speed": 1200.0,
+        "targeting": "dash",
+        "width": 140.0
+      },
+      "R": {
+        "castTime": 1.0,
+        "cooldown": [
+          140.0,
+          120.0,
+          100.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "damage": {
+          "base": [
+            150.0,
+            250.0,
+            350.0
+          ],
+          "bonusAd": 1.0,
+          "type": "physical"
+        },
+        "description": "Après 1 s de préparation, charge sur une très longue distance. Les champions percutés sont étourdis 1,5 s.",
+        "fxKey": "tharox_r",
+        "id": "tharox_r",
+        "maxRank": 3,
+        "name": "Ruée sauvage",
+        "params": {
+          "stun": 1.5
+        },
+        "range": 2500.0,
+        "slot": "R",
+        "speed": 1800.0,
+        "targeting": "dash",
+        "width": 200.0
+      },
+      "W": {
+        "cooldown": [
+          14.0
+        ],
+        "cost": [
+          40.0
+        ],
+        "damage": {
+          "base": [
+            15.0,
+            25.0,
+            35.0,
+            45.0,
+            55.0
+          ],
+          "bonusHp": 0.01,
+          "type": "magic"
+        },
+        "description": "Gagne armure et résistance magique pendant 4 s et inflige des dégâts magiques autour de lui chaque seconde.",
+        "fxKey": "tharox_w",
+        "id": "tharox_w",
+        "maxRank": 5,
+        "name": "Écorce de fer",
+        "params": {
+          "duration": 4.0,
+          "resists": [
+            15.0,
+            20.0,
+            25.0,
+            30.0,
+            35.0
+          ]
+        },
+        "radius": 300.0,
+        "range": 0.0,
+        "slot": "W",
+        "targeting": "self"
+      }
+    },
+    "attackWindup": 0.28,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 62.0,
+      "ap": 0.0,
+      "armor": 36.0,
+      "armorPen": 0.0,
+      "attackRange": 150.0,
+      "attackSpeed": 0.65,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 8.0,
+      "maxHp": 650.0,
+      "maxMana": 340.0,
+      "moveSpeed": 345.0,
+      "mr": 32.0
+    },
+    "class": "tank",
+    "difficulty": 1,
+    "id": "tharox",
+    "lore": "Sanglier cuirassé des forêts profondes. Quand Tharox prend de l'élan, rien ne l'arrête.",
+    "name": "Tharox",
+    "palette": {
+      "accent": "#ff5533",
+      "primary": "#5b3a29",
+      "secondary": "#c9a66b"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Se déplacer accumule de l'élan (jusqu'à 100). À 100, la prochaine attaque inflige 8 % des PV max de la cible et ralentit de 50 %.",
+      "fxKey": "tharox_p",
+      "id": "tharox_p",
+      "maxRank": 0,
+      "name": "Élan",
+      "params": {
+        "bonusTargetMaxHp": 0.08,
+        "perUnit": 0.03,
+        "slow": 0.5,
+        "slowDuration": 1.5
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 3.3,
+      "armor": 4.5,
+      "attackSpeed": 0.025,
+      "maxHp": 105.0,
+      "maxMana": 40.0,
+      "mr": 2.05
+    },
+    "ranged": false,
+    "resource": "mana",
+    "roles": [
+      "jungle",
+      "top"
+    ],
+    "title": "la Charge Sauvage"
+  },
+  "kaelen": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          10.0,
+          9.0,
+          8.0,
+          7.0,
+          6.0
+        ],
+        "cost": [
+          0.0
+        ],
+        "damage": {
+          "base": [
+            0.0
+          ],
+          "type": "physical"
+        },
+        "description": "Bondit à travers les unités sur une courte distance et gagne un bouclier pendant 2 s.",
+        "fxKey": "kaelen_e",
+        "id": "kaelen_e",
+        "maxRank": 5,
+        "name": "Fente",
+        "params": {
+          "shield": [
+            60.0,
+            90.0,
+            120.0,
+            150.0,
+            180.0
+          ],
+          "shieldBonusAd": 1.0,
+          "shieldDuration": 2.0
+        },
+        "range": 350.0,
+        "slot": "E",
+        "speed": 1500.0,
+        "targeting": "dash"
+      },
+      "Q": {
+        "cooldown": [
+          12.0,
+          11.0,
+          10.0,
+          9.0,
+          8.0
+        ],
+        "cost": [
+          0.0
+        ],
+        "damage": {
+          "ad": 0.6,
+          "base": [
+            20.0,
+            45.0,
+            70.0,
+            95.0,
+            120.0
+          ],
+          "type": "physical"
+        },
+        "description": "Se fend vers l'avant en infligeant des dégâts. Peut être relancé 2 fois en 4 s ; la 3e frappe projette.",
+        "fxKey": "kaelen_q",
+        "id": "kaelen_q",
+        "maxRank": 5,
+        "name": "Taille ascendante",
+        "params": {
+          "knockup": 0.75,
+          "recasts": 2.0,
+          "window": 4.0
+        },
+        "radius": 220.0,
+        "range": 275.0,
+        "slot": "Q",
+        "speed": 1100.0,
+        "targeting": "dash"
+      },
+      "R": {
+        "castTime": 0.4,
+        "cooldown": [
+          100.0,
+          80.0,
+          60.0
+        ],
+        "cost": [
+          0.0
+        ],
+        "damage": {
+          "base": [
+            150.0,
+            250.0,
+            350.0
+          ],
+          "bonusAd": 0.9,
+          "type": "physical"
+        },
+        "description": "Abat sa lame sur un champion : dégâts physiques augmentés de 1 % par 1 % de PV manquants de la cible.",
+        "fxKey": "kaelen_r",
+        "id": "kaelen_r",
+        "maxRank": 3,
+        "name": "Jugement solaire",
+        "params": {
+          "missingHpAmp": 1.0
+        },
+        "range": 400.0,
+        "slot": "R",
+        "targeting": "targeted"
+      },
+      "W": {
+        "cooldown": [
+          20.0,
+          18.0,
+          16.0,
+          14.0,
+          12.0
+        ],
+        "cost": [
+          0.0
+        ],
+        "description": "Pendant 1,25 s, bloque le prochain sort ou attaque de champion et étourdit l'attaquant 1 s s'il est au corps à corps.",
+        "fxKey": "kaelen_w",
+        "id": "kaelen_w",
+        "maxRank": 5,
+        "name": "Parade",
+        "params": {
+          "stun": 1.0,
+          "window": 1.25
+        },
+        "range": 0.0,
+        "slot": "W",
+        "targeting": "self"
+      }
+    },
+    "attackWindup": 0.25,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 66.0,
+      "ap": 0.0,
+      "armor": 34.0,
+      "armorPen": 0.0,
+      "attackRange": 175.0,
+      "attackSpeed": 0.68,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 0.0,
+      "maxHp": 630.0,
+      "maxMana": 0.0,
+      "moveSpeed": 345.0,
+      "mr": 32.0
+    },
+    "class": "fighter",
+    "difficulty": 2,
+    "id": "kaelen",
+    "lore": "Ancienne garde du temple solaire, Kaelen combat avec une lame qui brille plus fort à chaque coup porté.",
+    "name": "Kaelen",
+    "palette": {
+      "accent": "#ffffff",
+      "primary": "#f2d16b",
+      "secondary": "#2c3e75"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Chaque 3e attaque inflige 40 % de dégâts bonus et soigne Kaelen de 30 % des dégâts infligés.",
+      "fxKey": "kaelen_p",
+      "id": "kaelen_p",
+      "maxRank": 0,
+      "name": "Lame aiguisée",
+      "params": {
+        "bonus": 0.4,
+        "everyN": 3.0,
+        "heal": 0.3
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 3.8,
+      "armor": 4.2,
+      "attackSpeed": 0.03,
+      "maxHp": 102.0,
+      "mr": 2.05
+    },
+    "ranged": false,
+    "resource": "none",
+    "roles": [
+      "top"
+    ],
+    "title": "la Lame de l'Aube"
+  },
+  "vrenna": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          13.0,
+          12.0,
+          11.0,
+          10.0,
+          9.0
+        ],
+        "cost": [
+          60.0
+        ],
+        "damage": {
+          "base": [
+            50.0,
+            85.0,
+            120.0,
+            155.0,
+            190.0
+          ],
+          "bonusAd": 0.6,
+          "type": "physical"
+        },
+        "description": "Saute vers une zone : dégâts physiques et ralentissement de 40 % à l'atterrissage.",
+        "fxKey": "vrenna_e",
+        "id": "vrenna_e",
+        "maxRank": 5,
+        "name": "Bond des steppes",
+        "params": {
+          "slow": 0.4,
+          "slowDuration": 1.5
+        },
+        "radius": 250.0,
+        "range": 500.0,
+        "slot": "E",
+        "speed": 1200.0,
+        "targeting": "dash"
+      },
+      "Q": {
+        "castTime": 0.25,
+        "cooldown": [
+          9.0,
+          8.5,
+          8.0,
+          7.5,
+          7.0
+        ],
+        "cost": [
+          40.0
+        ],
+        "damage": {
+          "base": [
+            60.0,
+            95.0,
+            130.0,
+            165.0,
+            200.0
+          ],
+          "bonusAd": 1.0,
+          "type": "physical"
+        },
+        "description": "Frappe en ligne : dégâts physiques. Les ennemis touchés par la pointe sont attirés vers Vrenna.",
+        "fxKey": "vrenna_q",
+        "id": "vrenna_q",
+        "maxRank": 5,
+        "name": "Coup de lance",
+        "params": {
+          "pull": 300.0,
+          "tipLength": 150.0
+        },
+        "range": 600.0,
+        "slot": "Q",
+        "speed": 2500.0,
+        "targeting": "skillshot",
+        "width": 120.0
+      },
+      "R": {
+        "cooldown": [
+          110.0,
+          90.0,
+          70.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "damage": {
+          "base": [
+            175.0,
+            275.0,
+            375.0
+          ],
+          "bonusAd": 1.2,
+          "type": "physical"
+        },
+        "description": "Bondit sur un champion ennemi, inflige de lourds dégâts physiques et le projette 1 s.",
+        "fxKey": "vrenna_r",
+        "id": "vrenna_r",
+        "maxRank": 3,
+        "name": "Lance céleste",
+        "params": {
+          "knockup": 1.0
+        },
+        "range": 650.0,
+        "slot": "R",
+        "speed": 1800.0,
+        "targeting": "targetedDash"
+      },
+      "W": {
+        "cooldown": [
+          15.0,
+          14.0,
+          13.0,
+          12.0,
+          11.0
+        ],
+        "cost": [
+          50.0
+        ],
+        "description": "Gagne de 30 à 50 % de vitesse d'attaque pendant 4 s et se soigne de 8 % de ses PV manquants.",
+        "fxKey": "vrenna_w",
+        "id": "vrenna_w",
+        "maxRank": 5,
+        "name": "Cri de guerre",
+        "params": {
+          "attackSpeed": [
+            0.3,
+            0.35,
+            0.4,
+            0.45,
+            0.5
+          ],
+          "duration": 4.0,
+          "healMissing": 0.08
+        },
+        "range": 0.0,
+        "slot": "W",
+        "targeting": "self"
+      }
+    },
+    "attackWindup": 0.27,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 64.0,
+      "ap": 0.0,
+      "armor": 33.0,
+      "armorPen": 0.0,
+      "attackRange": 200.0,
+      "attackSpeed": 0.66,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 8.0,
+      "maxHp": 620.0,
+      "maxMana": 340.0,
+      "moveSpeed": 345.0,
+      "mr": 32.0
+    },
+    "class": "fighter",
+    "difficulty": 2,
+    "id": "vrenna",
+    "lore": "Cheffe de guerre nomade, Vrenna traque ses proies à travers les steppes avec une lance d'os de dragon.",
+    "name": "Vrenna",
+    "palette": {
+      "accent": "#ffcc00",
+      "primary": "#a33b3b",
+      "secondary": "#e8d9b0"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Les attaques et sorts appliquent Saignée (5 cumuls max) : dégâts physiques sur 3 s. À 5 cumuls, Vrenna gagne 20 % de vitesse d'attaque.",
+      "fxKey": "vrenna_p",
+      "id": "vrenna_p",
+      "maxRank": 0,
+      "name": "Saignée",
+      "params": {
+        "attackSpeedAtMax": 0.2,
+        "dps": 6.0,
+        "duration": 3.0,
+        "maxStacks": 5.0
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 3.6,
+      "armor": 4.2,
+      "attackSpeed": 0.028,
+      "maxHp": 100.0,
+      "maxMana": 45.0,
+      "mr": 2.05
+    },
+    "ranged": false,
+    "resource": "mana",
+    "roles": [
+      "jungle",
+      "top"
+    ],
+    "title": "la Lance des Steppes"
+  },
+  "ilyra": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          16.0,
+          15.0,
+          14.0,
+          13.0,
+          12.0
+        ],
+        "cost": [
+          60.0
+        ],
+        "description": "Protège un allié (ou elle-même) avec un bouclier pendant 2,5 s. Les ennemis qui le frappent sont ralentis.",
+        "fxKey": "ilyra_e",
+        "id": "ilyra_e",
+        "maxRank": 5,
+        "name": "Égide de givre",
+        "params": {
+          "duration": 2.5,
+          "shield": [
+            70.0,
+            105.0,
+            140.0,
+            175.0,
+            210.0
+          ],
+          "shieldAp": 0.5,
+          "slow": 0.2,
+          "slowDuration": 1.0
+        },
+        "range": 700.0,
+        "slot": "E",
+        "targeting": "targeted"
+      },
+      "Q": {
+        "castTime": 0.25,
+        "cooldown": [
+          6.0,
+          5.5,
+          5.0,
+          4.5,
+          4.0
+        ],
+        "cost": [
+          50.0,
+          55.0,
+          60.0,
+          65.0,
+          70.0
+        ],
+        "damage": {
+          "ap": 0.7,
+          "base": [
+            80.0,
+            120.0,
+            160.0,
+            200.0,
+            240.0
+          ],
+          "type": "magic"
+        },
+        "description": "Lance un éclat qui inflige des dégâts magiques au premier ennemi touché et le ralentit de 30 %.",
+        "fxKey": "ilyra_q",
+        "id": "ilyra_q",
+        "maxRank": 5,
+        "name": "Éclat de glace",
+        "params": {
+          "slow": 0.3,
+          "slowDuration": 1.5
+        },
+        "range": 950.0,
+        "slot": "Q",
+        "speed": 1700.0,
+        "targeting": "skillshot",
+        "width": 100.0
+      },
+      "R": {
+        "castTime": 0.25,
+        "cooldown": [
+          120.0,
+          100.0,
+          80.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "damage": {
+          "ap": 0.25,
+          "base": [
+            60.0,
+            90.0,
+            120.0
+          ],
+          "type": "magic"
+        },
+        "description": "Invoque un blizzard pendant 4 s dans une large zone : dégâts magiques par seconde et ralentissement croissant (jusqu'à 60 %).",
+        "fxKey": "ilyra_r",
+        "id": "ilyra_r",
+        "maxRank": 3,
+        "name": "Blizzard",
+        "params": {
+          "duration": 4.0,
+          "maxSlow": 0.6,
+          "tickRate": 1.0
+        },
+        "radius": 500.0,
+        "range": 900.0,
+        "slot": "R",
+        "targeting": "ground"
+      },
+      "W": {
+        "castTime": 0.25,
+        "cooldown": [
+          10.0,
+          9.5,
+          9.0,
+          8.5,
+          8.0
+        ],
+        "cost": [
+          70.0
+        ],
+        "damage": {
+          "ap": 0.6,
+          "base": [
+            70.0,
+            110.0,
+            150.0,
+            190.0,
+            230.0
+          ],
+          "type": "magic"
+        },
+        "description": "Une nova éclate à l'emplacement ciblé après 0,6 s : dégâts magiques et ralentissement de 50 %.",
+        "fxKey": "ilyra_w",
+        "id": "ilyra_w",
+        "maxRank": 5,
+        "name": "Nova glaciale",
+        "params": {
+          "delay": 0.6,
+          "slow": 0.5,
+          "slowDuration": 2.0
+        },
+        "radius": 280.0,
+        "range": 850.0,
+        "slot": "W",
+        "targeting": "ground"
+      }
+    },
+    "attackWindup": 0.3,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 52.0,
+      "ap": 0.0,
+      "armor": 22.0,
+      "armorPen": 0.0,
+      "attackRange": 550.0,
+      "attackSpeed": 0.64,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 9.0,
+      "maxHp": 560.0,
+      "maxMana": 420.0,
+      "moveSpeed": 330.0,
+      "mr": 30.0
+    },
+    "class": "mage",
+    "difficulty": 2,
+    "id": "ilyra",
+    "lore": "Gardienne d'un glacier vivant, Ilyra fige le temps autour d'elle.",
+    "name": "Ilyra",
+    "palette": {
+      "accent": "#e9fbff",
+      "primary": "#8fd3ff",
+      "secondary": "#1e3a5f"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Les sorts appliquent un cumul de Givre (4 s). Au 3e cumul, la cible est étourdie 1 s (une fois toutes les 8 s par cible).",
+      "fxKey": "ilyra_p",
+      "id": "ilyra_p",
+      "maxRank": 0,
+      "name": "Morsure du givre",
+      "params": {
+        "markDuration": 4.0,
+        "perTargetCooldown": 8.0,
+        "stacks": 3.0,
+        "stun": 1.0
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 3.0,
+      "armor": 4.4,
+      "attackSpeed": 0.015,
+      "manaRegen": 0.8,
+      "maxHp": 95.0,
+      "maxMana": 30.0,
+      "mr": 1.3
+    },
+    "projectileSpeed": 1600.0,
+    "ranged": true,
+    "resource": "mana",
+    "roles": [
+      "mid"
+    ],
+    "title": "la Sentinelle du Givre"
+  },
+  "zephyr": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          14.0,
+          13.0,
+          12.0,
+          11.0,
+          10.0
+        ],
+        "cost": [
+          70.0
+        ],
+        "damage": {
+          "ap": 0.5,
+          "base": [
+            60.0,
+            100.0,
+            140.0,
+            180.0,
+            220.0
+          ],
+          "type": "magic"
+        },
+        "description": "Enchaîne un ennemi : s'il reste à portée pendant 1,5 s, il est immobilisé 1,5 s et subit des dégâts magiques.",
+        "fxKey": "zephyr_e",
+        "id": "zephyr_e",
+        "maxRank": 5,
+        "name": "Chaîne arcanique",
+        "params": {
+          "breakRange": 900.0,
+          "root": 1.5,
+          "tetherTime": 1.5
+        },
+        "range": 650.0,
+        "slot": "E",
+        "targeting": "targeted"
+      },
+      "Q": {
+        "castTime": 0.25,
+        "cooldown": [
+          7.0,
+          6.5,
+          6.0,
+          5.5,
+          5.0
+        ],
+        "cost": [
+          60.0,
+          65.0,
+          70.0,
+          75.0,
+          80.0
+        ],
+        "damage": {
+          "ap": 0.5,
+          "base": [
+            60.0,
+            95.0,
+            130.0,
+            165.0,
+            200.0
+          ],
+          "type": "magic"
+        },
+        "description": "Lance un orbe qui revient vers Zephyr ; il inflige des dégâts magiques à l'aller et au retour (dégâts bruts au retour).",
+        "fxKey": "zephyr_q",
+        "id": "zephyr_q",
+        "maxRank": 5,
+        "name": "Orbe boomerang",
+        "params": {
+          "returnTrue": 1.0,
+          "returns": 1.0
+        },
+        "range": 900.0,
+        "slot": "Q",
+        "speed": 1400.0,
+        "targeting": "skillshot",
+        "width": 90.0
+      },
+      "R": {
+        "castTime": 0.5,
+        "cooldown": [
+          120.0,
+          100.0,
+          80.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "damage": {
+          "ap": 0.45,
+          "base": [
+            120.0,
+            180.0,
+            240.0
+          ],
+          "type": "magic"
+        },
+        "description": "Pendant 8 s, peut lancer jusqu'à 3 rayons à très longue portée qui infligent des dégâts magiques au premier champion touché.",
+        "fxKey": "zephyr_r",
+        "id": "zephyr_r",
+        "maxRank": 3,
+        "name": "Barrage arcanique",
+        "params": {
+          "charges": 3.0,
+          "window": 8.0
+        },
+        "range": 2500.0,
+        "slot": "R",
+        "speed": 3000.0,
+        "targeting": "skillshot",
+        "width": 160.0
+      },
+      "W": {
+        "cooldown": [
+          18.0,
+          16.5,
+          15.0,
+          13.5,
+          12.0
+        ],
+        "cost": [
+          80.0
+        ],
+        "damage": {
+          "ap": 0.6,
+          "base": [
+            70.0,
+            110.0,
+            150.0,
+            190.0,
+            230.0
+          ],
+          "type": "magic"
+        },
+        "description": "Se téléporte sur une courte distance, laissant une brèche qui explose après 1 s.",
+        "fxKey": "zephyr_w",
+        "id": "zephyr_w",
+        "maxRank": 5,
+        "name": "Brèche",
+        "params": {
+          "delay": 1.0
+        },
+        "radius": 250.0,
+        "range": 450.0,
+        "slot": "W",
+        "speed": 99999.0,
+        "targeting": "dash"
+      }
+    },
+    "attackWindup": 0.3,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 50.0,
+      "ap": 0.0,
+      "armor": 21.0,
+      "armorPen": 0.0,
+      "attackRange": 525.0,
+      "attackSpeed": 0.62,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 8.0,
+      "maxHp": 550.0,
+      "maxMana": 400.0,
+      "moveSpeed": 330.0,
+      "mr": 30.0
+    },
+    "class": "mage",
+    "difficulty": 3,
+    "id": "zephyr",
+    "lore": "Un étudiant de l'académie arcanique qui a ouvert une brèche qu'il ne sait pas refermer.",
+    "name": "Zephyr",
+    "palette": {
+      "accent": "#53f2ff",
+      "primary": "#b067ff",
+      "secondary": "#1a0f2e"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Tous les 4 sorts lancés, le prochain sort inflige 25 % de dégâts en plus et rend 30 de mana.",
+      "fxKey": "zephyr_p",
+      "id": "zephyr_p",
+      "maxRank": 0,
+      "name": "Surcharge",
+      "params": {
+        "amp": 0.25,
+        "every": 4.0,
+        "mana": 30.0
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 3.0,
+      "armor": 4.2,
+      "attackSpeed": 0.018,
+      "manaRegen": 0.8,
+      "maxHp": 92.0,
+      "maxMana": 32.0,
+      "mr": 1.3
+    },
+    "projectileSpeed": 1500.0,
+    "ranged": true,
+    "resource": "mana",
+    "roles": [
+      "mid"
+    ],
+    "title": "l'Arcaniste Instable"
+  },
+  "sable": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          18.0,
+          16.0,
+          14.0,
+          12.0,
+          10.0
+        ],
+        "cost": [
+          50.0
+        ],
+        "description": "Roule vers une position ; la prochaine attaque dans les 3 s est un coup critique garanti.",
+        "fxKey": "sable_e",
+        "id": "sable_e",
+        "maxRank": 5,
+        "name": "Roulade",
+        "params": {
+          "empowerWindow": 3.0
+        },
+        "range": 400.0,
+        "slot": "E",
+        "speed": 1200.0,
+        "targeting": "dash"
+      },
+      "Q": {
+        "cooldown": [
+          8.0,
+          7.0,
+          6.0,
+          5.0,
+          4.0
+        ],
+        "cost": [
+          30.0
+        ],
+        "damage": {
+          "ad": 1.1,
+          "base": [
+            20.0,
+            45.0,
+            70.0,
+            95.0,
+            120.0
+          ],
+          "type": "physical"
+        },
+        "description": "La prochaine attaque dans les 6 s explose et inflige des dégâts physiques bonus aux ennemis autour de la cible.",
+        "fxKey": "sable_q",
+        "id": "sable_q",
+        "maxRank": 5,
+        "name": "Tir explosif",
+        "params": {
+          "empowerWindow": 6.0
+        },
+        "radius": 200.0,
+        "range": 0.0,
+        "slot": "Q",
+        "targeting": "self"
+      },
+      "R": {
+        "castTime": 1.0,
+        "cooldown": [
+          100.0,
+          85.0,
+          70.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "damage": {
+          "base": [
+            250.0,
+            400.0,
+            550.0
+          ],
+          "bonusAd": 1.5,
+          "type": "physical"
+        },
+        "description": "Après 1 s de visée, tire une balle globale qui transperce les sbires et touche le premier champion.",
+        "fxKey": "sable_r",
+        "id": "sable_r",
+        "maxRank": 3,
+        "name": "Balle du jugement",
+        "params": {
+          "piercesMinions": 1.0
+        },
+        "range": 12000.0,
+        "slot": "R",
+        "speed": 2500.0,
+        "targeting": "skillshot",
+        "width": 160.0
+      },
+      "W": {
+        "castTime": 0.25,
+        "cooldown": [
+          12.0,
+          10.5,
+          9.0,
+          7.5,
+          6.0
+        ],
+        "cost": [
+          60.0
+        ],
+        "damage": {
+          "base": [
+            50.0,
+            85.0,
+            120.0,
+            155.0,
+            190.0
+          ],
+          "bonusAd": 1.0,
+          "type": "physical"
+        },
+        "description": "Tire 7 balles en cône ; chaque ennemi n'est touché qu'une fois et ralenti de 20 %.",
+        "fxKey": "sable_w",
+        "id": "sable_w",
+        "maxRank": 5,
+        "name": "Volée",
+        "params": {
+          "bullets": 7.0,
+          "coneAngle": 50.0,
+          "slow": 0.2,
+          "slowDuration": 1.5
+        },
+        "radius": 50.0,
+        "range": 750.0,
+        "slot": "W",
+        "targeting": "cone"
+      }
+    },
+    "attackWindup": 0.18,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 60.0,
+      "ap": 0.0,
+      "armor": 26.0,
+      "armorPen": 0.0,
+      "attackRange": 575.0,
+      "attackSpeed": 0.67,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 8.0,
+      "maxHp": 580.0,
+      "maxMana": 300.0,
+      "moveSpeed": 330.0,
+      "mr": 30.0
+    },
+    "class": "marksman",
+    "difficulty": 2,
+    "id": "sable",
+    "lore": "Chasseuse de primes du désert, Sable ne rate jamais deux fois la même cible.",
+    "name": "Sable",
+    "palette": {
+      "accent": "#ff7a1a",
+      "primary": "#d9a441",
+      "secondary": "#4a2f1b"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Les coups critiques infligent 10 % de dégâts en plus (192,5 % des dégâts normaux). Toucher un champion octroie 15 % de vitesse de déplacement pendant 1 s.",
+      "fxKey": "sable_p",
+      "id": "sable_p",
+      "maxRank": 0,
+      "name": "Œil du désert",
+      "params": {
+        "critBonus": 0.1,
+        "duration": 1.0,
+        "moveSpeed": 0.15
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 3.0,
+      "armor": 4.2,
+      "attackSpeed": 0.03,
+      "maxHp": 96.0,
+      "maxMana": 35.0,
+      "mr": 1.3
+    },
+    "projectileSpeed": 2000.0,
+    "ranged": true,
+    "resource": "mana",
+    "roles": [
+      "bot"
+    ],
+    "title": "la Tireuse des Dunes"
+  },
+  "corvin": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          20.0,
+          18.0,
+          16.0,
+          14.0,
+          12.0
+        ],
+        "cost": [
+          60.0
+        ],
+        "description": "Bondit en arrière dans un nuage de plumes et gagne 30 % de vitesse de déplacement pendant 2 s.",
+        "fxKey": "corvin_e",
+        "id": "corvin_e",
+        "maxRank": 5,
+        "name": "Envol",
+        "params": {
+          "duration": 2.0,
+          "moveSpeed": 0.3
+        },
+        "range": 425.0,
+        "slot": "E",
+        "speed": 1300.0,
+        "targeting": "dash"
+      },
+      "Q": {
+        "castTime": 0.25,
+        "cooldown": [
+          9.0,
+          8.0,
+          7.0,
+          6.0,
+          5.0
+        ],
+        "cost": [
+          50.0,
+          55.0,
+          60.0,
+          65.0,
+          70.0
+        ],
+        "damage": {
+          "ad": 1.0,
+          "base": [
+            40.0,
+            80.0,
+            120.0,
+            160.0,
+            200.0
+          ],
+          "type": "physical"
+        },
+        "description": "Tire une flèche qui transperce tous les ennemis en ligne et applique une marque.",
+        "fxKey": "corvin_q",
+        "id": "corvin_q",
+        "maxRank": 5,
+        "name": "Flèche perçante",
+        "params": {
+          "pierce": 1.0
+        },
+        "range": 1000.0,
+        "slot": "Q",
+        "speed": 2000.0,
+        "targeting": "skillshot",
+        "width": 80.0
+      },
+      "R": {
+        "castTime": 0.25,
+        "cooldown": [
+          110.0,
+          95.0,
+          80.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "damage": {
+          "base": [
+            70.0,
+            110.0,
+            150.0
+          ],
+          "bonusAd": 0.35,
+          "type": "physical"
+        },
+        "description": "Une nuée de corbeaux s'abat sur une zone pendant 3 s : dégâts physiques par seconde, révèle et réduit les soins de 40 %.",
+        "fxKey": "corvin_r",
+        "id": "corvin_r",
+        "maxRank": 3,
+        "name": "Nuée",
+        "params": {
+          "duration": 3.0,
+          "grievous": 0.4
+        },
+        "radius": 450.0,
+        "range": 1200.0,
+        "slot": "R",
+        "targeting": "ground"
+      },
+      "W": {
+        "cooldown": [
+          16.0,
+          14.0,
+          12.0,
+          10.0,
+          8.0
+        ],
+        "cost": [
+          40.0
+        ],
+        "damage": {
+          "ap": 0.4,
+          "base": [
+            40.0,
+            70.0,
+            100.0,
+            130.0,
+            160.0
+          ],
+          "type": "magic"
+        },
+        "description": "Pose un piège invisible (1 min). Le premier ennemi qui marche dessus est immobilisé 1,25 s et révélé.",
+        "fxKey": "corvin_w",
+        "id": "corvin_w",
+        "maxRank": 5,
+        "name": "Piège à griffes",
+        "params": {
+          "lifetime": 60.0,
+          "maxTraps": 3.0,
+          "root": 1.25
+        },
+        "radius": 120.0,
+        "range": 800.0,
+        "slot": "W",
+        "targeting": "ground"
+      }
+    },
+    "attackWindup": 0.2,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 59.0,
+      "ap": 0.0,
+      "armor": 25.0,
+      "armorPen": 0.0,
+      "attackRange": 600.0,
+      "attackSpeed": 0.66,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 8.0,
+      "maxHp": 570.0,
+      "maxMana": 320.0,
+      "moveSpeed": 330.0,
+      "mr": 30.0
+    },
+    "class": "marksman",
+    "difficulty": 2,
+    "id": "corvin",
+    "lore": "Corvin parle aux corbeaux, et les corbeaux lui disent où se cachent ses proies.",
+    "name": "Corvin",
+    "palette": {
+      "accent": "#7cff6b",
+      "primary": "#2b2d42",
+      "secondary": "#8d99ae"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Les attaques marquent la cible. La 3e marque consomme les marques : 6 % des PV max de la cible en dégâts magiques.",
+      "fxKey": "corvin_p",
+      "id": "corvin_p",
+      "maxRank": 0,
+      "name": "Marque du corbeau",
+      "params": {
+        "markDuration": 4.0,
+        "marks": 3.0,
+        "targetMaxHp": 0.06
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 2.9,
+      "armor": 4.2,
+      "attackSpeed": 0.032,
+      "maxHp": 94.0,
+      "maxMana": 35.0,
+      "mr": 1.3
+    },
+    "projectileSpeed": 2200.0,
+    "ranged": true,
+    "resource": "mana",
+    "roles": [
+      "bot"
+    ],
+    "title": "l'Archer des Corbeaux"
+  },
+  "nyx": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          16.0,
+          14.5,
+          13.0,
+          11.5,
+          10.0
+        ],
+        "cost": [
+          50.0
+        ],
+        "damage": {
+          "base": [
+            40.0,
+            65.0,
+            90.0,
+            115.0,
+            140.0
+          ],
+          "bonusAd": 0.5,
+          "type": "physical"
+        },
+        "description": "Se téléporte derrière une unité (alliée ou ennemie). Sur un ennemi, ralentit de 40 % pendant 1 s.",
+        "fxKey": "nyx_e",
+        "id": "nyx_e",
+        "maxRank": 5,
+        "name": "Pas de l'ombre",
+        "params": {
+          "slow": 0.4,
+          "slowDuration": 1.0
+        },
+        "range": 600.0,
+        "slot": "E",
+        "speed": 99999.0,
+        "targeting": "targetedDash"
+      },
+      "Q": {
+        "cooldown": [
+          6.0,
+          5.5,
+          5.0,
+          4.5,
+          4.0
+        ],
+        "cost": [
+          40.0
+        ],
+        "damage": {
+          "base": [
+            70.0,
+            105.0,
+            140.0,
+            175.0,
+            210.0
+          ],
+          "bonusAd": 1.1,
+          "type": "physical"
+        },
+        "description": "Lacère une cible : dégâts physiques. Si la cible meurt dans les 3 s, le délai de récupération est réinitialisé.",
+        "fxKey": "nyx_q",
+        "id": "nyx_q",
+        "maxRank": 5,
+        "name": "Lame du crépuscule",
+        "params": {
+          "resetWindow": 3.0
+        },
+        "range": 325.0,
+        "slot": "Q",
+        "targeting": "targeted"
+      },
+      "R": {
+        "cooldown": [
+          110.0,
+          85.0,
+          60.0
+        ],
+        "cost": [
+          0.0
+        ],
+        "damage": {
+          "base": [
+            100.0,
+            200.0,
+            300.0
+          ],
+          "bonusAd": 0.8,
+          "type": "physical"
+        },
+        "description": "Marque un champion pendant 3 s. À la fin, la marque explose et inflige 30 % des dégâts subis pendant la durée, plus des dégâts de base.",
+        "fxKey": "nyx_r",
+        "id": "nyx_r",
+        "maxRank": 3,
+        "name": "Mort certaine",
+        "params": {
+          "duration": 3.0,
+          "storedPercent": 0.3
+        },
+        "range": 500.0,
+        "slot": "R",
+        "targeting": "targeted"
+      },
+      "W": {
+        "cooldown": [
+          22.0,
+          20.0,
+          18.0,
+          16.0,
+          14.0
+        ],
+        "cost": [
+          60.0
+        ],
+        "description": "Devient invisible pendant 1,5 s et gagne 25 % de vitesse de déplacement. Attaquer ou lancer un sort brise l'invisibilité.",
+        "fxKey": "nyx_w",
+        "id": "nyx_w",
+        "maxRank": 5,
+        "name": "Voile d'ombre",
+        "params": {
+          "duration": 1.5,
+          "moveSpeed": 0.25
+        },
+        "range": 0.0,
+        "slot": "W",
+        "targeting": "self"
+      }
+    },
+    "attackWindup": 0.22,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 68.0,
+      "ap": 0.0,
+      "armor": 30.0,
+      "armorPen": 0.0,
+      "attackRange": 125.0,
+      "attackSpeed": 0.69,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 50.0,
+      "maxHp": 590.0,
+      "maxMana": 200.0,
+      "moveSpeed": 350.0,
+      "mr": 32.0
+    },
+    "class": "assassin",
+    "difficulty": 3,
+    "id": "nyx",
+    "lore": "Personne ne connaît son vrai nom. Ceux qui l'ont vu ne s'en souviennent plus.",
+    "name": "Nyx",
+    "palette": {
+      "accent": "#ff2e63",
+      "primary": "#1b1b2f",
+      "secondary": "#4b2a6b"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Les attaques et sorts contre un ennemi sans allié à moins de 500 unités infligent 20 % de dégâts en plus.",
+      "fxKey": "nyx_p",
+      "id": "nyx_p",
+      "maxRank": 0,
+      "name": "Proie isolée",
+      "params": {
+        "amp": 0.2,
+        "isolationRadius": 500.0
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 3.4,
+      "armor": 4.5,
+      "attackSpeed": 0.025,
+      "maxHp": 98.0,
+      "mr": 2.05
+    },
+    "ranged": false,
+    "resource": "energy",
+    "roles": [
+      "mid",
+      "jungle"
+    ],
+    "title": "l'Ombre Sans Nom"
+  },
+  "solenne": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          14.0,
+          13.0,
+          12.0,
+          11.0,
+          10.0
+        ],
+        "cost": [
+          60.0
+        ],
+        "description": "Protège un allié avec un bouclier pendant 2,5 s ; il gagne 25 % de vitesse d'attaque.",
+        "fxKey": "solenne_e",
+        "id": "solenne_e",
+        "maxRank": 5,
+        "name": "Bouclier sacré",
+        "params": {
+          "attackSpeed": 0.25,
+          "duration": 2.5,
+          "shield": [
+            60.0,
+            90.0,
+            120.0,
+            150.0,
+            180.0
+          ],
+          "shieldAp": 0.4
+        },
+        "range": 800.0,
+        "slot": "E",
+        "targeting": "targeted"
+      },
+      "Q": {
+        "castTime": 0.25,
+        "cooldown": [
+          13.0,
+          12.0,
+          11.0,
+          10.0,
+          9.0
+        ],
+        "cost": [
+          60.0
+        ],
+        "damage": {
+          "ap": 0.6,
+          "base": [
+            70.0,
+            115.0,
+            160.0,
+            205.0,
+            250.0
+          ],
+          "type": "magic"
+        },
+        "description": "Lance un rayon de lumière : le premier ennemi touché subit des dégâts magiques et est immobilisé de 1,25 à 1,65 s selon le rang.",
+        "fxKey": "solenne_q",
+        "id": "solenne_q",
+        "maxRank": 5,
+        "name": "Lien lumineux",
+        "params": {
+          "root": [
+            1.25,
+            1.35,
+            1.45,
+            1.55,
+            1.65
+          ]
+        },
+        "range": 1100.0,
+        "slot": "Q",
+        "speed": 1200.0,
+        "targeting": "skillshot",
+        "width": 120.0
+      },
+      "R": {
+        "castTime": 0.25,
+        "cooldown": [
+          130.0,
+          115.0,
+          100.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "description": "Après 0,5 s, une colonne de lumière soigne tous les alliés dans une large zone et leur octroie un bouclier pendant 3 s.",
+        "fxKey": "solenne_r",
+        "id": "solenne_r",
+        "maxRank": 3,
+        "name": "Aube",
+        "params": {
+          "delay": 0.5,
+          "duration": 3.0,
+          "heal": [
+            150.0,
+            250.0,
+            350.0
+          ],
+          "healAp": 0.5,
+          "shield": [
+            100.0,
+            175.0,
+            250.0
+          ]
+        },
+        "radius": 600.0,
+        "range": 900.0,
+        "slot": "R",
+        "targeting": "ground"
+      },
+      "W": {
+        "cooldown": [
+          12.0,
+          11.0,
+          10.0,
+          9.0,
+          8.0
+        ],
+        "cost": [
+          70.0,
+          75.0,
+          80.0,
+          85.0,
+          90.0
+        ],
+        "description": "Soigne un allié et Solenne.",
+        "fxKey": "solenne_w",
+        "id": "solenne_w",
+        "maxRank": 5,
+        "name": "Bénédiction",
+        "params": {
+          "heal": [
+            70.0,
+            95.0,
+            120.0,
+            145.0,
+            170.0
+          ],
+          "healAp": 0.35,
+          "selfPercent": 0.6
+        },
+        "range": 750.0,
+        "slot": "W",
+        "targeting": "targeted"
+      }
+    },
+    "attackWindup": 0.3,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 50.0,
+      "ap": 0.0,
+      "armor": 26.0,
+      "armorPen": 0.0,
+      "attackRange": 550.0,
+      "attackSpeed": 0.63,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 11.0,
+      "maxHp": 560.0,
+      "maxMana": 380.0,
+      "moveSpeed": 335.0,
+      "mr": 30.0
+    },
+    "class": "support",
+    "difficulty": 1,
+    "id": "solenne",
+    "lore": "Dernière prêtresse d'un ordre solaire, Solenne porte la lumière là où ses alliés en ont besoin.",
+    "name": "Solenne",
+    "palette": {
+      "accent": "#7ee8fa",
+      "primary": "#fff1c1",
+      "secondary": "#e0a96d"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Les soins et boucliers de Solenne sont augmentés de 1 % par tranche de 2 % de PV manquants de la cible.",
+      "fxKey": "solenne_p",
+      "id": "solenne_p",
+      "maxRank": 0,
+      "name": "Grâce",
+      "params": {
+        "ampPerMissing": 0.5
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 2.8,
+      "armor": 4.2,
+      "attackSpeed": 0.015,
+      "manaRegen": 0.6,
+      "maxHp": 92.0,
+      "maxMana": 40.0,
+      "mr": 1.3
+    },
+    "projectileSpeed": 1500.0,
+    "ranged": true,
+    "resource": "mana",
+    "roles": [
+      "bot",
+      "mid"
+    ],
+    "title": "la Prêtresse de l'Aube"
+  },
+  "melenchon": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          18.0,
+          17.0,
+          16.0,
+          15.0,
+          14.0
+        ],
+        "cost": [
+          60.0
+        ],
+        "damage": {
+          "ap": 0.4,
+          "base": [
+            50.0,
+            80.0,
+            110.0,
+            140.0,
+            170.0
+          ],
+          "type": "magic"
+        },
+        "description": "Se téléporte de 400 unités et gagne un bouclier de 45/65/85/105/125 (+30 % AP) pendant 2 s. Son hologramme reste au départ, puis explose après 1,2 s. Même absent, il occupe le débat.",
+        "fxKey": "melenchon_e",
+        "id": "melenchon_e",
+        "maxRank": 5,
+        "name": "Hologramme",
+        "params": {
+          "delay": 1.2,
+          "duration": 2.0,
+          "shield": [
+            45.0,
+            65.0,
+            85.0,
+            105.0,
+            125.0
+          ],
+          "shieldAp": 0.3
+        },
+        "radius": 240.0,
+        "range": 400.0,
+        "slot": "E",
+        "targeting": "dash"
+      },
+      "Q": {
+        "castTime": 0.2,
+        "cooldown": [
+          7.0,
+          6.5,
+          6.0,
+          5.5,
+          5.0
+        ],
+        "cost": [
+          45.0,
+          50.0,
+          55.0,
+          60.0,
+          65.0
+        ],
+        "damage": {
+          "ap": 0.65,
+          "base": [
+            80.0,
+            120.0,
+            160.0,
+            200.0,
+            240.0
+          ],
+          "type": "magic"
+        },
+        "description": "Projette un micro sur le premier ennemi : 80/120/160/200/240 (+65 % AP) dégâts magiques et ralentissement de 35 % pendant 1,5 s. La question est courte. L'impact, beaucoup moins.",
+        "fxKey": "melenchon_q",
+        "id": "melenchon_q",
+        "maxRank": 5,
+        "name": "Question au gouvernement",
+        "params": {
+          "slow": 0.35,
+          "slowDuration": 1.5
+        },
+        "range": 950.0,
+        "slot": "Q",
+        "speed": 1750.0,
+        "targeting": "skillshot",
+        "width": 110.0
+      },
+      "R": {
+        "castTime": 0.6,
+        "cooldown": [
+          120.0,
+          105.0,
+          90.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "damage": {
+          "ap": 0.6,
+          "base": [
+            150.0,
+            225.0,
+            300.0
+          ],
+          "type": "magic"
+        },
+        "description": "Après 0,6 s de déclaration solennelle, une onde tricolore inflige 150/225/300 (+60 % AP) dégâts magiques et provoque les ennemis pendant 1,25 s. Gagne un bouclier de 20 % des PV max (+40 % AP) pendant 4 s. Le teamfight devient une séance extraordinaire.",
+        "fxKey": "melenchon_r",
+        "id": "melenchon_r",
+        "maxRank": 3,
+        "name": "La République, c’est moi !",
+        "params": {
+          "duration": 4.0,
+          "shieldAp": 0.4,
+          "shieldMaxHp": 0.2,
+          "taunt": 1.25
+        },
+        "radius": 500.0,
+        "range": 0.0,
+        "slot": "R",
+        "targeting": "self"
+      },
+      "W": {
+        "castTime": 0.2,
+        "cooldown": [
+          13.0,
+          12.0,
+          11.0,
+          10.0,
+          9.0
+        ],
+        "cost": [
+          65.0
+        ],
+        "damage": {
+          "ap": 0.5,
+          "base": [
+            70.0,
+            105.0,
+            140.0,
+            175.0,
+            210.0
+          ],
+          "type": "magic"
+        },
+        "description": "Après une télégraphie de 0,55 s, les amendements pleuvent : 70/105/140/175/210 (+50 % AP) dégâts magiques et silence pendant 1 s. Pour une fois, quelqu'un d'autre coupe son micro.",
+        "fxKey": "melenchon_w",
+        "id": "melenchon_w",
+        "maxRank": 5,
+        "name": "Motion de censure",
+        "params": {
+          "delay": 0.55,
+          "silence": 1.0
+        },
+        "radius": 280.0,
+        "range": 800.0,
+        "slot": "W",
+        "targeting": "ground"
+      }
+    },
+    "attackWindup": 0.28,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 54.0,
+      "ap": 0.0,
+      "armor": 28.0,
+      "armorPen": 0.0,
+      "attackRange": 525.0,
+      "attackSpeed": 0.64,
+      "critChance": 0.0,
+      "hpRegen": 7.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 9.0,
+      "maxHp": 620.0,
+      "maxMana": 400.0,
+      "moveSpeed": 325.0,
+      "mr": 30.0
+    },
+    "class": "mage",
+    "difficulty": 2,
+    "id": "melenchon",
+    "lore": "Personnage satirique. Arrivé dans la Faille pour une simple question au gouvernement, il a réquisitionné la voie du milieu. Son micro n'a pas de bouton d'arrêt. Son adversaire aimerait bien en avoir un.",
+    "name": "Mélenchon",
+    "palette": {
+      "accent": "#5de2ff",
+      "primary": "#203452",
+      "secondary": "#ef3340"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Toucher un champion avec un sort donne de l'Indignation (6 s, au plus un cumul toutes les 0,5 s). À 3 cumuls : bouclier de 35 + 5 par niveau (+20 % AP) et +18 % de vitesse pendant 2 s. La cravate aussi monte dans les tours.",
+      "fxKey": "melenchon_p",
+      "id": "melenchon_p",
+      "maxRank": 0,
+      "name": "Indignation permanente",
+      "params": {
+        "duration": 2.0,
+        "hitLockout": 0.5,
+        "maxStacks": 3.0,
+        "moveSpeed": 0.18,
+        "shield": 35.0,
+        "shieldAp": 0.2,
+        "shieldPerLevel": 5.0,
+        "stackDuration": 6.0
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 2.8,
+      "armor": 4.2,
+      "attackSpeed": 0.018,
+      "manaRegen": 0.7,
+      "maxHp": 100.0,
+      "maxMana": 42.0,
+      "mr": 1.3
+    },
+    "projectileSpeed": 1700.0,
+    "ranged": true,
+    "resource": "mana",
+    "roles": [
+      "mid",
+      "bot"
+    ],
+    "title": "le Tribun indigné"
+  },
+  "master67": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          16.7,
+          15.7,
+          14.7,
+          13.7,
+          12.7
+        ],
+        "cost": [
+          47.0
+        ],
+        "description": "Se téléporte jusqu'à 367 unités et gagne un bouclier de 67/87/107/127/147 (+35 % AP) pendant 2,67 s. Les pieds se déplacent. Les mains restent au travail.",
+        "fxKey": "master67_e",
+        "id": "master67_e",
+        "maxRank": 5,
+        "name": "Les mains en l’air",
+        "params": {
+          "duration": 2.67,
+          "shield": [
+            67.0,
+            87.0,
+            107.0,
+            127.0,
+            147.0
+          ],
+          "shieldAp": 0.35
+        },
+        "range": 367.0,
+        "slot": "E",
+        "targeting": "dash"
+      },
+      "Q": {
+        "castTime": 0.17,
+        "cooldown": [
+          6.7,
+          6.2,
+          5.7,
+          5.2,
+          4.7
+        ],
+        "cost": [
+          47.0
+        ],
+        "damage": {
+          "ap": 0.6,
+          "base": [
+            66.0,
+            96.0,
+            126.0,
+            156.0,
+            186.0
+          ],
+          "type": "magic"
+        },
+        "description": "Envoie un 6 lumineux sur le premier ennemi : 66/96/126/156/186 (+60 % AP) dégâts magiques et ralentissement de 27 % pendant 1,67 s. La main gauche avait quelque chose à dire.",
+        "fxKey": "master67_q",
+        "id": "master67_q",
+        "maxRank": 5,
+        "name": "Six.",
+        "params": {
+          "slow": 0.27,
+          "slowDuration": 1.67
+        },
+        "range": 967.0,
+        "slot": "Q",
+        "speed": 1667.0,
+        "targeting": "skillshot",
+        "width": 107.0
+      },
+      "R": {
+        "castTime": 0.67,
+        "cooldown": [
+          107.0,
+          87.0,
+          67.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "damage": {
+          "ap": 0.3,
+          "base": [
+            67.0,
+            107.0,
+            147.0
+          ],
+          "type": "magic"
+        },
+        "description": "Après 0,67 s, déclenche deux ondes espacées de 0,67 s. Chacune inflige 67/107/147 (+30 % AP) dégâts magiques. SIX ralentit de 37 % pendant 1,34 s ; SEVEN projette en l'air pendant 0,67 s. Le débat est clos. Les mains continuent.",
+        "fxKey": "master67_r",
+        "id": "master67_r",
+        "maxRank": 3,
+        "name": "SIX… SEVEN !",
+        "params": {
+          "delay": 0.67,
+          "knockup": 0.67,
+          "slow": 0.37,
+          "slowDuration": 1.34
+        },
+        "radius": 467.0,
+        "range": 0.0,
+        "slot": "R",
+        "targeting": "self"
+      },
+      "W": {
+        "castTime": 0.17,
+        "cooldown": [
+          12.7,
+          11.7,
+          10.7,
+          9.7,
+          8.7
+        ],
+        "cost": [
+          67.0
+        ],
+        "damage": {
+          "ap": 0.55,
+          "base": [
+            77.0,
+            107.0,
+            137.0,
+            167.0,
+            197.0
+          ],
+          "type": "magic"
+        },
+        "description": "Après 0,67 s, un 7 géant tombe sur la zone : 77/107/137/167/197 (+55 % AP) dégâts magiques et immobilisation de 0,67 s. La main droite exigeait un droit de réponse.",
+        "fxKey": "master67_w",
+        "id": "master67_w",
+        "maxRank": 5,
+        "name": "Seven.",
+        "params": {
+          "delay": 0.67,
+          "root": 0.67
+        },
+        "radius": 267.0,
+        "range": 767.0,
+        "slot": "W",
+        "targeting": "ground"
+      }
+    },
+    "attackWindup": 0.27,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 57.0,
+      "ap": 0.0,
+      "armor": 27.0,
+      "armorPen": 0.0,
+      "attackRange": 567.0,
+      "attackSpeed": 0.67,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 8.7,
+      "maxHp": 607.0,
+      "maxMana": 367.0,
+      "moveSpeed": 337.0,
+      "mr": 30.0
+    },
+    "class": "mage",
+    "difficulty": 1,
+    "id": "master67",
+    "lore": "Personnage original. Personne ne connaît son niveau, son âge ni le sens de ses gestes. Six témoins parlent de génie. Sept demandent qu'il arrête. Ses mains ont refusé de commenter.",
+    "name": "67 Master",
+    "palette": {
+      "accent": "#35e6e0",
+      "primary": "#8061ff",
+      "secondary": "#15213d"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Chaque impact de sort sur un champion donne un cumul pendant 6,7 s (un maximum toutes les 0,67 s). Le 7e impact consomme les cumuls et inflige 67 (+20 % AP) dégâts magiques supplémentaires. Il comptait sur ses doigts. Il a quand même vérifié.",
+      "fxKey": "master67_p",
+      "id": "master67_p",
+      "maxRank": 0,
+      "name": "Le compte est bon. Enfin presque.",
+      "params": {
+        "damage": 67.0,
+        "damageAp": 0.2,
+        "duration": 6.7,
+        "hitLockout": 0.67,
+        "maxStacks": 7.0
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 2.7,
+      "armor": 4.3,
+      "attackSpeed": 0.017,
+      "manaRegen": 0.7,
+      "maxHp": 97.0,
+      "maxMana": 37.0,
+      "mr": 1.3
+    },
+    "projectileSpeed": 1667.0,
+    "ranged": true,
+    "resource": "mana",
+    "roles": [
+      "mid",
+      "bot"
+    ],
+    "title": "le Grand Maître du Six-Sept"
+  },
+  "touilleur": {
+    "abilities": {
+      "E": {
+        "cooldown": [
+          17.0,
+          16.0,
+          15.0,
+          14.0,
+          13.0
+        ],
+        "cost": [
+          50.0
+        ],
+        "description": "Se téléporte jusqu'à 325 unités et gagne un bouclier de 45/65/85/105/125 (+30 % AP) pendant 2 s. Le corps esquive. L'index n'a pas reçu le mémo.",
+        "fxKey": "touilleur_e",
+        "id": "touilleur_e",
+        "maxRank": 5,
+        "name": "Pas de côté",
+        "params": {
+          "duration": 2.0,
+          "shield": [
+            45.0,
+            65.0,
+            85.0,
+            105.0,
+            125.0
+          ],
+          "shieldAp": 0.3
+        },
+        "range": 325.0,
+        "slot": "E",
+        "targeting": "dash"
+      },
+      "Q": {
+        "castTime": 0.15,
+        "cooldown": [
+          7.0,
+          6.5,
+          6.0,
+          5.5,
+          5.0
+        ],
+        "cost": [
+          45.0
+        ],
+        "damage": {
+          "ap": 0.55,
+          "base": [
+            65.0,
+            95.0,
+            125.0,
+            155.0,
+            185.0
+          ],
+          "type": "magic"
+        },
+        "description": "Projette un petit moulinet sur le premier ennemi : 65/95/125/155/185 (+55 % AP) dégâts magiques et ralentissement de 20 % pendant 1 s. Un doigt d'explication suffit.",
+        "fxKey": "touilleur_q",
+        "id": "touilleur_q",
+        "maxRank": 5,
+        "name": "Coup de doigt",
+        "params": {
+          "slow": 0.2,
+          "slowDuration": 1.0
+        },
+        "range": 825.0,
+        "slot": "Q",
+        "speed": 1550.0,
+        "targeting": "skillshot",
+        "width": 85.0
+      },
+      "R": {
+        "castTime": 0.25,
+        "cooldown": [
+          110.0,
+          90.0,
+          70.0
+        ],
+        "cost": [
+          100.0
+        ],
+        "damage": {
+          "ap": 0.7,
+          "base": [
+            150.0,
+            250.0,
+            350.0
+          ],
+          "type": "magic"
+        },
+        "description": "Passe derrière un champion ennemi, inflige 150/250/350 (+70 % AP) dégâts magiques et l'étourdit jusqu'à 2 s pendant un moulinet burlesque derrière son manteau. Le Touilleur canalise sur place. Contrôle du lanceur, purification, mort, stase ou rupture de proximité arrêtent la touille. La ténacité réduit l'étourdissement. Le service était compris.",
+        "fxKey": "touilleur_r",
+        "id": "touilleur_r",
+        "maxRank": 3,
+        "name": "La grande touille",
+        "params": {
+          "breakRange": 230.0,
+          "duration": 2.0,
+          "offset": 15.0
+        },
+        "range": 450.0,
+        "slot": "R",
+        "targeting": "targetedDash"
+      },
+      "W": {
+        "castTime": 0.15,
+        "cooldown": [
+          13.0,
+          12.0,
+          11.0,
+          10.0,
+          9.0
+        ],
+        "cost": [
+          65.0
+        ],
+        "damage": {
+          "ap": 0.45,
+          "base": [
+            70.0,
+            100.0,
+            130.0,
+            160.0,
+            190.0
+          ],
+          "type": "magic"
+        },
+        "description": "Après 0,45 s, remue une zone : 70/100/130/160/190 (+45 % AP) dégâts magiques et ralentissement de 35 % pendant 1,5 s. La recette ne prévoyait pas autant d'opposants.",
+        "fxKey": "touilleur_w",
+        "id": "touilleur_w",
+        "maxRank": 5,
+        "name": "Tourbillon de poche",
+        "params": {
+          "delay": 0.45,
+          "slow": 0.35,
+          "slowDuration": 1.5
+        },
+        "radius": 215.0,
+        "range": 650.0,
+        "slot": "W",
+        "targeting": "ground"
+      }
+    },
+    "attackWindup": 0.27,
+    "baseStats": {
+      "abilityHaste": 0.0,
+      "ad": 58.0,
+      "ap": 0.0,
+      "armor": 31.0,
+      "armorPen": 0.0,
+      "attackRange": 175.0,
+      "attackSpeed": 0.67,
+      "critChance": 0.0,
+      "hpRegen": 8.0,
+      "lifesteal": 0.0,
+      "magicPen": 0.0,
+      "manaRegen": 8.0,
+      "maxHp": 615.0,
+      "maxMana": 350.0,
+      "moveSpeed": 345.0,
+      "mr": 32.0
+    },
+    "class": "mage",
+    "difficulty": 2,
+    "id": "touilleur",
+    "lore": "On lui avait demandé de remuer la soupe. Il a découvert les duels. Depuis, son index travaille en CDI et son autre main cherche encore le bouton d'arrêt.",
+    "name": "Le Touilleur",
+    "palette": {
+      "accent": "#8ef4d2",
+      "primary": "#17434a",
+      "secondary": "#d29a49"
+    },
+    "passive": {
+      "cooldown": [
+        0.0
+      ],
+      "cost": [
+        0.0
+      ],
+      "description": "Chaque impact de sort sur un champion donne un tour de moulinet pendant 5 s (un maximum toutes les 0,4 s). Au troisième : 30 (+20 % AP) dégâts magiques supplémentaires et 20 % de vitesse pendant 1,5 s. Il mélange ses adversaires avec ses priorités.",
+      "fxKey": "touilleur_p",
+      "id": "touilleur_p",
+      "maxRank": 0,
+      "name": "Ça monte à la tête",
+      "params": {
+        "ap": 0.2,
+        "damage": 30.0,
+        "duration": 5.0,
+        "lockout": 0.4,
+        "speed": 0.2,
+        "speedDuration": 1.5,
+        "stacks": 3.0
+      },
+      "range": 0.0,
+      "slot": "P",
+      "targeting": "self"
+    },
+    "perLevel": {
+      "ad": 3.0,
+      "armor": 4.5,
+      "attackSpeed": 0.022,
+      "manaRegen": 0.7,
+      "maxHp": 98.0,
+      "maxMana": 42.0,
+      "mr": 1.3
+    },
+    "ranged": false,
+    "resource": "mana",
+    "roles": [
+      "mid",
+      "jungle"
+    ],
+    "title": "le Virtuose du Moulinet"
+  }
+}

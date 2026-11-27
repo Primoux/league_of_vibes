@@ -1,0 +1,2518 @@
+{
+  "buffs": [
+    [
+      "stun",
+      {
+        "cc": "stun",
+        "fxKey": "cc_stun",
+        "id": "stun",
+        "kind": "cc",
+        "name": "Étourdissement"
+      }
+    ],
+    [
+      "root",
+      {
+        "cc": "root",
+        "fxKey": "cc_root",
+        "id": "root",
+        "kind": "cc",
+        "name": "Immobilisation"
+      }
+    ],
+    [
+      "slow",
+      {
+        "cc": "slow",
+        "fxKey": "cc_slow",
+        "id": "slow",
+        "kind": "cc",
+        "name": "Ralentissement"
+      }
+    ],
+    [
+      "silence",
+      {
+        "cc": "silence",
+        "fxKey": "cc_silence",
+        "id": "silence",
+        "kind": "cc",
+        "name": "Silence"
+      }
+    ],
+    [
+      "knockup",
+      {
+        "cc": "knockup",
+        "fxKey": "cc_knockup",
+        "id": "knockup",
+        "kind": "cc",
+        "name": "Projection"
+      }
+    ],
+    [
+      "taunt",
+      {
+        "cc": "taunt",
+        "fxKey": "cc_taunt",
+        "id": "taunt",
+        "kind": "cc",
+        "name": "Provocation"
+      }
+    ],
+    [
+      "suppress",
+      {
+        "cc": "suppress",
+        "fxKey": "cc_suppress",
+        "id": "suppress",
+        "kind": "cc",
+        "name": "Suppression"
+      }
+    ],
+    [
+      "fear",
+      {
+        "cc": "fear",
+        "fxKey": "cc_fear",
+        "id": "fear",
+        "kind": "cc",
+        "name": "Peur"
+      }
+    ],
+    [
+      "blind",
+      {
+        "cc": "blind",
+        "fxKey": "cc_blind",
+        "id": "blind",
+        "kind": "cc",
+        "name": "Aveuglement"
+      }
+    ],
+    [
+      "grounded",
+      {
+        "cc": "grounded",
+        "fxKey": "cc_grounded",
+        "id": "grounded",
+        "kind": "cc",
+        "name": "Ancrage"
+      }
+    ],
+    [
+      "shield",
+      {
+        "fxKey": "shield",
+        "id": "shield",
+        "kind": "buff",
+        "name": "Bouclier"
+      }
+    ],
+    [
+      "invisible",
+      {
+        "fxKey": "invisible",
+        "id": "invisible",
+        "kind": "buff",
+        "name": "Invisibilité"
+      }
+    ],
+    [
+      "grievous",
+      {
+        "fxKey": "grievous",
+        "id": "grievous",
+        "kind": "debuff",
+        "name": "Blessure profonde"
+      }
+    ],
+    [
+      "haste",
+      {
+        "id": "haste",
+        "kind": "buff",
+        "name": "Célérité"
+      }
+    ],
+    [
+      "cleanse",
+      {
+        "id": "cleanse",
+        "kind": "buff",
+        "name": "Résilience"
+      }
+    ],
+    [
+      "exhaust",
+      {
+        "cc": "slow",
+        "fxKey": "sum_exhaust",
+        "id": "exhaust",
+        "kind": "debuff",
+        "name": "Fatigue"
+      }
+    ],
+    [
+      "ignite",
+      {
+        "fxKey": "sum_ignite",
+        "id": "ignite",
+        "kind": "debuff",
+        "name": "Embrasement"
+      }
+    ]
+  ],
+  "defaultSummoners": [
+    "flash",
+    "ignite"
+  ],
+  "dragonElements": [
+    "infernal",
+    "ocean",
+    "mountain",
+    "cloud",
+    "hextech",
+    "chemtech"
+  ],
+  "items": [
+    {
+      "buildsFrom": [],
+      "category": "starter",
+      "cost": 450.0,
+      "description": "+8 AD, +80 PV, 2,5 % de vol de vie sur les auto-attaques.",
+      "icon": "blade_small",
+      "id": "doran_blade",
+      "name": "Lame de l’aube",
+      "stats": {
+        "ad": 8.0,
+        "lifesteal": 0.025,
+        "maxHp": 80.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "starter",
+      "cost": 400.0,
+      "description": "+18 AP, +90 PV, +5 régénération de mana.",
+      "icon": "ring_small",
+      "id": "doran_ring",
+      "name": "Anneau de l’aube",
+      "stats": {
+        "ap": 18.0,
+        "manaRegen": 5.0,
+        "maxHp": 90.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "starter",
+      "cost": 450.0,
+      "description": "+80 PV, +6 PV/5 s. Passif : +4 PV à chaque sbire tué.",
+      "icon": "shield_small",
+      "id": "doran_shield",
+      "name": "Bouclier de l’aube",
+      "passive": {
+        "description": "+4 PV à chaque sbire tué.",
+        "id": "last_hit_heal",
+        "name": "Solidarité",
+        "params": {
+          "heal": 4.0
+        }
+      },
+      "stats": {
+        "hpRegen": 6.0,
+        "maxHp": 80.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "starter",
+      "cost": 400.0,
+      "description": "+15 AP, +4 régénération de mana.",
+      "icon": "amulet",
+      "id": "amulette_novice",
+      "name": "Amulette de cuivre",
+      "stats": {
+        "ap": 15.0,
+        "manaRegen": 4.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "starter",
+      "cost": 450.0,
+      "description": "+60 PV, +5 armure. Passif : +4 PV à chaque sbire tué.",
+      "icon": "buckler",
+      "id": "ecu_novice",
+      "name": "Écu de cuivre",
+      "passive": {
+        "description": "+4 PV à chaque sbire tué.",
+        "id": "last_hit_heal",
+        "name": "Solidarité",
+        "params": {
+          "heal": 4.0
+        }
+      },
+      "stats": {
+        "armor": 5.0,
+        "maxHp": 60.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "starter",
+      "cost": 450.0,
+      "description": "Jungle : +10 AD, +8 % vitesse d’attaque, +15 dégâts et +10 PV contre les monstres.",
+      "icon": "machete",
+      "id": "hunter_machete",
+      "name": "Machette de broussaille",
+      "passive": {
+        "description": "+15 dégâts contre les monstres, +10 PV à leur mort.",
+        "id": "chasseur",
+        "name": "Trophée",
+        "params": {
+          "bonusDamage": 15.0,
+          "heal": 10.0
+        }
+      },
+      "stats": {
+        "ad": 10.0,
+        "attackSpeed": 0.08
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "starter",
+      "cost": 350.0,
+      "description": "Jungle : +10 AD, 8 % vol de vie, +15 dégâts contre les monstres.",
+      "icon": "vial",
+      "id": "fiole_chasseur",
+      "name": "Flasque de broussaille",
+      "passive": {
+        "description": "+15 dégâts contre les monstres.",
+        "id": "chasseur",
+        "name": "Trophée",
+        "params": {
+          "bonusDamage": 15.0
+        }
+      },
+      "stats": {
+        "ad": 10.0,
+        "lifesteal": 0.08
+      }
+    },
+    {
+      "active": {
+        "cooldown": 0.0,
+        "description": "Rend 120 PV sur 15 s.",
+        "id": "potion",
+        "name": "Boire"
+      },
+      "buildsFrom": [],
+      "category": "consumable",
+      "cost": 50.0,
+      "description": "Active : rend 120 PV sur 15 s. 5 charges max.",
+      "icon": "potion_red",
+      "id": "health_potion",
+      "maxStacks": 5,
+      "name": "Fiole de vie",
+      "stats": {}
+    },
+    {
+      "buildsFrom": [],
+      "category": "starter",
+      "cost": 350.0,
+      "description": "+7 AD, +5 % vitesse d’attaque.",
+      "icon": "griffe",
+      "id": "griffe_du_debutant",
+      "name": "Griffe du débutant",
+      "stats": {
+        "ad": 7.0,
+        "attackSpeed": 0.05
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "starter",
+      "cost": 350.0,
+      "description": "+60 PV, +4 armure.",
+      "icon": "bouclier",
+      "id": "bouclier_du_debutant",
+      "name": "Bouclier du débutant",
+      "stats": {
+        "armor": 4.0,
+        "maxHp": 60.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "boots",
+      "cost": 300.0,
+      "description": "+45 vitesse de déplacement.",
+      "icon": "boots",
+      "id": "boots",
+      "name": "Souliers de marche",
+      "stats": {
+        "moveSpeed": 45.0
+      },
+      "unique": true
+    },
+    {
+      "buildsFrom": [
+        "boots"
+      ],
+      "category": "boots",
+      "cost": 1100.0,
+      "description": "+45 vitesse, +35 % vitesse d’attaque.",
+      "icon": "boots_as",
+      "id": "berserker_greaves",
+      "name": "Bottes de rage",
+      "stats": {
+        "attackSpeed": 0.35,
+        "moveSpeed": 45.0
+      },
+      "unique": true
+    },
+    {
+      "buildsFrom": [
+        "boots"
+      ],
+      "category": "boots",
+      "cost": 1100.0,
+      "description": "+45 vitesse, +18 pénétration magique.",
+      "icon": "boots_pen",
+      "id": "sorcerer_shoes",
+      "name": "Bottes du mage",
+      "stats": {
+        "magicPen": 18.0,
+        "moveSpeed": 45.0
+      },
+      "unique": true
+    },
+    {
+      "buildsFrom": [
+        "boots"
+      ],
+      "category": "boots",
+      "cost": 1200.0,
+      "description": "+45 vitesse, +60 armure.",
+      "icon": "boots_armor",
+      "id": "plated_steelcaps",
+      "name": "Solerets de fer",
+      "stats": {
+        "armor": 60.0,
+        "moveSpeed": 45.0
+      },
+      "unique": true
+    },
+    {
+      "buildsFrom": [
+        "boots"
+      ],
+      "category": "boots",
+      "cost": 1250.0,
+      "description": "+45 vitesse, +30 résistance magique.",
+      "icon": "boots_mr",
+      "id": "mercury_treads",
+      "name": "Bottes de brume",
+      "stats": {
+        "moveSpeed": 45.0,
+        "mr": 30.0
+      },
+      "unique": true
+    },
+    {
+      "buildsFrom": [
+        "boots"
+      ],
+      "category": "boots",
+      "cost": 950.0,
+      "description": "+45 vitesse, +20 hâte de compétence.",
+      "icon": "boots_haste",
+      "id": "ionian_lucidity",
+      "name": "Bottes vives",
+      "stats": {
+        "abilityHaste": 20.0,
+        "moveSpeed": 45.0
+      },
+      "unique": true
+    },
+    {
+      "buildsFrom": [
+        "boots"
+      ],
+      "category": "boots",
+      "cost": 800.0,
+      "description": "+60 vitesse de déplacement.",
+      "icon": "boots_swiftness",
+      "id": "swift_boots",
+      "name": "Bottes du vent",
+      "stats": {
+        "moveSpeed": 60.0
+      },
+      "unique": true
+    },
+    {
+      "buildsFrom": [
+        "boots"
+      ],
+      "category": "boots",
+      "cost": 700.0,
+      "description": "+50 vitesse, +4 PV/5 s.",
+      "icon": "boots_traveler",
+      "id": "bottes_du_voyageur",
+      "name": "Bottes du voyageur",
+      "stats": {
+        "hpRegen": 4.0,
+        "moveSpeed": 50.0
+      },
+      "unique": true
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 350.0,
+      "description": "+10 AD.",
+      "icon": "sword",
+      "id": "long_sword",
+      "name": "Épée franche",
+      "stats": {
+        "ad": 10.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 400.0,
+      "description": "+20 AP.",
+      "icon": "tome",
+      "id": "amplifying_tome",
+      "name": "Grimoire mineur",
+      "stats": {
+        "ap": 20.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 400.0,
+      "description": "+150 PV.",
+      "icon": "ruby",
+      "id": "ruby_crystal",
+      "name": "Cœur de rubis",
+      "stats": {
+        "maxHp": 150.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 350.0,
+      "description": "+250 mana.",
+      "icon": "sapphire",
+      "id": "sapphire_crystal",
+      "name": "Saphir brut",
+      "stats": {
+        "maxMana": 250.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 300.0,
+      "description": "+12 % vitesse d’attaque.",
+      "icon": "dagger",
+      "id": "dagger",
+      "name": "Coutelas",
+      "stats": {
+        "attackSpeed": 0.12
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 600.0,
+      "description": "+15 % de chance de critique.",
+      "icon": "cloak",
+      "id": "cloak_agility",
+      "name": "Cape de plumes",
+      "stats": {
+        "critChance": 0.15
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 300.0,
+      "description": "+15 armure.",
+      "icon": "cloth",
+      "id": "cloth_armor",
+      "name": "Tunique de toile",
+      "stats": {
+        "armor": 15.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 450.0,
+      "description": "+25 résistance magique.",
+      "icon": "negatron",
+      "id": "negatron_cloak",
+      "name": "Manteau d’annulation",
+      "stats": {
+        "mr": 25.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 1000.0,
+      "description": "+25 AD, +10 hâte de compétence.",
+      "icon": "warhammer",
+      "id": "warhammer",
+      "name": "Marteau de forge",
+      "stats": {
+        "abilityHaste": 10.0,
+        "ad": 25.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 850.0,
+      "description": "+40 AP.",
+      "icon": "wand",
+      "id": "blasting_wand",
+      "name": "Bâton fulgurant",
+      "stats": {
+        "ap": 40.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "long_sword"
+      ],
+      "category": "basic",
+      "cost": 900.0,
+      "description": "+15 AD, 10 % vol de vie.",
+      "icon": "vampiric",
+      "id": "sceptre_vampirique",
+      "name": "Sceptre sanglant",
+      "stats": {
+        "ad": 15.0,
+        "lifesteal": 0.1
+      }
+    },
+    {
+      "buildsFrom": [
+        "long_sword",
+        "long_sword"
+      ],
+      "category": "basic",
+      "cost": 1300.0,
+      "description": "+35 AD.",
+      "icon": "bf_sword",
+      "id": "grand_glaive",
+      "name": "Grand glaive",
+      "stats": {
+        "ad": 35.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "dagger",
+        "dagger"
+      ],
+      "category": "basic",
+      "cost": 700.0,
+      "description": "+25 % vitesse d’attaque.",
+      "icon": "recurve",
+      "id": "arc_recurve",
+      "name": "Arc sinueux",
+      "stats": {
+        "attackSpeed": 0.25
+      }
+    },
+    {
+      "buildsFrom": [
+        "cloth_armor",
+        "cloth_armor"
+      ],
+      "category": "basic",
+      "cost": 800.0,
+      "description": "+40 armure.",
+      "icon": "chainvest",
+      "id": "gilet_de_maille",
+      "name": "Cotte de mailles",
+      "stats": {
+        "armor": 40.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "amplifying_tome"
+      ],
+      "category": "basic",
+      "cost": 1200.0,
+      "description": "+30 AP, +10 hâte de compétence.",
+      "icon": "codex",
+      "id": "codex_sombre",
+      "name": "Codex sombre",
+      "stats": {
+        "abilityHaste": 10.0,
+        "ap": 30.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "ruby_crystal"
+      ],
+      "category": "basic",
+      "cost": 1000.0,
+      "description": "+200 PV, +10 hâte de compétence.",
+      "icon": "kindlegem",
+      "id": "kindlegem",
+      "name": "Symbole ardent",
+      "stats": {
+        "abilityHaste": 10.0,
+        "maxHp": 200.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "ruby_crystal",
+        "ruby_crystal"
+      ],
+      "category": "basic",
+      "cost": 900.0,
+      "description": "+350 PV.",
+      "icon": "belt",
+      "id": "ceinture_du_colosse",
+      "name": "Sangle du titan",
+      "stats": {
+        "maxHp": 350.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "long_sword"
+      ],
+      "category": "basic",
+      "cost": 875.0,
+      "description": "+20 AD, 8 % vol de vie.",
+      "icon": "vampaxe",
+      "id": "hache_vampirique",
+      "name": "Hache vampirique",
+      "stats": {
+        "ad": 20.0,
+        "lifesteal": 0.08
+      }
+    },
+    {
+      "buildsFrom": [
+        "amplifying_tome",
+        "ruby_crystal"
+      ],
+      "category": "basic",
+      "cost": 1000.0,
+      "description": "+25 AP, +200 PV.",
+      "icon": "guise",
+      "id": "masque_tenebreux",
+      "name": "Masque funèbre",
+      "stats": {
+        "ap": 25.0,
+        "maxHp": 200.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "negatron_cloak"
+      ],
+      "category": "basic",
+      "cost": 900.0,
+      "description": "+40 résistance magique.",
+      "icon": "voidcloak",
+      "id": "cape_du_vide",
+      "name": "Manteau du néant",
+      "stats": {
+        "mr": 40.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "ruby_crystal",
+        "sapphire_crystal"
+      ],
+      "category": "basic",
+      "cost": 1000.0,
+      "description": "+250 PV, +250 mana.",
+      "icon": "catalyst",
+      "id": "pierre_du_lac",
+      "name": "Pierre des lacs",
+      "stats": {
+        "maxHp": 250.0,
+        "maxMana": 250.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "long_sword"
+      ],
+      "category": "basic",
+      "cost": 1000.0,
+      "description": "+15 AD, +5 pénétration d’armure.",
+      "icon": "dirk",
+      "id": "hachette_assassin",
+      "name": "Hachette d’assassin",
+      "stats": {
+        "ad": 15.0,
+        "armorPen": 5.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "dagger"
+      ],
+      "category": "basic",
+      "cost": 900.0,
+      "description": "+15 % vitesse d’attaque, +5 % crit.",
+      "icon": "shiv",
+      "id": "lame_ondulante",
+      "name": "Lame ondulante",
+      "stats": {
+        "attackSpeed": 0.15,
+        "critChance": 0.05
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 500.0,
+      "description": "+8 AD.",
+      "icon": "gloves",
+      "id": "gantelets",
+      "name": "Gantelets",
+      "stats": {
+        "ad": 8.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 500.0,
+      "description": "+12 AP.",
+      "icon": "wand_minor",
+      "id": "baguette_mineure",
+      "name": "Baguette mineure",
+      "stats": {
+        "ap": 12.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "cloth_armor"
+      ],
+      "category": "basic",
+      "cost": 450.0,
+      "description": "+20 armure.",
+      "icon": "shield_minor",
+      "id": "bouclier_mineur",
+      "name": "Bouclier mineur",
+      "stats": {
+        "armor": 20.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 400.0,
+      "description": "+12 résistance magique.",
+      "icon": "cloak_minor",
+      "id": "cape_mineure",
+      "name": "Cape mineure",
+      "stats": {
+        "mr": 12.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 500.0,
+      "description": "+120 PV, +3 PV/5 s.",
+      "icon": "lifering",
+      "id": "anneau_de_vie",
+      "name": "Anneau de vie",
+      "stats": {
+        "hpRegen": 3.0,
+        "maxHp": 120.0
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "basic",
+      "cost": 500.0,
+      "description": "+200 PV.",
+      "icon": "heart",
+      "id": "coeur_du_roc",
+      "name": "Cœur du roc",
+      "stats": {
+        "maxHp": 200.0
+      }
+    },
+    {
+      "active": {
+        "cooldown": 60.0,
+        "description": "+40 % vitesse de déplacement pendant 2 s.",
+        "id": "rafale",
+        "name": "Rafale"
+      },
+      "buildsFrom": [
+        "long_sword",
+        "cloak_agility",
+        "dagger"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+40 AD, +20 % crit, +25 % vitesse d’attaque. Active : +40 % vitesse de déplacement pendant 2 s (60 s).",
+      "icon": "rafale",
+      "id": "lame_des_rafales",
+      "name": "Lame des rafales",
+      "stats": {
+        "ad": 40.0,
+        "attackSpeed": 0.25,
+        "critChance": 0.2
+      }
+    },
+    {
+      "buildsFrom": [
+        "dagger",
+        "long_sword",
+        "cloak_agility"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+30 AD, +35 % vitesse d’attaque, +20 % crit. Passif : vos attaques infligent 20 dégâts bonus.",
+      "icon": "dunebow",
+      "id": "arc_des_dunes",
+      "name": "Arc des dunes",
+      "passive": {
+        "description": "Auto-attaques : +20 dégâts bonus.",
+        "id": "etincelle",
+        "name": "Étincelle",
+        "params": {
+          "damage": 20.0
+        }
+      },
+      "stats": {
+        "ad": 30.0,
+        "attackSpeed": 0.35,
+        "critChance": 0.2
+      }
+    },
+    {
+      "buildsFrom": [
+        "arc_recurve",
+        "grand_glaive",
+        "cloak_agility"
+      ],
+      "category": "legendary",
+      "cost": 3100.0,
+      "description": "+40 AD, +40 % vitesse d’attaque, +25 % crit. Passif : attaques bonus de 20 dégâts.",
+      "icon": "hurricane",
+      "id": "ouragan_des_dunes",
+      "name": "Ouragan des dunes",
+      "passive": {
+        "description": "Auto-attaques : +20 dégâts bonus.",
+        "id": "etincelle",
+        "name": "Étincelle",
+        "params": {
+          "damage": 20.0
+        }
+      },
+      "stats": {
+        "ad": 40.0,
+        "attackSpeed": 0.4,
+        "critChance": 0.25
+      }
+    },
+    {
+      "buildsFrom": [
+        "arc_recurve",
+        "codex_sombre",
+        "cloak_agility"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+35 % vitesse d’attaque, +20 % crit, +40 AP. Passif « Sort-lame » : après un sort, prochaine attaque +80 % AP bonus.",
+      "icon": "stormeye",
+      "id": "oeil_de_la_tempete",
+      "name": "Œil de la tempête",
+      "passive": {
+        "description": "Après un sort, prochaine attaque : +80 % AP bonus.",
+        "id": "spellblade",
+        "name": "Sort-lame",
+        "params": {
+          "apRatio": 0.8
+        }
+      },
+      "stats": {
+        "ap": 40.0,
+        "attackSpeed": 0.35,
+        "critChance": 0.2
+      }
+    },
+    {
+      "buildsFrom": [
+        "warhammer",
+        "ruby_crystal"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+45 AD, +300 PV, +10 hâte.",
+      "icon": "colossus",
+      "id": "masse_du_colosse",
+      "name": "Masse du colosse",
+      "stats": {
+        "abilityHaste": 10.0,
+        "ad": 45.0,
+        "maxHp": 300.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "long_sword",
+        "ruby_crystal"
+      ],
+      "category": "legendary",
+      "cost": 3200.0,
+      "description": "+40 AD, +250 PV, 10 % vol de vie.",
+      "icon": "wildblade",
+      "id": "lame_coeur_sauvage",
+      "name": "Lame cœur-sauvage",
+      "stats": {
+        "ad": 40.0,
+        "lifesteal": 0.1,
+        "maxHp": 250.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "grand_glaive",
+        "sceptre_vampirique",
+        "kindlegem"
+      ],
+      "category": "legendary",
+      "cost": 3200.0,
+      "description": "+45 AD, +20 % vitesse d’attaque, +250 PV, 12 % vol de vie.",
+      "icon": "royal",
+      "id": "epee_du_roi",
+      "name": "Épée du souverain",
+      "stats": {
+        "ad": 45.0,
+        "attackSpeed": 0.2,
+        "lifesteal": 0.12,
+        "maxHp": 250.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "hache_vampirique",
+        "kindlegem"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+50 AD, +300 PV, +10 hâte.",
+      "icon": "waraxe",
+      "id": "hache_de_guerre",
+      "name": "Hache de guerre",
+      "stats": {
+        "abilityHaste": 10.0,
+        "ad": 50.0,
+        "maxHp": 300.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "grand_glaive",
+        "sceptre_vampirique"
+      ],
+      "category": "legendary",
+      "cost": 3300.0,
+      "description": "+55 AD, 15 % vol de vie.",
+      "icon": "bloodblade",
+      "id": "lame_sanguine",
+      "name": "Lame sanguine",
+      "stats": {
+        "ad": 55.0,
+        "lifesteal": 0.15
+      }
+    },
+    {
+      "buildsFrom": [
+        "long_sword",
+        "warhammer"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+55 AD, +15 pénétration d’armure, +10 hâte. Passif : +10 % dégâts contre les cibles sous 40 % PV.",
+      "icon": "shadowclaw",
+      "id": "griffe_de_lombre",
+      "name": "Griffe de l’ombre",
+      "passive": {
+        "description": "+10 % dégâts contre les cibles sous 40 % PV.",
+        "id": "ombre",
+        "name": "Ténèbres",
+        "params": {
+          "bonus": 0.1,
+          "threshold": 0.4
+        }
+      },
+      "stats": {
+        "abilityHaste": 10.0,
+        "ad": 55.0,
+        "armorPen": 15.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "grand_glaive",
+        "warhammer"
+      ],
+      "category": "legendary",
+      "cost": 3200.0,
+      "description": "+60 AD, +18 pénétration d’armure. Passif : +10 % dégâts contre les cibles sous 40 % PV.",
+      "icon": "duskblade",
+      "id": "lame_du_crepuscule",
+      "name": "Lame du soir",
+      "passive": {
+        "description": "+10 % dégâts contre les cibles sous 40 % PV.",
+        "id": "ombre",
+        "name": "Ténèbres",
+        "params": {
+          "bonus": 0.1,
+          "threshold": 0.4
+        }
+      },
+      "stats": {
+        "ad": 60.0,
+        "armorPen": 18.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "grand_glaive",
+        "codex_sombre"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+50 AD, +30 AP, +15 pénétration magique, +10 hâte.",
+      "icon": "serpent",
+      "id": "dague_du_serpent",
+      "name": "Dague du serpent",
+      "stats": {
+        "abilityHaste": 10.0,
+        "ad": 50.0,
+        "ap": 30.0,
+        "magicPen": 15.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "long_sword",
+        "warhammer",
+        "cloak_agility"
+      ],
+      "category": "legendary",
+      "cost": 2900.0,
+      "description": "+45 AD, +15 % crit, +20 vitesse. Passif : +10 % dégâts contre les cibles sous 40 % PV.",
+      "icon": "nightfall",
+      "id": "ombre_fuyante",
+      "name": "Ombre fuyante",
+      "passive": {
+        "description": "+10 % dégâts contre les cibles sous 40 % PV.",
+        "id": "ombre",
+        "name": "Ténèbres",
+        "params": {
+          "bonus": 0.1,
+          "threshold": 0.4
+        }
+      },
+      "stats": {
+        "ad": 45.0,
+        "critChance": 0.15,
+        "moveSpeed": 20.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "blasting_wand",
+        "amplifying_tome"
+      ],
+      "category": "legendary",
+      "cost": 2800.0,
+      "description": "+70 AP, +15 pénétration magique. Passif « Sort-lame » : votre prochaine attaque après un sort inflige +80 % AP dégâts bonus.",
+      "icon": "stormstaff",
+      "id": "sceptre_de_lorage",
+      "name": "Sceptre de l’orage",
+      "passive": {
+        "description": "Après un sort, prochaine attaque : +80 % AP bonus.",
+        "id": "spellblade",
+        "name": "Sort-lame",
+        "params": {
+          "apRatio": 0.8
+        }
+      },
+      "stats": {
+        "ap": 70.0,
+        "magicPen": 15.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "blasting_wand",
+        "ruby_crystal"
+      ],
+      "category": "legendary",
+      "cost": 2800.0,
+      "description": "+60 AP, +250 PV, +10 hâte.",
+      "icon": "frostcrown",
+      "id": "couronne_du_givre",
+      "name": "Couronne du givre",
+      "stats": {
+        "abilityHaste": 10.0,
+        "ap": 60.0,
+        "maxHp": 250.0
+      }
+    },
+    {
+      "active": {
+        "cooldown": 120.0,
+        "description": "Devient invulnérable et immobile pendant 2,5 s.",
+        "id": "stase",
+        "name": "Stase"
+      },
+      "buildsFrom": [
+        "blasting_wand",
+        "cloth_armor"
+      ],
+      "category": "legendary",
+      "cost": 2600.0,
+      "description": "+50 AP, +40 armure. Active : stase pendant 2,5 s (invulnérable, 120 s).",
+      "icon": "hourglass",
+      "id": "sablier_eternel",
+      "name": "Sablier éternel",
+      "stats": {
+        "ap": 50.0,
+        "armor": 40.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "blasting_wand",
+        "codex_sombre"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+80 AP, +250 PV, +10 hâte.",
+      "icon": "whitestaff",
+      "id": "baton_du_mage_blanc",
+      "name": "Bâton du mage blanc",
+      "stats": {
+        "abilityHaste": 10.0,
+        "ap": 80.0,
+        "maxHp": 250.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "blasting_wand",
+        "arc_recurve"
+      ],
+      "category": "legendary",
+      "cost": 2800.0,
+      "description": "+60 AP, +30 % vitesse d’attaque. Passif « Sort-lame » : après un sort, prochaine attaque +80 % AP bonus.",
+      "icon": "traveler",
+      "id": "tome_du_voyageur",
+      "name": "Tome du voyageur",
+      "passive": {
+        "description": "Après un sort, prochaine attaque : +80 % AP bonus.",
+        "id": "spellblade",
+        "name": "Sort-lame",
+        "params": {
+          "apRatio": 0.8
+        }
+      },
+      "stats": {
+        "ap": 60.0,
+        "attackSpeed": 0.3
+      }
+    },
+    {
+      "buildsFrom": [
+        "blasting_wand",
+        "codex_sombre",
+        "amplifying_tome"
+      ],
+      "category": "legendary",
+      "cost": 3200.0,
+      "description": "+90 AP, +15 pénétration magique.",
+      "icon": "royalstaff",
+      "id": "sceptre_royal",
+      "name": "Sceptre royal",
+      "stats": {
+        "ap": 90.0,
+        "magicPen": 15.0
+      }
+    },
+    {
+      "active": {
+        "cooldown": 60.0,
+        "description": "Dash de 400 u vers la position visée.",
+        "id": "frappe_spectrale",
+        "name": "Frappe spectrale"
+      },
+      "buildsFrom": [
+        "grand_glaive",
+        "blasting_wand"
+      ],
+      "category": "legendary",
+      "cost": 2900.0,
+      "description": "+40 AD, +40 AP. Active : dash de 400 u vers la position visée (60 s).",
+      "icon": "spectral",
+      "id": "lame_spectrale",
+      "name": "Lame spectrale",
+      "stats": {
+        "ad": 40.0,
+        "ap": 40.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "cloth_armor",
+        "ruby_crystal",
+        "cloth_armor"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+70 armure, +400 PV, +8 PV/5 s.",
+      "icon": "rockplate",
+      "id": "cuirasse_du_roc",
+      "name": "Cuirasse du roc",
+      "stats": {
+        "armor": 70.0,
+        "hpRegen": 8.0,
+        "maxHp": 400.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "negatron_cloak",
+        "ruby_crystal"
+      ],
+      "category": "legendary",
+      "cost": 2900.0,
+      "description": "+60 résistance magique, +350 PV. Passif : bouclier magique de 100 toutes les 40 s.",
+      "icon": "nightveil",
+      "id": "voile_de_la_nuit",
+      "name": "Voile de la nuit",
+      "passive": {
+        "description": "Bouclier de 100 contre les dégâts magiques, tous les 40 s.",
+        "id": "voile",
+        "name": "Voile magique",
+        "params": {
+          "cooldown": 40.0,
+          "shield": 100.0
+        }
+      },
+      "stats": {
+        "maxHp": 350.0,
+        "mr": 60.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "gilet_de_maille",
+        "ceinture_du_colosse",
+        "gilet_de_maille"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+80 armure, +400 PV.",
+      "icon": "giantplate",
+      "id": "armure_du_geant",
+      "name": "Armure du géant",
+      "stats": {
+        "armor": 80.0,
+        "maxHp": 400.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "gilet_de_maille",
+        "negatron_cloak",
+        "ruby_crystal"
+      ],
+      "category": "legendary",
+      "cost": 2800.0,
+      "description": "+50 armure, +50 résistance magique, +350 PV. Passif : renvoie 10 % des dégâts subis (magiques).",
+      "icon": "thorn",
+      "id": "carapace_du_roc",
+      "name": "Carapace du roc",
+      "passive": {
+        "description": "Renvoie 10 % des dégâts subis à l’attaquant.",
+        "id": "vengeance",
+        "name": "Vengeance",
+        "params": {
+          "reflect": 0.1
+        }
+      },
+      "stats": {
+        "armor": 50.0,
+        "maxHp": 350.0,
+        "mr": 50.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "gilet_de_maille",
+        "ceinture_du_colosse"
+      ],
+      "category": "legendary",
+      "cost": 2900.0,
+      "description": "+60 armure, +400 PV, +8 PV/5 s.",
+      "icon": "sunfire",
+      "id": "masque_ardent",
+      "name": "Auréole ardente",
+      "stats": {
+        "armor": 60.0,
+        "hpRegen": 8.0,
+        "maxHp": 400.0
+      }
+    },
+    {
+      "active": {
+        "cooldown": 90.0,
+        "description": "Bouclier de 120 sur vous et l’allié le plus proche pendant 2,5 s.",
+        "id": "bouclier_allie",
+        "name": "Protection"
+      },
+      "buildsFrom": [
+        "amplifying_tome",
+        "ruby_crystal"
+      ],
+      "category": "legendary",
+      "cost": 2300.0,
+      "description": "+30 AP, +200 PV, +15 hâte. Passif : vos soins sont amplifiés de 20 %. Active : bouclier de 120 sur vous et l’allié le plus proche (90 s).",
+      "icon": "dawncenser",
+      "id": "encensoir_de_laube",
+      "name": "Encensoir du matin",
+      "passive": {
+        "description": "Vos soins sont amplifiés de 20 %.",
+        "id": "benediction",
+        "name": "Bénédiction",
+        "params": {
+          "bonus": 0.2
+        }
+      },
+      "stats": {
+        "abilityHaste": 15.0,
+        "ap": 30.0,
+        "maxHp": 200.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "codex_sombre",
+        "kindlegem"
+      ],
+      "category": "legendary",
+      "cost": 2600.0,
+      "description": "+50 AP, +250 PV, +20 hâte. Passif : vos soins sont amplifiés de 20 %.",
+      "icon": "queen",
+      "id": "sceptre_de_la_reine",
+      "name": "Sceptre de la reine",
+      "passive": {
+        "description": "Vos soins sont amplifiés de 20 %.",
+        "id": "benediction",
+        "name": "Bénédiction",
+        "params": {
+          "bonus": 0.2
+        }
+      },
+      "stats": {
+        "abilityHaste": 20.0,
+        "ap": 50.0,
+        "maxHp": 250.0
+      }
+    },
+    {
+      "active": {
+        "cooldown": 90.0,
+        "description": "Bouclier de 120 sur vous et l’allié le plus proche pendant 2,5 s.",
+        "id": "bouclier_allie",
+        "name": "Protection"
+      },
+      "buildsFrom": [
+        "amplifying_tome",
+        "ruby_crystal"
+      ],
+      "category": "legendary",
+      "cost": 2200.0,
+      "description": "+30 AP, +200 PV, +15 hâte. Active : bouclier de 120 sur vous et l’allié le plus proche (90 s).",
+      "icon": "amuletgold",
+      "id": "collier_de_laurore",
+      "name": "Collier de l’aurore",
+      "stats": {
+        "abilityHaste": 15.0,
+        "ap": 30.0,
+        "maxHp": 200.0
+      }
+    },
+    {
+      "active": {
+        "cooldown": 90.0,
+        "description": "Soigne de 150 PV vous et l’allié le plus proche.",
+        "id": "soin_rapide",
+        "name": "Soin du mont"
+      },
+      "buildsFrom": [
+        "gilet_de_maille",
+        "negatron_cloak"
+      ],
+      "category": "legendary",
+      "cost": 2500.0,
+      "description": "+40 armure, +40 résistance magique. Active : soigne de 150 PV vous et l’allié le plus proche (90 s).",
+      "icon": "mountain",
+      "id": "bouclier_du_mont",
+      "name": "Bouclier du mont",
+      "stats": {
+        "armor": 40.0,
+        "mr": 40.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "long_sword",
+        "warhammer"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+50 AD, 8 % vol de vie. Passif « Blessure grave » : réduit les soins ennemis de 40 % pendant 3 s.",
+      "icon": "executioner",
+      "id": "hache_du_bourreau",
+      "name": "Tranchoir",
+      "passive": {
+        "description": "Vos dégâts réduisent les soins ennemis de 40 % pendant 3 s.",
+        "id": "grievous",
+        "name": "Blessure grave",
+        "params": {
+          "duration": 3.0,
+          "reduction": 0.4
+        }
+      },
+      "stats": {
+        "ad": 50.0,
+        "lifesteal": 0.08
+      }
+    },
+    {
+      "buildsFrom": [
+        "grand_glaive",
+        "hache_vampirique"
+      ],
+      "category": "legendary",
+      "cost": 2900.0,
+      "description": "+55 AD, 10 % vol de vie. Passif « Blessure grave » : réduit les soins ennemis de 40 % pendant 3 s.",
+      "icon": "cursed",
+      "id": "lame_maudite",
+      "name": "Lame maudite",
+      "passive": {
+        "description": "Vos dégâts réduisent les soins ennemis de 40 % pendant 3 s.",
+        "id": "grievous",
+        "name": "Blessure grave",
+        "params": {
+          "duration": 3.0,
+          "reduction": 0.4
+        }
+      },
+      "stats": {
+        "ad": 55.0,
+        "lifesteal": 0.1
+      }
+    },
+    {
+      "buildsFrom": [
+        "arc_recurve",
+        "long_sword",
+        "cloak_agility"
+      ],
+      "category": "legendary",
+      "cost": 2800.0,
+      "description": "+30 AD, +30 % vitesse d’attaque, +15 % crit. Passif : attaques bonus de 20 dégâts.",
+      "icon": "windcrossbow",
+      "id": "arbalete_du_vent",
+      "name": "Arbalète du vent",
+      "passive": {
+        "description": "Auto-attaques : +20 dégâts bonus.",
+        "id": "etincelle",
+        "name": "Étincelle",
+        "params": {
+          "damage": 20.0
+        }
+      },
+      "stats": {
+        "ad": 30.0,
+        "attackSpeed": 0.3,
+        "critChance": 0.15
+      }
+    },
+    {
+      "buildsFrom": [
+        "arc_recurve",
+        "hachette_assassin"
+      ],
+      "category": "legendary",
+      "cost": 2600.0,
+      "description": "+35 AD, +10 pénétration d’armure, +20 % vitesse d’attaque.",
+      "icon": "piercing",
+      "id": "fleche_percante",
+      "name": "Flèche percante",
+      "stats": {
+        "ad": 35.0,
+        "armorPen": 10.0,
+        "attackSpeed": 0.2
+      }
+    },
+    {
+      "buildsFrom": [
+        "arc_recurve",
+        "cloak_agility",
+        "dagger"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+30 % crit, +25 % vitesse d’attaque.",
+      "icon": "moonbow",
+      "id": "arc_de_la_lune",
+      "name": "Arc de la lune",
+      "stats": {
+        "attackSpeed": 0.25,
+        "critChance": 0.3
+      }
+    },
+    {
+      "buildsFrom": [
+        "grand_glaive",
+        "ceinture_du_colosse"
+      ],
+      "category": "legendary",
+      "cost": 3100.0,
+      "description": "+50 AD, +350 PV.",
+      "icon": "titan",
+      "id": "masse_du_titan",
+      "name": "Masse du titan",
+      "stats": {
+        "ad": 50.0,
+        "maxHp": 350.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "grand_glaive",
+        "arc_recurve",
+        "kindlegem"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+45 AD, +30 % vitesse d’attaque, +200 PV.",
+      "icon": "berserker",
+      "id": "lame_du_berserker",
+      "name": "Lame du berserker",
+      "stats": {
+        "ad": 45.0,
+        "attackSpeed": 0.3,
+        "maxHp": 200.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "gilet_de_maille",
+        "sceptre_vampirique",
+        "kindlegem"
+      ],
+      "category": "legendary",
+      "cost": 2700.0,
+      "description": "+25 AD, +40 armure, +250 PV, 8 % vol de vie.",
+      "icon": "harness",
+      "id": "harnachement",
+      "name": "Harnachement",
+      "stats": {
+        "ad": 25.0,
+        "armor": 40.0,
+        "lifesteal": 0.08,
+        "maxHp": 250.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "gilet_de_maille",
+        "grand_glaive"
+      ],
+      "category": "legendary",
+      "cost": 2900.0,
+      "description": "+35 AD, +50 armure.",
+      "icon": "rockgauntlets",
+      "id": "gantelets_du_roc",
+      "name": "Gantelets du roc",
+      "stats": {
+        "ad": 35.0,
+        "armor": 50.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "hachette_assassin",
+        "codex_sombre"
+      ],
+      "category": "legendary",
+      "cost": 2800.0,
+      "description": "+40 AD, +25 AP. Passif : +10 % dégâts contre les cibles sous 40 % PV.",
+      "icon": "venom",
+      "id": "dague_du_venin",
+      "name": "Dague du venin",
+      "passive": {
+        "description": "+10 % dégâts contre les cibles sous 40 % PV.",
+        "id": "ombre",
+        "name": "Ténèbres",
+        "params": {
+          "bonus": 0.1,
+          "threshold": 0.4
+        }
+      },
+      "stats": {
+        "ad": 40.0,
+        "ap": 25.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "grand_glaive",
+        "hachette_assassin",
+        "warhammer"
+      ],
+      "category": "legendary",
+      "cost": 3300.0,
+      "description": "+65 AD, +20 pénétration d’armure.",
+      "icon": "assassin",
+      "id": "lame_de_l_assassin",
+      "name": "Lame de l’assassin",
+      "stats": {
+        "ad": 65.0,
+        "armorPen": 20.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "cloak_agility",
+        "codex_sombre"
+      ],
+      "category": "legendary",
+      "cost": 2700.0,
+      "description": "+20 % crit, +30 AP, +25 vitesse. Passif : +10 % dégâts contre les cibles sous 40 % PV.",
+      "icon": "shadowcloak",
+      "id": "cape_de_l_ombre",
+      "name": "Cape de l’ombre",
+      "passive": {
+        "description": "+10 % dégâts contre les cibles sous 40 % PV.",
+        "id": "ombre",
+        "name": "Ténèbres",
+        "params": {
+          "bonus": 0.1,
+          "threshold": 0.4
+        }
+      },
+      "stats": {
+        "ap": 30.0,
+        "critChance": 0.2,
+        "moveSpeed": 25.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "blasting_wand",
+        "codex_sombre",
+        "sapphire_crystal"
+      ],
+      "category": "legendary",
+      "cost": 2900.0,
+      "description": "+75 AP, +300 mana, +10 hâte.",
+      "icon": "frosttome",
+      "id": "grimoire_du_givre",
+      "name": "Grimoire du givre",
+      "stats": {
+        "abilityHaste": 10.0,
+        "ap": 75.0,
+        "maxMana": 300.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "blasting_wand",
+        "amplifying_tome",
+        "negatron_cloak"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+80 AP, +25 résistance magique.",
+      "icon": "orb",
+      "id": "orbe_des_arcannes",
+      "name": "Orbe des arcanes",
+      "stats": {
+        "ap": 80.0,
+        "mr": 25.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "codex_sombre",
+        "arc_recurve"
+      ],
+      "category": "legendary",
+      "cost": 2600.0,
+      "description": "+50 AP, +30 % vitesse d’attaque. Passif « Sort-lame » : après un sort, prochaine attaque +80 % AP bonus.",
+      "icon": "mageband",
+      "id": "bague_du_mage",
+      "name": "Bague du mage",
+      "passive": {
+        "description": "Après un sort, prochaine attaque : +80 % AP bonus.",
+        "id": "spellblade",
+        "name": "Sort-lame",
+        "params": {
+          "apRatio": 0.8
+        }
+      },
+      "stats": {
+        "ap": 50.0,
+        "attackSpeed": 0.3
+      }
+    },
+    {
+      "buildsFrom": [
+        "blasting_wand",
+        "cape_du_vide",
+        "codex_sombre"
+      ],
+      "category": "legendary",
+      "cost": 3300.0,
+      "description": "+90 AP, +20 pénétration magique.",
+      "icon": "voidstaff",
+      "id": "sceptre_du_neant",
+      "name": "Sceptre des abysses",
+      "stats": {
+        "ap": 90.0,
+        "magicPen": 20.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "gilet_de_maille",
+        "ceinture_du_colosse",
+        "negatron_cloak"
+      ],
+      "category": "legendary",
+      "cost": 3200.0,
+      "description": "+70 armure, +30 résistance magique, +450 PV.",
+      "icon": "royalplate",
+      "id": "cuirasse_royale",
+      "name": "Cuirasse royale",
+      "stats": {
+        "armor": 70.0,
+        "maxHp": 450.0,
+        "mr": 30.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "gilet_de_maille",
+        "kindlegem",
+        "cape_du_vide"
+      ],
+      "category": "legendary",
+      "cost": 2800.0,
+      "description": "+45 armure, +45 résistance magique, +300 PV, +6 PV/5 s.",
+      "icon": "warden",
+      "id": "plaque_du_gardien",
+      "name": "Plaque du guet",
+      "stats": {
+        "armor": 45.0,
+        "hpRegen": 6.0,
+        "maxHp": 300.0,
+        "mr": 45.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "ceinture_du_colosse",
+        "ceinture_du_colosse"
+      ],
+      "category": "legendary",
+      "cost": 3000.0,
+      "description": "+600 PV, +10 PV/5 s.",
+      "icon": "helm",
+      "id": "heausse_du_colosse",
+      "name": "Heaume du colosse",
+      "stats": {
+        "hpRegen": 10.0,
+        "maxHp": 600.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "codex_sombre",
+        "sapphire_crystal"
+      ],
+      "category": "legendary",
+      "cost": 2400.0,
+      "description": "+40 AP, +300 mana, +15 hâte. Passif : vos soins sont amplifiés de 20 %.",
+      "icon": "moonstaff",
+      "id": "sceptre_de_la_lune",
+      "name": "Sceptre de la lune",
+      "passive": {
+        "description": "Vos soins sont amplifiés de 20 %.",
+        "id": "benediction",
+        "name": "Bénédiction",
+        "params": {
+          "bonus": 0.2
+        }
+      },
+      "stats": {
+        "abilityHaste": 15.0,
+        "ap": 40.0,
+        "maxMana": 300.0
+      }
+    },
+    {
+      "active": {
+        "cooldown": 90.0,
+        "description": "Bouclier de 120 sur vous et l’allié le plus proche pendant 2,5 s.",
+        "id": "bouclier_allie",
+        "name": "Protection"
+      },
+      "buildsFrom": [
+        "masque_tenebreux",
+        "kindlegem"
+      ],
+      "category": "legendary",
+      "cost": 2500.0,
+      "description": "+45 AP, +250 PV, +10 hâte. Active : bouclier de 120 sur vous et l’allié le plus proche (90 s).",
+      "icon": "nightcenser",
+      "id": "encensoir_nocturne",
+      "name": "Encensoir nocturne",
+      "stats": {
+        "abilityHaste": 10.0,
+        "ap": 45.0,
+        "maxHp": 250.0
+      }
+    },
+    {
+      "buildsFrom": [
+        "hache_vampirique",
+        "hachette_assassin"
+      ],
+      "category": "legendary",
+      "cost": 2700.0,
+      "description": "+45 AD, 12 % vol de vie. Passif « Blessure grave » : réduit les soins ennemis de 40 % pendant 3 s.",
+      "icon": "reaper",
+      "id": "faux_du_revenant",
+      "name": "Faux du revenant",
+      "passive": {
+        "description": "Vos dégâts réduisent les soins ennemis de 40 % pendant 3 s.",
+        "id": "grievous",
+        "name": "Blessure grave",
+        "params": {
+          "duration": 3.0,
+          "reduction": 0.4
+        }
+      },
+      "stats": {
+        "ad": 45.0,
+        "lifesteal": 0.12
+      }
+    },
+    {
+      "buildsFrom": [
+        "grand_glaive",
+        "cloak_agility",
+        "sceptre_vampirique"
+      ],
+      "category": "legendary",
+      "cost": 3400.0,
+      "description": "+70 AD, +25 % crit, 10 % vol de vie.",
+      "icon": "infinity",
+      "id": "epee_de_l_infini",
+      "name": "Lame de l’horizon",
+      "stats": {
+        "ad": 70.0,
+        "critChance": 0.25,
+        "lifesteal": 0.1
+      }
+    },
+    {
+      "buildsFrom": [],
+      "category": "trinket",
+      "cost": 0.0,
+      "description": "Trinket : pose une balise invisible (90 s, vision 900 u), détruite en 3 attaques. 2 charges, rechargées toutes les 90 s.",
+      "icon": "ward",
+      "id": "stealth_ward",
+      "name": "Sentinelle de vision",
+      "stats": {}
+    },
+    {
+      "active": {
+        "cooldown": 0.0,
+        "description": "Invoque le Colosse du Rift.",
+        "id": "colosse",
+        "name": "Invocation"
+      },
+      "buildsFrom": [],
+      "category": "trinket",
+      "cost": 0.0,
+      "description": "Objet de quête (Colosse du Rift). Active : invoque le Colosse contre la tour ennemie la plus proche.",
+      "icon": "eye",
+      "id": "colossus_eye",
+      "name": "Œil du colosse",
+      "shop": false,
+      "stats": {}
+    }
+  ],
+  "itemsRecordKeys": [
+    "doran_blade",
+    "doran_ring",
+    "doran_shield",
+    "amulette_novice",
+    "ecu_novice",
+    "hunter_machete",
+    "fiole_chasseur",
+    "health_potion",
+    "griffe_du_debutant",
+    "bouclier_du_debutant",
+    "boots",
+    "berserker_greaves",
+    "sorcerer_shoes",
+    "plated_steelcaps",
+    "mercury_treads",
+    "ionian_lucidity",
+    "swift_boots",
+    "bottes_du_voyageur",
+    "long_sword",
+    "amplifying_tome",
+    "ruby_crystal",
+    "sapphire_crystal",
+    "dagger",
+    "cloak_agility",
+    "cloth_armor",
+    "negatron_cloak",
+    "warhammer",
+    "blasting_wand",
+    "sceptre_vampirique",
+    "grand_glaive",
+    "arc_recurve",
+    "gilet_de_maille",
+    "codex_sombre",
+    "kindlegem",
+    "ceinture_du_colosse",
+    "hache_vampirique",
+    "masque_tenebreux",
+    "cape_du_vide",
+    "pierre_du_lac",
+    "hachette_assassin",
+    "lame_ondulante",
+    "gantelets",
+    "baguette_mineure",
+    "bouclier_mineur",
+    "cape_mineure",
+    "anneau_de_vie",
+    "coeur_du_roc",
+    "lame_des_rafales",
+    "arc_des_dunes",
+    "ouragan_des_dunes",
+    "oeil_de_la_tempete",
+    "masse_du_colosse",
+    "lame_coeur_sauvage",
+    "epee_du_roi",
+    "hache_de_guerre",
+    "lame_sanguine",
+    "griffe_de_lombre",
+    "lame_du_crepuscule",
+    "dague_du_serpent",
+    "ombre_fuyante",
+    "sceptre_de_lorage",
+    "couronne_du_givre",
+    "sablier_eternel",
+    "baton_du_mage_blanc",
+    "tome_du_voyageur",
+    "sceptre_royal",
+    "lame_spectrale",
+    "cuirasse_du_roc",
+    "voile_de_la_nuit",
+    "armure_du_geant",
+    "carapace_du_roc",
+    "masque_ardent",
+    "encensoir_de_laube",
+    "sceptre_de_la_reine",
+    "collier_de_laurore",
+    "bouclier_du_mont",
+    "hache_du_bourreau",
+    "lame_maudite",
+    "arbalete_du_vent",
+    "fleche_percante",
+    "arc_de_la_lune",
+    "masse_du_titan",
+    "lame_du_berserker",
+    "harnachement",
+    "gantelets_du_roc",
+    "dague_du_venin",
+    "lame_de_l_assassin",
+    "cape_de_l_ombre",
+    "grimoire_du_givre",
+    "orbe_des_arcannes",
+    "bague_du_mage",
+    "sceptre_du_neant",
+    "cuirasse_royale",
+    "plaque_du_gardien",
+    "heausse_du_colosse",
+    "sceptre_de_la_lune",
+    "encensoir_nocturne",
+    "faux_du_revenant",
+    "epee_de_l_infini",
+    "stealth_ward",
+    "colossus_eye"
+  ],
+  "minions": [
+    [
+      "melee",
+      {
+        "ad": 10.0,
+        "armor": 0.0,
+        "attackSpeed": 1.25,
+        "gold": 21.0,
+        "hp": 370.0,
+        "range": 125.0,
+        "speed": 325.0,
+        "xp": 60.0
+      }
+    ],
+    [
+      "caster",
+      {
+        "ad": 17.0,
+        "armor": 0.0,
+        "attackSpeed": 0.67,
+        "gold": 14.0,
+        "hp": 230.0,
+        "range": 550.0,
+        "speed": 325.0,
+        "xp": 29.0
+      }
+    ],
+    [
+      "cannon",
+      {
+        "ad": 32.0,
+        "armor": 0.0,
+        "attackSpeed": 1.0,
+        "gold": 60.0,
+        "hp": 700.0,
+        "range": 300.0,
+        "speed": 325.0,
+        "xp": 93.0
+      }
+    ],
+    [
+      "super",
+      {
+        "ad": 190.0,
+        "armor": 100.0,
+        "attackSpeed": 0.85,
+        "gold": 90.0,
+        "hp": 1240.0,
+        "range": 170.0,
+        "speed": 325.0,
+        "xp": 97.0
+      }
+    ]
+  ],
+  "monsters": [
+    [
+      "blue_buff",
+      {
+        "ad": 50.0,
+        "armor": 15.0,
+        "gold": 90.0,
+        "hp": 1500.0,
+        "range": 175.0,
+        "xp": 280.0
+      }
+    ],
+    [
+      "red_buff",
+      {
+        "ad": 50.0,
+        "armor": 15.0,
+        "gold": 90.0,
+        "hp": 1500.0,
+        "range": 175.0,
+        "xp": 280.0
+      }
+    ],
+    [
+      "gromp",
+      {
+        "ad": 55.0,
+        "armor": 15.0,
+        "gold": 90.0,
+        "hp": 1350.0,
+        "range": 250.0,
+        "xp": 280.0
+      }
+    ],
+    [
+      "wolves",
+      {
+        "ad": 32.0,
+        "armor": 15.0,
+        "gold": 55.0,
+        "hp": 1100.0,
+        "range": 125.0,
+        "xp": 160.0
+      }
+    ],
+    [
+      "wolf_small",
+      {
+        "ad": 9.0,
+        "armor": 0.0,
+        "gold": 7.0,
+        "hp": 300.0,
+        "range": 125.0,
+        "xp": 25.0
+      }
+    ],
+    [
+      "raptors",
+      {
+        "ad": 15.0,
+        "armor": 15.0,
+        "gold": 30.0,
+        "hp": 750.0,
+        "range": 125.0,
+        "xp": 110.0
+      }
+    ],
+    [
+      "raptor_small",
+      {
+        "ad": 9.0,
+        "armor": 0.0,
+        "gold": 7.0,
+        "hp": 240.0,
+        "range": 125.0,
+        "xp": 25.0
+      }
+    ],
+    [
+      "krugs",
+      {
+        "ad": 45.0,
+        "armor": 15.0,
+        "gold": 65.0,
+        "hp": 1100.0,
+        "range": 125.0,
+        "xp": 180.0
+      }
+    ],
+    [
+      "krug_small",
+      {
+        "ad": 9.0,
+        "armor": 0.0,
+        "gold": 7.0,
+        "hp": 300.0,
+        "range": 125.0,
+        "xp": 25.0
+      }
+    ],
+    [
+      "scuttle",
+      {
+        "ad": 0.0,
+        "armor": 15.0,
+        "gold": 55.0,
+        "hp": 1100.0,
+        "range": 0.0,
+        "xp": 180.0
+      }
+    ],
+    [
+      "dragon",
+      {
+        "ad": 70.0,
+        "armor": 25.0,
+        "gold": 25.0,
+        "hp": 5000.0,
+        "range": 500.0,
+        "teamGold": 25.0,
+        "xp": 240.0
+      }
+    ],
+    [
+      "elder_dragon",
+      {
+        "ad": 115.0,
+        "armor": 50.0,
+        "gold": 250.0,
+        "hp": 9000.0,
+        "range": 500.0,
+        "teamGold": 250.0,
+        "xp": 750.0
+      }
+    ],
+    [
+      "grub",
+      {
+        "ad": 28.0,
+        "armor": 15.0,
+        "gold": 20.0,
+        "hp": 1300.0,
+        "range": 200.0,
+        "teamGold": 20.0,
+        "xp": 120.0
+      }
+    ],
+    [
+      "herald",
+      {
+        "ad": 75.0,
+        "armor": 40.0,
+        "gold": 100.0,
+        "hp": 6500.0,
+        "range": 250.0,
+        "teamGold": 100.0,
+        "xp": 320.0
+      }
+    ],
+    [
+      "leviathan",
+      {
+        "ad": 120.0,
+        "armor": 65.0,
+        "gold": 300.0,
+        "hp": 10000.0,
+        "range": 600.0,
+        "teamGold": 300.0,
+        "xp": 900.0
+      }
+    ]
+  ],
+  "structures": {
+    "backdoorRadius": 1000.0,
+    "backdoorResistance": 60.0,
+    "fortificationUntil": 180.0,
+    "inhibitorHp": 3200.0,
+    "nexusHp": 4500.0,
+    "plateGold": 125.0,
+    "plateRadius": 1000.0,
+    "range": 750.0,
+    "towers": {
+      "inhib": {
+        "ad": 190.0,
+        "armor": 60.0,
+        "hp": 2700.0,
+        "localGold": 300.0,
+        "teamGold": 50.0
+      },
+      "inner": {
+        "ad": 170.0,
+        "armor": 45.0,
+        "hp": 2600.0,
+        "localGold": 300.0,
+        "teamGold": 50.0
+      },
+      "nexus": {
+        "ad": 210.0,
+        "armor": 60.0,
+        "hp": 2200.0,
+        "localGold": 50.0,
+        "teamGold": 50.0
+      },
+      "outer": {
+        "ad": 152.0,
+        "armor": 30.0,
+        "hp": 3400.0,
+        "localGold": 250.0,
+        "teamGold": 50.0
+      }
+    }
+  },
+  "summonerIds": [
+    "flash",
+    "ignite",
+    "heal",
+    "barrier",
+    "exhaust",
+    "teleport",
+    "smite",
+    "ghost",
+    "cleanse"
+  ],
+  "summoners": [
+    [
+      "flash",
+      {
+        "cooldown": 300.0,
+        "description": "Se téléporte sur une courte distance (400).",
+        "fxKey": "sum_flash",
+        "id": "flash",
+        "name": "Saut éclair",
+        "range": 400.0,
+        "targeting": "ground"
+      }
+    ],
+    [
+      "ignite",
+      {
+        "cooldown": 180.0,
+        "description": "Brûle un champion ennemi : 70 à 410 dégâts bruts selon le niveau sur 5 s, soins réduits de 40 %.",
+        "fxKey": "sum_ignite",
+        "id": "ignite",
+        "name": "Embrasement",
+        "params": {
+          "baseDamage": 50.0,
+          "damagePerLevel": 20.0,
+          "duration": 5.0,
+          "grievous": 0.4
+        },
+        "range": 600.0,
+        "targeting": "targeted"
+      }
+    ],
+    [
+      "heal",
+      {
+        "cooldown": 240.0,
+        "description": "Rend 95 à 350 PV selon le niveau au lanceur et à l’allié le plus blessé à proximité ; +30 % de vitesse pendant 1 s.",
+        "fxKey": "sum_heal",
+        "id": "heal",
+        "name": "Soins",
+        "params": {
+          "baseHeal": 80.0,
+          "healPerLevel": 15.0,
+          "speed": 0.3,
+          "speedDuration": 1.0
+        },
+        "range": 850.0,
+        "targeting": "self"
+      }
+    ],
+    [
+      "barrier",
+      {
+        "cooldown": 180.0,
+        "description": "Octroie un bouclier de 125 à 465 PV selon le niveau pendant 2,5 s.",
+        "fxKey": "sum_barrier",
+        "id": "barrier",
+        "name": "Barrière",
+        "params": {
+          "baseShield": 105.0,
+          "duration": 2.5,
+          "shieldPerLevel": 20.0
+        },
+        "range": 0.0,
+        "targeting": "self"
+      }
+    ],
+    [
+      "exhaust",
+      {
+        "cooldown": 210.0,
+        "description": "Ralentit un champion ennemi de 30 % et réduit ses dégâts de 40 % pendant 3 s.",
+        "fxKey": "sum_exhaust",
+        "id": "exhaust",
+        "name": "Fatigue",
+        "params": {
+          "damageReduction": 0.4,
+          "duration": 3.0,
+          "slow": 0.3
+        },
+        "range": 650.0,
+        "targeting": "targeted"
+      }
+    ],
+    [
+      "teleport",
+      {
+        "cooldown": 360.0,
+        "description": "Après 4 s de canalisation, se téléporte sur une tour, un sbire ou une balise alliée.",
+        "fxKey": "sum_teleport",
+        "id": "teleport",
+        "name": "Téléportation",
+        "params": {
+          "channelDuration": 4.0
+        },
+        "range": 99999.0,
+        "targeting": "targeted"
+      }
+    ],
+    [
+      "smite",
+      {
+        "cooldown": 90.0,
+        "description": "Inflige 600 dégâts bruts à un monstre ou un sbire. Requis pour jouer jungle (bonus d’or/xp des camps).",
+        "fxKey": "sum_smite",
+        "id": "smite",
+        "name": "Châtiment",
+        "params": {
+          "damage": 600.0,
+          "healMaxHp": 0.1
+        },
+        "range": 500.0,
+        "targeting": "targeted"
+      }
+    ],
+    [
+      "ghost",
+      {
+        "cooldown": 210.0,
+        "description": "Ignore les collisions et gagne 24 à 40 % de vitesse de déplacement selon le niveau pendant 10 s.",
+        "fxKey": "sum_ghost",
+        "id": "ghost",
+        "name": "Fantôme",
+        "params": {
+          "duration": 10.0,
+          "speedMax": 0.4,
+          "speedMin": 0.24
+        },
+        "range": 0.0,
+        "targeting": "self"
+      }
+    ],
+    [
+      "cleanse",
+      {
+        "cooldown": 210.0,
+        "description": "Retire tous les contrôles (sauf projections et suppressions) et réduit les suivants de 65 % pendant 3 s.",
+        "fxKey": "sum_cleanse",
+        "id": "cleanse",
+        "name": "Purge",
+        "params": {
+          "duration": 3.0,
+          "tenacity": 0.65
+        },
+        "range": 0.0,
+        "targeting": "self"
+      }
+    ]
+  ]
+}
