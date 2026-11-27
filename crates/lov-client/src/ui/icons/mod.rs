@@ -1,7 +1,7 @@
 //! Icônes et portraits : portage de `packages/client/src/ui/icons/` (area `ui-core`).
 //!
-//! Pour l'instant les portraits de champions (`ChampionPortrait`) et leurs illustrations peintes
-//! (`ChampionArtwork.tsx`) ; les glyphes des sorts, objets et rôles arrivent avec le HUD.
+//! Portraits de champions (`ChampionPortrait`) et illustrations peintes (`ChampionArtwork.tsx`) ; tracés
+//! des icônes (`paths`), choix des glyphes (`glyphs`) et leur dessin (`raster`).
 
 use std::collections::HashMap;
 
@@ -9,7 +9,15 @@ use bevy::asset::RenderAssetUsages;
 use bevy::image::{CompressedImageFormats, ImageSampler, ImageType};
 use bevy::prelude::*;
 
+// Glyphes et dessin servent aux icônes du HUD (#113), branchées dans la PR suivante : en attendant,
+// seuls les tests les lisent.
+#[allow(dead_code)]
+pub mod glyphs;
+#[allow(dead_code)]
+pub mod paths;
 pub mod portrait;
+#[allow(dead_code)]
+pub mod raster;
 
 pub use portrait::{ChampionPortrait, PortraitKind};
 
