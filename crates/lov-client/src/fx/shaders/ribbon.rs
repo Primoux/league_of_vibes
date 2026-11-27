@@ -245,7 +245,7 @@ impl Ribbon {
 /// Avance tous les rubans et réécrit leurs sommets.
 pub fn update_ribbons(
     time: Res<Time>,
-    camera: Query<&GlobalTransform, With<Camera3d>>,
+    camera: Query<&GlobalTransform, With<crate::render::camera::MainCamera>>,
     mut ribbons: Query<(&mut Ribbon, &Mesh3d, &mut Visibility)>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {

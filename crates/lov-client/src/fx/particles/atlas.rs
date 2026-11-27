@@ -479,6 +479,17 @@ fn paint_cell(tex: Tex, c: &mut Cell) {
     }
 }
 
+/// Une seule cellule en RGBA8 (`CELL × CELL`) : rgb blanc, alpha = masque (`atlasCell` du client web,
+/// pour les sprites du runtime FX).
+pub fn cell_rgba(tex: Tex) -> Vec<u8> {
+    let mut cell = Cell::new();
+    paint_cell(tex, &mut cell);
+    cell.a
+        .iter()
+        .flat_map(|a| [255, 255, 255, (a.clamp(0.0, 1.0) * 255.0).round() as u8])
+        .collect()
+}
+
 /// Atlas RGBA8 (`SIZE × SIZE`, ligne 0 en haut) : rgb blanc, alpha = masque de la cellule.
 pub fn build_atlas() -> Vec<u8> {
     let mut rgba = vec![255u8; SIZE * SIZE * 4];
