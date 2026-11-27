@@ -12,6 +12,7 @@ use bevy::prelude::*;
 // (primitives, FX des sorts). Jusque-là, une partie n'est appelée que par les tests.
 #[allow(dead_code)]
 pub mod bus;
+pub mod champions;
 // Le pool et les easings servent aux effets des areas fx-effects et champion ; jusque-là, seuls les tests
 // les appellent.
 #[allow(dead_code)]
@@ -64,6 +65,7 @@ impl Plugin for FxPlugin {
             effects::EffectsPlugin,
             telegraph::TelegraphPlugin,
             world::WorldFxPlugin,
+            champions::ChampionFxPlugin,
         ))
         .add_message::<ServerEvent>()
         .add_message::<CameraShake>()
