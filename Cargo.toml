@@ -23,3 +23,12 @@ opt-level = 3
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# Release pour tester : optimisé, mais compilé sur tous les cœurs et sans LTO. Une modification du client se
+# recompile bien plus vite qu'avec `--release` (une seule unité de code + LTO, réservé au binaire livré).
+# `cargo run -p lov-client --profile release-fast`
+[profile.release-fast]
+inherits = "release"
+lto = false
+codegen-units = 16
+incremental = true
