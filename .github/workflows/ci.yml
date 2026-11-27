@@ -17,8 +17,8 @@ jobs:
     # Vérifications rapides : format du code Rust, garde-fou des areas et couverture du dépôt.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - name: Toolchain épinglé (rust-toolchain.toml)
@@ -31,7 +31,7 @@ jobs:
     # Le jeu : client natif (Bevy) et serveur (tokio + axum), dans `crates/`.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Toolchain épinglé (rust-toolchain.toml)
         run: rustup toolchain install
       - name: Bibliothèques système de Bevy (audio, périphériques, clavier)
@@ -58,10 +58,10 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - name: Périmètre de la PR
@@ -104,7 +104,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Taille de la PR

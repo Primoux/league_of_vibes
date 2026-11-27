@@ -28,7 +28,7 @@ jobs:
           - { os: macos-latest, name: macos, exe: '' }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Toolchain épinglé (rust-toolchain.toml)
         run: rustup toolchain install
       - name: Bibliothèques système de Bevy (Linux)
@@ -53,7 +53,7 @@ jobs:
           else
             tar czf "$dir.tar.gz" "$dir"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: league-of-vibes-${{ matrix.name }}
           path: league-of-vibes-${{ matrix.name }}.*
@@ -67,7 +67,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
