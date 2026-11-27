@@ -1,5 +1,10 @@
 //! Tests de la grille de navigation : port de `packages/server/test/nav.test.ts` (bloc `NavGrid`),
-//! plus comparaison avec les chemins produits par l'implémentation TypeScript.
+//! plus comparaison avec l'instantané `fixtures/nav_paths.json`.
+//!
+//! L'instantané a d'abord été produit par l'implémentation TypeScript (`navGrid().findPath`) : la
+//! grille Rust donne les mêmes chemins. Depuis la bascule, c'est lui la référence : un mur ou un
+//! réglage de la grille changé volontairement se livre avec l'instantané régénéré par
+//! `scripts/bless-fixtures.sh` (`LOV_BLESS=1`), dont le diff se relit dans la PR (#276).
 //!
 //! Le bloc `movement` du test TS dépend du monde, des commandes et des dashes (pas encore portés) :
 //! il arrivera avec le portage de `systems/movement`.
@@ -208,9 +213,13 @@ fn parse(s: &[u8], i: &mut usize) -> J {
     }
 }
 
+/// Un point en JSON, nombres au format le plus court qui se relit à l'identique.
+fn json_vec2(p: Vec2) -> String {
+    format!("{{\"x\":{},\"y\":{}}}", p.x, p.y)
+}
+
 #[test]
-fn memes_chemins_que_l_implementation_typescript() {
-    // Généré avec la vraie grille TS (`navGrid().findPath`), voir tests/fixtures/nav_paths.json.
+fn memes_chemins_que_l_instantane() {
     let raw = include_str!("fixtures/nav_paths.json");
     let mut pos = 0;
     let doc = parse(raw.as_bytes(), &mut pos);
@@ -218,23 +227,54 @@ fn memes_chemins_que_l_implementation_typescript() {
     assert!(cases.len() >= 40);
 
     let g = nav_grid();
-    // Même nombre de cellules bloquées que la grille TS.
+    let blocked = g.blocked.iter().map(|&b| usize::from(b)).sum::<usize>();
+    let mut s = g.new_search();
+    let bless = std::env::var_os("LOV_BLESS").is_some_and(|v| !v.is_empty() && v != "0");
+    if bless {
+        // Mêmes départs et arrivées, chemins recalculés par la grille Rust ; un cas par ligne.
+        let lines: Vec<String> = cases
+            .iter()
+            .map(|case| {
+                let (from, to) = (case.get("from").vec2(), case.get("to").vec2());
+                let path: Vec<String> = g
+                    .find_path(&mut s, from, to)
+                    .into_iter()
+                    .map(json_vec2)
+                    .collect();
+                format!(
+                    " {{\"from\":{},\"to\":{},\"path\":[{}]}}",
+                    json_vec2(from),
+                    json_vec2(to),
+                    path.join(",")
+                )
+            })
+            .collect();
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/nav_paths.json");
+        std::fs::write(path, format!("[\n{}\n]\n", lines.join(",\n"))).expect("écriture");
+        return;
+    }
+
+    // Même nombre de cellules bloquées que la grille de l'instantané. Les murs ont changé
+    // volontairement ? Mets à jour ce nombre avec l'instantané.
     assert_eq!(
-        g.blocked.iter().map(|&b| usize::from(b)).sum::<usize>(),
-        7668
+        blocked, 7668,
+        "cellules bloquées : régénère l'instantané (#276)"
     );
 
-    let mut s = g.new_search();
     for (n, case) in cases.iter().enumerate() {
         let from = case.get("from").vec2();
         let to = case.get("to").vec2();
         let want: Vec<Vec2> = case.get("path").arr().iter().map(J::vec2).collect();
         let got = g.find_path(&mut s, from, to);
-        assert_eq!(got.len(), want.len(), "cas {n} : {from:?} -> {to:?}");
+        assert_eq!(
+            got.len(),
+            want.len(),
+            "cas {n} : {from:?} -> {to:?} (changement voulu : scripts/bless-fixtures.sh)"
+        );
         for (k, (a, b)) in got.iter().zip(&want).enumerate() {
             assert!(
                 (a.x - b.x).abs() < 1e-6 && (a.y - b.y).abs() < 1e-6,
-                "cas {n}, point {k} : {a:?} != {b:?}"
+                "cas {n}, point {k} : {a:?} != {b:?} (changement voulu : scripts/bless-fixtures.sh)"
             );
         }
     }

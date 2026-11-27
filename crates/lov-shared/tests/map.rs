@@ -1,11 +1,14 @@
 //! Géométrie de la carte : port de `packages/shared/test/map.test.ts` et `shared.test.ts` (partie
-//! carte), plus comparaison exacte avec les tables calculées par le TypeScript
-//! (`fixtures/ts_tables.json`, généré en important `map.ts` / `constants.ts` avec tsx).
+//! carte), plus comparaison exacte avec l'instantané des tables `fixtures/tables.json`.
+//!
+//! L'instantané a d'abord été calculé par le TypeScript (en important `map.ts` / `constants.ts` avec
+//! tsx) : le portage Rust lui est identique. Depuis la bascule, c'est lui la référence, régénéré
+//! depuis le Rust par `scripts/bless-fixtures.sh` quand la carte change volontairement (#276).
 
 mod common;
 
-use common::{fixture, json_diff};
-use lov_shared::constants::{MAP_SIZE, TIMERS, scaled};
+use common::{check_snapshot, pretty};
+use lov_shared::constants::{MAP_SIZE, TIMERS, Timers, scaled};
 use lov_shared::map::*;
 use lov_shared::types::{Lane, Team, Vec2};
 use serde_json::Value;
@@ -239,72 +242,85 @@ fn point_in_polygon_et_voies() {
     assert_eq!(RIVER_HALF_WIDTH, 520.0);
 }
 
-/// Les tables Rust sont ÉGALES à celles calculées par le TypeScript (sérialisées en JSON).
+/// Valeurs d'entrée de `scaled()` gardées dans l'instantané.
+const SCALED_SAMPLES: [f64; 5] = [0.0, 1.0, 65.0, 300.0, 1185.0];
+
+/// Toutes les tables de la carte, dans la forme de `fixtures/tables.json` (clés du TypeScript).
+fn tables() -> Value {
+    // Déstructuration exhaustive : un timer ajouté à `Timers` doit entrer dans l'instantané.
+    let Timers {
+        minion_first_wave,
+        minion_wave_interval,
+        cannon_every_n_waves,
+        cannon_every_n_waves_late,
+        cannon_late_at,
+        tower_plates_until,
+        inhibitor_respawn,
+        jungle_first_spawn,
+        jungle_buff_respawn,
+        jungle_small_respawn,
+        scuttle_first_spawn,
+        scuttle_respawn,
+        dragon_first_spawn,
+        dragon_respawn,
+        elder_respawn,
+        grubs_spawn,
+        herald_spawn,
+        herald_despawn,
+        leviathan_spawn,
+        leviathan_respawn,
+        leviathan_buff_duration,
+        elder_buff_duration,
+    } = TIMERS;
+    serde_json::json!({
+        "FOUNTAINS": j(&FOUNTAINS),
+        "NEXUS": j(&NEXUS),
+        "TOWERS": j(&*TOWERS),
+        "INHIBITORS": j(&*INHIBITORS),
+        "LANE_PATHS": j(&*LANE_PATHS),
+        "CAMPS": j(&*CAMPS),
+        "PITS": j(&PITS),
+        "WALLS": j(&*WALLS),
+        "BRUSHES": j(&*BRUSHES),
+        "lanePathRedMid": j(&lane_path_for(Lane::Mid, Team::Red)),
+        "lanePathRedTop": j(&lane_path_for(Lane::Top, Team::Red)),
+        "RIVER_HALF_WIDTH": j(&RIVER_HALF_WIDTH),
+        "LANE_HALF_WIDTH": j(&LANE_HALF_WIDTH),
+        "BASE_RADIUS": j(&BASE_RADIUS),
+        "TEAMS": j(&lov_shared::types::TEAMS),
+        "scaledSamples": SCALED_SAMPLES.map(|s| [s, scaled(s)]),
+        // `Timers` n'est pas sérialisable : clés camelCase du TS <-> champs snake_case Rust.
+        "TIMERS": {
+            "minionFirstWave": minion_first_wave,
+            "minionWaveInterval": minion_wave_interval,
+            "cannonEveryNWaves": cannon_every_n_waves,
+            "cannonEveryNWavesLate": cannon_every_n_waves_late,
+            "cannonLateAt": cannon_late_at,
+            "towerPlatesUntil": tower_plates_until,
+            "inhibitorRespawn": inhibitor_respawn,
+            "jungleFirstSpawn": jungle_first_spawn,
+            "jungleBuffRespawn": jungle_buff_respawn,
+            "jungleSmallRespawn": jungle_small_respawn,
+            "scuttleFirstSpawn": scuttle_first_spawn,
+            "scuttleRespawn": scuttle_respawn,
+            "dragonFirstSpawn": dragon_first_spawn,
+            "dragonRespawn": dragon_respawn,
+            "elderRespawn": elder_respawn,
+            "grubsSpawn": grubs_spawn,
+            "heraldSpawn": herald_spawn,
+            "heraldDespawn": herald_despawn,
+            "leviathanSpawn": leviathan_spawn,
+            "leviathanRespawn": leviathan_respawn,
+            "leviathanBuffDuration": leviathan_buff_duration,
+            "elderBuffDuration": elder_buff_duration,
+        },
+    })
+}
+
+/// Les tables Rust sont ÉGALES à l'instantané (d'abord calculé par le TypeScript) ; `LOV_BLESS=1`
+/// le réécrit (voir `common::check_snapshot`).
 #[test]
-fn tables_identiques_au_typescript() {
-    let ts: Value = serde_json::from_str(&fixture("ts_tables.json")).expect("json");
-    let check = |name: &str, rust: Value| {
-        if let Some(d) = json_diff(&ts[name], &rust, name) {
-            panic!("{d}");
-        }
-    };
-    check("FOUNTAINS", j(&FOUNTAINS));
-    check("NEXUS", j(&NEXUS));
-    check("TOWERS", j(&*TOWERS));
-    check("INHIBITORS", j(&*INHIBITORS));
-    check("LANE_PATHS", j(&*LANE_PATHS));
-    check("CAMPS", j(&*CAMPS));
-    check("PITS", j(&PITS));
-    check("WALLS", j(&*WALLS));
-    check("BRUSHES", j(&*BRUSHES));
-    check("lanePathRedMid", j(&lane_path_for(Lane::Mid, Team::Red)));
-    check("lanePathRedTop", j(&lane_path_for(Lane::Top, Team::Red)));
-    check("RIVER_HALF_WIDTH", j(&RIVER_HALF_WIDTH));
-    check("LANE_HALF_WIDTH", j(&LANE_HALF_WIDTH));
-    check("BASE_RADIUS", j(&BASE_RADIUS));
-    check("TEAMS", j(&lov_shared::types::TEAMS));
-    // scaled()
-    for pair in ts["scaledSamples"].as_array().expect("tableau") {
-        let (s, want) = (
-            pair[0].as_f64().expect("f64"),
-            pair[1].as_f64().expect("f64"),
-        );
-        assert_eq!(scaled(s), want);
-    }
-    // TIMERS : mêmes valeurs, clés camelCase du TS <-> snake_case Rust (conversion via serde_json)
-    let t = &ts["TIMERS"];
-    let get = |k: &str| t[k].as_f64().unwrap_or_else(|| panic!("TIMERS.{k}"));
-    assert_eq!(TIMERS.minion_first_wave, get("minionFirstWave"));
-    assert_eq!(TIMERS.minion_wave_interval, get("minionWaveInterval"));
-    assert_eq!(
-        f64::from(TIMERS.cannon_every_n_waves),
-        get("cannonEveryNWaves")
-    );
-    assert_eq!(
-        f64::from(TIMERS.cannon_every_n_waves_late),
-        get("cannonEveryNWavesLate")
-    );
-    assert_eq!(TIMERS.cannon_late_at, get("cannonLateAt"));
-    assert_eq!(TIMERS.tower_plates_until, get("towerPlatesUntil"));
-    assert_eq!(TIMERS.inhibitor_respawn, get("inhibitorRespawn"));
-    assert_eq!(TIMERS.jungle_first_spawn, get("jungleFirstSpawn"));
-    assert_eq!(TIMERS.jungle_buff_respawn, get("jungleBuffRespawn"));
-    assert_eq!(TIMERS.jungle_small_respawn, get("jungleSmallRespawn"));
-    assert_eq!(TIMERS.scuttle_first_spawn, get("scuttleFirstSpawn"));
-    assert_eq!(TIMERS.scuttle_respawn, get("scuttleRespawn"));
-    assert_eq!(TIMERS.dragon_first_spawn, get("dragonFirstSpawn"));
-    assert_eq!(TIMERS.dragon_respawn, get("dragonRespawn"));
-    assert_eq!(TIMERS.elder_respawn, get("elderRespawn"));
-    assert_eq!(TIMERS.grubs_spawn, get("grubsSpawn"));
-    assert_eq!(TIMERS.herald_spawn, get("heraldSpawn"));
-    assert_eq!(TIMERS.herald_despawn, get("heraldDespawn"));
-    assert_eq!(TIMERS.leviathan_spawn, get("leviathanSpawn"));
-    assert_eq!(TIMERS.leviathan_respawn, get("leviathanRespawn"));
-    assert_eq!(TIMERS.leviathan_buff_duration, get("leviathanBuffDuration"));
-    assert_eq!(TIMERS.elder_buff_duration, get("elderBuffDuration"));
-    assert_eq!(
-        t.as_object().map(|o| o.len()),
-        Some(22),
-        "nouveau timer côté TS non porté ?"
-    );
+fn tables_identiques_a_l_instantane() {
+    let v = tables();
+    check_snapshot("tables.json", &pretty(&v), &v);
 }

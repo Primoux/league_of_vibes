@@ -1,12 +1,15 @@
-//! Tables de données (`data/**`) comparées champ par champ aux valeurs du TypeScript
-//! (`fixtures/ts_data.json`, généré en important `packages/shared/src/data/*.ts` avec Node : chaque
-//! `Record` est dumpé en liste de paires `[clé, valeur]` dans l'ordre d'insertion, `ITEM_LIST` en liste).
+//! Tables de données (`data/**`) comparées champ par champ à l'instantané `fixtures/data.json`.
+//!
+//! L'instantané a d'abord été généré en important `packages/shared/src/data/*.ts` avec Node (chaque
+//! `Record` dumpé en liste de paires `[clé, valeur]` dans l'ordre d'insertion, `ITEM_LIST` en liste) :
+//! le portage Rust lui est identique. Depuis la bascule, c'est lui la référence, régénéré depuis le
+//! Rust par `scripts/bless-fixtures.sh` quand une donnée change volontairement (#276).
 //! L'ordre des clés d'objet est ignoré par `json_diff`, pas celui des listes : l'ordre des entrées
 //! est donc vérifié.
 
 mod common;
 
-use common::{fixture, json_diff};
+use common::{check_snapshot, fixture, json_diff, pretty};
 use lov_shared::data::buffs::{BUFFS, buff};
 use lov_shared::data::items::{ITEM_LIST, item};
 use lov_shared::data::minions::{MINIONS, minion};
@@ -18,7 +21,37 @@ use serde_json::Value;
 use std::collections::HashSet;
 
 fn ts() -> Value {
-    serde_json::from_str(&fixture("ts_data.json")).expect("ts_data.json")
+    serde_json::from_str(&fixture("data.json")).expect("data.json")
+}
+
+/// L'instantané complet, dans la forme de `fixtures/data.json`.
+fn snapshot() -> Value {
+    let pairs = |v: Vec<(Value, Value)>| {
+        Value::Array(
+            v.into_iter()
+                .map(|(k, d)| Value::Array(vec![k, d]))
+                .collect(),
+        )
+    };
+    serde_json::json!({
+        "buffs": pairs(BUFFS.iter().map(|b| (j(&b.id), j(b))).collect()),
+        "items": j(&*ITEM_LIST),
+        "itemsRecordKeys": j(&ITEM_LIST.iter().map(|i| i.id.as_str()).collect::<Vec<_>>()),
+        "minions": j(&MINIONS),
+        "monsters": j(&MONSTERS),
+        "dragonElements": j(&DRAGON_ELEMENTS),
+        "structures": j(&STRUCTURES),
+        "summoners": pairs(SUMMONERS.iter().map(|s| (j(&s.id), j(s))).collect()),
+        "summonerIds": j(&SUMMONER_IDS),
+        "defaultSummoners": j(&DEFAULT_SUMMONERS),
+    })
+}
+
+/// Toutes les tables à la fois ; `LOV_BLESS=1` réécrit l'instantané (voir `common::check_snapshot`).
+#[test]
+fn instantane_des_donnees() {
+    let v = snapshot();
+    check_snapshot("data.json", &pretty(&v), &v);
 }
 
 fn j<T: serde::Serialize + ?Sized>(v: &T) -> Value {
@@ -43,7 +76,6 @@ fn keys(v: &Value) -> Vec<&str> {
 #[test]
 fn buffs_identiques_au_ts() {
     let ts = ts();
-    assert_eq!(BUFFS.len(), 17);
     same(
         "buffs",
         &j(&*BUFFS),
@@ -67,7 +99,6 @@ fn buffs_identiques_au_ts() {
 #[test]
 fn objets_identiques_au_ts() {
     let ts = ts();
-    assert_eq!(ITEM_LIST.len(), 101);
     same("items", &j(&*ITEM_LIST), &ts["items"]);
     // `ITEMS` = `Object.fromEntries(ITEM_LIST.map(i => [i.id, i]))` : mêmes clés, dans l'ordre.
     let ids: Vec<&str> = ITEM_LIST.iter().map(|i| i.id.as_str()).collect();
@@ -92,7 +123,6 @@ fn objets_identiques_au_ts() {
 #[test]
 fn sbires_identiques_au_ts() {
     let ts = ts();
-    assert_eq!(MINIONS.len(), 4);
     same("minions", &j(&MINIONS), &ts["minions"]);
     for (kind, def) in MINIONS {
         assert_eq!(minion(kind), &def);
@@ -113,7 +143,6 @@ fn sbires_identiques_au_ts() {
 #[test]
 fn monstres_identiques_au_ts() {
     let ts = ts();
-    assert_eq!(MONSTERS.len(), 15);
     same("monsters", &j(&MONSTERS), &ts["monsters"]);
     for (kind, def) in MONSTERS {
         assert_eq!(monster(kind), &def);
@@ -142,7 +171,6 @@ fn structures_identiques_au_ts() {
 #[test]
 fn sorts_d_invocateur_identiques_au_ts() {
     let ts = ts();
-    assert_eq!(SUMMONERS.len(), 9);
     let pairs: Vec<Value> = SUMMONERS
         .iter()
         .map(|s| Value::Array(vec![j(&s.id), j(s)]))
