@@ -6,19 +6,30 @@
 //! eau, modèle qui se dissout) et deux rubans de traînée en orbite.
 //! `F9` bascule le post-traitement (qualité haute / basse) ; `LOV_POST=low` démarre en qualité basse.
 //! `LOV_SCREENSHOT=chemin.png` enregistre une capture après 3 s (`LOV_SCREENSHOT_AT=4.5` pour choisir l'instant).
+//!
+//! Tout au fond, un sort factice parcourt la chaîne complète des FX de sorts : un `ServerEvent` de zone,
+//! toutes les 2,5 s, passe par le bus et le dispatcher jusqu'à un handler enregistré (`register_fx`), qui
+//! compose les primitives du runtime : décal de télégraphie (`add`), puis éclat (sprite) et traînée (ruban)
+//! à l'explosion (`after`). C'est l'exemple à suivre pour écrire le FX d'un sort.
 
 use std::f32::consts::TAU;
 
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, save_to_disk};
 
+use lov_shared::types::GameEvent;
+
+use super::core::palette::FxColors;
+use super::core::runtime::{Effect, Fx, FxDecal, FxRibbon, FxSprite};
 use super::particles::system::Blend;
 use super::particles::{EmitOptions, EmitShape, ParticleSystem, StdStyles};
 use super::post::{FxQuality, PostFxSettings};
+use super::registry::{FxHandlers, RegisterFx};
 use super::shaders::{
     DecalMaterial, DecalMesh, DecalShape, DissolveMaterial, FresnelMaterial, GroundDecal,
     IceMaterial, Ribbon, RibbonMaterial, RibbonMode, WaterMaterial, dissolvable, set_dissolve,
 };
+use crate::net::ServerEvent;
 use crate::render::camera::CameraRig;
 
 /// `LOV_FXLAB` défini (et non vide) : lancer la démo.
@@ -46,7 +57,15 @@ impl Plugin for FxDemoPlugin {
                 toggle_post,
                 screenshot,
                 log_stats,
+                cast_demo_spell,
             ),
+        )
+        .register_fx(
+            DEMO_KEY,
+            FxHandlers {
+                area: Some(demo_area),
+                ..default()
+            },
         );
     }
 }
@@ -568,17 +587,211 @@ fn screenshot(mut commands: Commands, time: Res<Time>, mut done: Local<bool>) {
 }
 
 /// Une ligne de log toutes les 5 s : emplacements occupés par lot et total émis (budget de particules).
-fn log_stats(time: Res<Time>, ps: Res<ParticleSystem>, mut next: Local<f32>) {
+fn log_stats(
+    time: Res<Time>,
+    ps: Res<ParticleSystem>,
+    dispatcher: Res<super::FxDispatcher>,
+    rt: Res<super::FxRuntime>,
+    mut next: Local<f32>,
+) {
     if time.elapsed_secs() < *next {
         return;
     }
     *next = time.elapsed_secs() + 5.0;
     info!(
-        "fx : {} / {} particules additives, {} / {} normales, {} emises",
+        "fx : {} / {} particules additives, {} / {} normales, {} emises ; sorts : {} evenements, {} FX dedies, {} effets actifs",
         ps.batch(Blend::Add).used(),
         ps.batch(Blend::Add).capacity(),
         ps.batch(Blend::Normal).used(),
         ps.batch(Blend::Normal).capacity(),
-        ps.emitted
+        ps.emitted,
+        dispatcher.stats.events,
+        dispatcher.stats.custom,
+        rt.active_effects()
     );
+}
+
+// ------------------------------------------------------------------- chaîne complète des FX de sorts
+
+/// fxKey du sort factice (palette par défaut : aucun champion ne s'appelle `fxlab`).
+const DEMO_KEY: &str = "fxlab_demo";
+const DEMO_PERIOD: f32 = 2.5;
+const FLASH_LIFE: f32 = 0.3;
+const SPIRAL_LIFE: f32 = 0.8;
+
+/// Émet l'événement de zone du sort factice, comme le ferait le serveur.
+fn cast_demo_spell(
+    time: Res<Time>,
+    rig: Res<CameraRig>,
+    mut events: MessageWriter<ServerEvent>,
+    mut next: Local<f32>,
+) {
+    if time.elapsed_secs() < *next {
+        return;
+    }
+    *next = time.elapsed_secs() + DEMO_PERIOD;
+    let p = crate::render::to_game(rig.focus + Vec3::new(0.0, 0.0, -4.5 * SPACING));
+    events.write(ServerEvent(GameEvent::AreaEffect {
+        source: 0,
+        fx_key: DEMO_KEY.into(),
+        pos: crate::render::to_shared(p),
+        radius: 250.0,
+        duration: 1.0,
+    }));
+}
+
+/// Handler `area` du sort factice : télégraphie qui se remplit, puis explosion.
+fn demo_area(fx: &mut Fx, e: &GameEvent, c: &FxColors) {
+    let GameEvent::AreaEffect {
+        pos,
+        radius,
+        duration,
+        ..
+    } = e
+    else {
+        return;
+    };
+    let center = Fx::world_pos(*pos, 0.0);
+    let radius = Fx::scale(*radius as f32);
+    let duration = *duration as f32;
+    let color = fx.ground_color(c.vivid_hdr);
+    let decal = fx.acquire_decal();
+    fx.add(Telegraph {
+        decal,
+        center,
+        radius,
+        t: 0.0,
+        duration,
+        color,
+    });
+    let (accent, vivid) = (c.accent_hdr, c.vivid_hdr);
+    fx.after(duration, move |fx| {
+        let sprite = fx.acquire_sprite(accent, radius * 2.0);
+        fx.add(Flash {
+            sprite,
+            center,
+            size: radius * 2.0,
+            t: 0.0,
+            color: accent,
+        });
+        let ribbon = fx.acquire_ribbon(vivid);
+        fx.add(Spiral {
+            ribbon,
+            center,
+            radius,
+            t: 0.0,
+        });
+        let s = fx.styles();
+        fx.ps().emit(
+            s.spark,
+            center + Vec3::Y,
+            &EmitOptions {
+                count: 24.0,
+                speed: Some([3.0, 7.0].into()),
+                life: [0.2, 0.4].into(),
+                size: [0.06, 0.12].into(),
+                gravity: 6.0,
+                tint: vivid,
+                ..default()
+            },
+        );
+    });
+}
+
+/// Disque au sol qui se remplit pendant `duration`.
+struct Telegraph {
+    decal: FxDecal,
+    center: Vec3,
+    radius: f32,
+    t: f32,
+    duration: f32,
+    color: Vec3,
+}
+
+impl Effect for Telegraph {
+    fn update(&mut self, fx: &mut Fx, dt: f32) -> bool {
+        self.t += dt;
+        let progress = (self.t / self.duration).min(1.0);
+        let world = fx.world();
+        let tf = world
+            .resource_mut::<Assets<DecalMaterial>>()
+            .get_mut(&self.decal.material)
+            .map(|mut m| {
+                m.set_color(self.color, self.color);
+                m.u.progress = progress;
+                self.decal
+                    .decal
+                    .circle(&mut m, self.center, self.radius, DecalShape::Circle)
+            });
+        if let (Some(tf), Some(mut cur)) = (tf, world.get_mut::<Transform>(self.decal.entity)) {
+            *cur = tf;
+        }
+        self.t < self.duration
+    }
+
+    fn end(&mut self, fx: &mut Fx) {
+        fx.release_decal(self.decal.clone());
+    }
+}
+
+/// Éclat lumineux qui grossit et s'éteint.
+struct Flash {
+    sprite: FxSprite,
+    center: Vec3,
+    size: f32,
+    t: f32,
+    color: Vec3,
+}
+
+impl Effect for Flash {
+    fn update(&mut self, fx: &mut Fx, dt: f32) -> bool {
+        self.t += dt;
+        let k = (self.t / FLASH_LIFE).min(1.0);
+        let world = fx.world();
+        if let Some(mut m) = world
+            .resource_mut::<Assets<StandardMaterial>>()
+            .get_mut(&self.sprite.material)
+        {
+            let c = self.color * (1.0 - k);
+            m.base_color = Color::LinearRgba(LinearRgba::rgb(c.x, c.y, c.z));
+        }
+        if let Some(mut tf) = world.get_mut::<Transform>(self.sprite.entity) {
+            tf.translation = self.center + Vec3::Y;
+            tf.scale = Vec3::splat(self.size * (1.0 + k));
+        }
+        k < 1.0
+    }
+
+    fn end(&mut self, fx: &mut Fx) {
+        fx.release_sprite(self.sprite.clone());
+    }
+}
+
+/// Traînée qui monte en spirale au-dessus de l'explosion.
+struct Spiral {
+    ribbon: FxRibbon,
+    center: Vec3,
+    radius: f32,
+    t: f32,
+}
+
+impl Effect for Spiral {
+    fn update(&mut self, fx: &mut Fx, dt: f32) -> bool {
+        self.t += dt;
+        let a = self.t * 12.0;
+        let p = self.center
+            + Vec3::new(
+                a.cos() * self.radius * 0.6,
+                0.3 + self.t * 3.0,
+                a.sin() * self.radius * 0.6,
+            );
+        if let Some(mut r) = fx.world().get_mut::<Ribbon>(self.ribbon.entity) {
+            r.push(p);
+        }
+        self.t < SPIRAL_LIFE
+    }
+
+    fn end(&mut self, fx: &mut Fx) {
+        fx.release_ribbon(self.ribbon.clone());
+    }
 }
