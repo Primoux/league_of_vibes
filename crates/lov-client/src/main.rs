@@ -7,6 +7,9 @@
 //! Lancement : `SKIP_DRAFT=1 DEV_LOBBY=1 npm run dev:server`, puis `cargo run -p lov-client --release`.
 //! `LOV_URL` change l'adresse du serveur (défaut `ws://localhost:3000/ws`).
 //! `LOV_FXLAB=1` lance la démo des FX sans serveur.
+//! `LOV_SPELLLAB=<champion>` (ou `all`) lance le labo des sorts : la vraie simulation, sans serveur.
+//! Il n'est compilé qu'avec la feature `spelllab` :
+//! `LOV_SPELLLAB=all cargo run -p lov-client --features spelllab`.
 //! `LOV_AUDIOLAB=1` lance la démo du moteur audio (galerie de sons synthétisés) sans serveur.
 //! `LOV_VIEWLAB=1` lance la démo des vues d'entités (tous les modèles, toutes les animations) sans serveur.
 //! `LOV_UILAB=<écran>` affiche un écran de l'interface avec des données fictives, sans serveur.
@@ -49,6 +52,12 @@ fn main() {
     .insert_resource(ClearColor(Color::srgb(0.03, 0.04, 0.06)))
     .add_systems(Startup, spawn_status)
     .add_systems(Update, (update_status, screenshot_once));
+    // le labo des sorts n'existe qu'avec la feature `spelllab` (le jeu livré n'embarque pas la simulation) ;
+    // l'avertissement suit `DefaultPlugins`, qui installe le journal
+    #[cfg(not(feature = "spelllab"))]
+    if std::env::var("LOV_SPELLLAB").is_ok_and(|v| !v.is_empty()) {
+        warn!("labo des sorts non compilé : cargo run -p lov-client --features spelllab");
+    }
     // `LOV_STRESS=<n>` : scène de charge hors ligne, sans connexion au serveur.
     match stress {
         Some(units) => app.add_plugins((net::OfflinePlugin, render::stress::StressPlugin(units))),
@@ -57,6 +66,10 @@ fn main() {
         }
         None if ui::lab::requested().is_some() => {
             app.add_plugins((net::OfflinePlugin, ui::UiPlugin, ui::lab::UiLabPlugin))
+        }
+        #[cfg(feature = "spelllab")]
+        None if fx::lab::enabled() => {
+            app.add_plugins((net::OfflinePlugin, fx::lab::SpellLabPlugin))
         }
         None if fx::demo::enabled() => {
             app.add_plugins((net::OfflinePlugin, fx::demo::FxDemoPlugin))
