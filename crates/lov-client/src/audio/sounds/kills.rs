@@ -32,8 +32,10 @@ pub struct KillAnnouncer {
     champ_teams: HashMap<EntityId, Team>,
     /// Bus des jingles, créé au premier kill et gardé d'une partie à l'autre (le mixeur en héberge 4).
     bus: Option<MusicBusHandle>,
-    /// `serverTime` du `GameStart` de la partie en cours (bits du `f64`), pour repérer une nouvelle partie.
+    /// `serverTime` du dernier `GameStart` vu (bits du `f64`), `None` hors partie (`wasInGame`).
     game: Option<u64>,
+    /// Un résultat a été vu depuis ce `GameStart` (`hadResult`).
+    had_result: bool,
 }
 
 impl KillAnnouncer {
@@ -45,21 +47,34 @@ impl KillAnnouncer {
 
     /// Remet les annonces à zéro à chaque nouvelle partie (le `store.subscribe` d'`installAudio`).
     ///
-    /// Le web réagit au passage de `game` de vide à rempli. Ici `game` n'est jamais vidé (un nouveau
-    /// `GameStart` le remplace) : une partie est reconnue à son `serverTime`. Renvoie `true` à la remise
+    /// Le web réagit au passage de `game` de vide à rempli. Ici, `game` n'est jamais vidé : un nouveau
+    /// `GameStart` le remplace. Un `GameStart` au `serverTime` différent compte donc comme une nouvelle
+    /// partie s'il suit un résultat ; sans résultat, c'est le même `GameStart` renvoyé à un joueur qui
+    /// revient (`resync` du serveur), et le web ne remet rien à zéro non plus. Renvoie `true` à la remise
     /// à zéro.
     pub fn track_game(&mut self, state: &GameState) -> bool {
+        self.had_result |= state.result.is_some();
         match &state.game {
-            Some(g) if self.game != Some(g.server_time.to_bits()) => {
-                self.game = Some(g.server_time.to_bits());
-                self.reset();
-                true
+            Some(g) => {
+                let start = g.server_time.to_bits();
+                let new_game = match self.game {
+                    None => true,
+                    Some(last) => last != start && self.had_result,
+                };
+                self.game = Some(start);
+                if new_game {
+                    self.had_result = state.result.is_some();
+                    self.reset();
+                }
+                new_game
             }
-            None if state.result.is_none() => {
-                self.game = None;
+            None => {
+                if state.result.is_none() {
+                    self.game = None;
+                    self.had_result = false;
+                }
                 false
             }
-            _ => false,
         }
     }
 

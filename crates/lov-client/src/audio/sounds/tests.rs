@@ -510,7 +510,7 @@ fn le_joueur_un_allie_et_un_ennemi_declenchent_le_bon_cote_de_jingle() {
         k.on_death(&state, ME, Some(FOE), 0.0),
         Some(Sting::FirstBlood(StingSide::Enemy))
     );
-    // l'entité du joueur vient de `self` quand il est connu
+    // sans `self`, l'entité du joueur est celle du `GameStart` : un autre id ne compte pas comme soi
     let mut k = KillAnnouncer::default();
     let mut s = fake_state();
     if let Some(g) = s.game.as_mut() {
@@ -565,7 +565,24 @@ fn les_annonces_sont_remises_a_zero_a_chaque_nouvelle_partie() {
     );
     assert!(!k.track_game(&state));
 
-    // nouveau GameStart : premier sang et séries repartent de zéro
+    // le même GameStart renvoyé à un joueur qui revient en cours de partie : rien n'est remis à zéro
+    if let Some(g) = state.game.as_mut() {
+        g.server_time = 1.5;
+    }
+    assert!(!k.track_game(&state), "retour en cours de partie");
+    assert_eq!(
+        k.on_death(&state, FOE, Some(ME), 1.5),
+        Some(Sting::Kill(5, StingSide::Own))
+    );
+
+    // fin de partie puis nouveau GameStart : premier sang et séries repartent de zéro
+    state.result = Some(lov_shared::protocol::GameOver {
+        winner: Team::Blue,
+        stats: Vec::new(),
+        duration: 1.0,
+    });
+    assert!(!k.track_game(&state), "résultat affiché, même partie");
+    state.result = None;
     if let Some(g) = state.game.as_mut() {
         g.server_time = 2.0;
     }
