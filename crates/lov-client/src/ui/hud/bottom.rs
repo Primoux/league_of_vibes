@@ -11,7 +11,7 @@ use lov_shared::data::champions::get_champion;
 use lov_shared::data::items::item;
 use lov_shared::data::summoners::summoner;
 use lov_shared::protocol::ClientMsg;
-use lov_shared::schema::{ChampionDef, ItemCategory, Resource};
+use lov_shared::schema::{ChampionDef, ItemCategory, ItemDef, Resource};
 use lov_shared::types::{AbilitySlot, EntitySnapshot, SelfState, Stats, SummonerSlot};
 
 use super::{HUD_Z, hud_root, label, set_bg, set_shown, set_text};
@@ -34,22 +34,24 @@ const SLOTS: [AbilitySlot; 4] = [
 const SUMS: [SummonerSlot; 2] = [SummonerSlot::D, SummonerSlot::F];
 const ITEM_KEYS: [&str; 6] = ["1", "2", "3", "5", "6", "7"];
 const MAX_BUFFS: usize = 12;
+const MAX_PIPS: usize = 6;
 
 const ICON: f32 = 56.0;
 const SUM_ICON: f32 = 42.0;
+const PASSIVE: f32 = 38.0;
 const ITEM: f32 = 40.0;
 const PORTRAIT: f32 = 92.0;
 
 const MANA: Color = hex(0x4f8dff);
 const ENERGY: Color = hex(0xf2d14c);
 const HP: Color = hex(0x3ecf6a);
-const HP_LOW: Color = hex(0xe8503f);
 const SHIELD: Color = hex(0xdfe6ef);
 const XP: Color = hex(0xb072ff);
 
 /// Emplacement dont on affiche une recharge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Slot {
+    Passive,
     Ability(usize),
     Summoner(usize),
     Item(usize),
@@ -58,6 +60,7 @@ enum Slot {
 
 /// Texte dynamique.
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
+#[require(Src)]
 enum T {
     Hp,
     HpRegen,
@@ -94,6 +97,8 @@ struct Img {
     kind: Slot,
     sweep: bool,
     shown: String,
+    /// Cran de balayage affiché (sur 64), pour ne changer l'image qu'au besoin.
+    step: Option<u32>,
 }
 
 impl Img {
@@ -102,6 +107,7 @@ impl Img {
             kind,
             sweep: false,
             shown: String::new(),
+            step: None,
         }
     }
 
@@ -110,6 +116,7 @@ impl Img {
             kind,
             sweep: true,
             shown: String::new(),
+            step: None,
         }
     }
 }
@@ -118,6 +125,8 @@ impl Img {
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
 enum V {
     RankUp(usize),
+    /// Pastille de rang `j` du sort `i`, montrée jusqu'au rang max du sort.
+    Pip(usize, usize),
     Points,
     ResBar,
     Shield,
@@ -133,7 +142,6 @@ enum V {
 enum C {
     Pip(usize, usize),
     Buff(usize),
-    Hp,
 }
 
 /// Cadre d'un sort (couleur selon l'état).
@@ -166,6 +174,7 @@ fn me(state: &GameState) -> Option<Me<'_>> {
 fn cooldown(st: &SelfState, s: Slot) -> (f64, f64) {
     let cd = &st.cooldowns;
     match s {
+        Slot::Passive => (0.0, 0.0),
         Slot::Ability(i) => (
             [cd.q, cd.w, cd.e, cd.r][i],
             0.0, // total calculé par l'appelant
@@ -205,14 +214,9 @@ fn cd_frac(m: &Me, s: Slot) -> (f64, f64) {
                 0.0
             }
         }
-        Slot::Item(i) => {
-            m.e.champ
-                .as_ref()
-                .and_then(|c| c.items.get(i).cloned().flatten())
-                .and_then(|id| item(&id))
-                .and_then(|d| d.active.as_ref())
-                .map_or(0.0, |a| a.cooldown)
-        }
+        Slot::Item(i) => item_at(m, i)
+            .and_then(|d| d.active.as_ref())
+            .map_or(0.0, |a| a.cooldown),
         _ => total,
     };
     (rem, cooldown_fraction(rem, total.max(rem)))
@@ -256,19 +260,24 @@ fn items<'a>(m: &'a Me<'a>) -> &'a [Option<String>] {
     m.e.champ.as_ref().map_or(&[], |c| c.items.as_slice())
 }
 
+/// Identifiant de l'objet de l'emplacement `i`, sans copie.
+fn item_id<'a>(m: &'a Me<'a>, i: usize) -> Option<&'a str> {
+    items(m).get(i).and_then(|o| o.as_deref())
+}
+
+fn item_at(m: &Me, i: usize) -> Option<&'static ItemDef> {
+    item_id(m, i).and_then(item)
+}
+
 /// Balise : l'emplacement 7, sinon un objet de catégorie balise.
-fn trinket(m: &Me) -> Option<&'static lov_shared::schema::ItemDef> {
-    let list = items(m);
-    list.get(6)
-        .cloned()
-        .flatten()
-        .or_else(|| {
-            list.iter()
-                .flatten()
-                .find(|id| item(id).is_some_and(|d| d.category == ItemCategory::Trinket))
-                .cloned()
-        })
-        .and_then(|id| item(id.as_str()))
+fn trinket(m: &Me) -> Option<&'static ItemDef> {
+    item_at(m, 6).or_else(|| {
+        items(m)
+            .iter()
+            .flatten()
+            .filter_map(|id| item(id))
+            .find(|d| d.category == ItemCategory::Trinket)
+    })
 }
 
 /// Statistiques permanentes : clé, glyphe, couleur, format.
@@ -284,6 +293,21 @@ const STAT_ROWS: [(&str, &str, u32); 10] = [
     ("armorPen", "scythe", 0xff9a5c),
     ("magicPen", "flask", 0xd2a8ff),
 ];
+
+fn stat_value(s: &Stats, key: &str) -> f64 {
+    match key {
+        "ad" => s.ad,
+        "ap" => s.ap,
+        "armor" => s.armor,
+        "mr" => s.mr,
+        "attackSpeed" => s.attack_speed,
+        "abilityHaste" => s.ability_haste,
+        "critChance" => s.crit_chance,
+        "moveSpeed" => s.move_speed,
+        "armorPen" => s.armor_pen,
+        _ => s.magic_pen,
+    }
+}
 
 fn stat_text(s: &Stats, key: &str) -> String {
     match key {
@@ -372,6 +396,8 @@ fn spawn_ability(p: &mut ChildSpawnerCommands, f: &UiFonts, i: usize) {
             ),
             Act::RankUp(slot),
             V::RankUp(i),
+            // il dépasse du cadre de la barre : il bloque le monde lui-même
+            BlocksWorld,
             Visibility::Hidden,
             children![label(f, "+", 13.0, 900, hex(0x032019))],
         ));
@@ -420,8 +446,8 @@ fn spawn_ability(p: &mut ChildSpawnerCommands, f: &UiFonts, i: usize) {
             Pickable::IGNORE,
         ))
         .with_children(|pips| {
-            let max = if ult { 3 } else { 5 };
-            for j in 0..max {
+            // rang max du sort, connu une fois le champion reçu : les pastilles en trop sont cachées
+            for j in 0..MAX_PIPS {
                 pips.spawn((
                     Node {
                         width: px(if ult { 14.0 } else { 8.0 }),
@@ -431,10 +457,30 @@ fn spawn_ability(p: &mut ChildSpawnerCommands, f: &UiFonts, i: usize) {
                     },
                     BackgroundColor(hexa(0xffffff, 0.12)),
                     C::Pip(i, j),
+                    V::Pip(i, j),
+                    Visibility::Hidden,
                 ));
             }
         });
     });
+}
+
+/// Passif, avant Q : icône seule, sans recharge ni rang.
+fn spawn_passive(p: &mut ChildSpawnerCommands) {
+    p.spawn((
+        Node {
+            margin: UiRect::bottom(px(9)),
+            ..slot_frame(PASSIVE, false)
+        },
+        BorderColor::all(GOLD_LO),
+        BackgroundColor(hex(0x05060c)),
+    ))
+    .with_child((
+        overlay(),
+        ImageNode::default(),
+        Img::icon(Slot::Passive),
+        Pickable::IGNORE,
+    ));
 }
 
 fn spawn_summoner(p: &mut ChildSpawnerCommands, f: &UiFonts, i: usize) {
@@ -501,7 +547,7 @@ fn bar(p: &mut ChildSpawnerCommands, f: &UiFonts, hp: bool) {
         if hp {
             b.spawn((abs(0.0), BackgroundColor(hexa(0xffd9a0, 0.55)), F::HpTrail));
         }
-        let mut fill_e = b.spawn((
+        b.spawn((
             abs(0.0),
             BackgroundGradient::from(LinearGradient {
                 angle: 0.0,
@@ -514,9 +560,6 @@ fn bar(p: &mut ChildSpawnerCommands, f: &UiFonts, hp: bool) {
             BackgroundColor(if hp { HP } else { MANA }),
             fill,
         ));
-        if hp {
-            fill_e.insert(C::Hp);
-        }
         if hp {
             b.spawn((
                 abs(100.0),
@@ -719,14 +762,17 @@ fn spawn_item_slot(p: &mut ChildSpawnerCommands, f: &UiFonts, s: Slot, key: &str
             Img::icon(s),
             Pickable::IGNORE,
         ));
-        sl.spawn((
-            overlay(),
-            ImageNode::default(),
-            Img::sweep(s),
-            V::Cd(s),
-            Visibility::Hidden,
-            Pickable::IGNORE,
-        ));
+        // la balise n'a pas de balayage (sa recharge n'a pas de durée totale connue) : le chiffre seul
+        if s != Slot::Trinket {
+            sl.spawn((
+                overlay(),
+                ImageNode::default(),
+                Img::sweep(s),
+                V::Cd(s),
+                Visibility::Hidden,
+                Pickable::IGNORE,
+            ));
+        }
         sl.spawn((overlay(), V::Cd(s), Visibility::Hidden, Pickable::IGNORE))
             .with_child((label(f, "", 13.0, 800, Color::WHITE), T::Cd(s)));
         sl.spawn((
@@ -971,6 +1017,7 @@ fn spawn(
                             ..default()
                         })
                         .with_children(|row| {
+                            spawn_passive(row);
                             for i in 0..4 {
                                 spawn_ability(row, f, i);
                             }
@@ -1000,83 +1047,155 @@ fn spawn(
 
 // ---------------------------------------------------------------------------------- mise à jour
 
-fn update_texts(state: Res<GameState>, mut q: Query<(&T, &mut Text)>) {
-    let Some(m) = me(&state) else { return };
+/// Dernière valeur source d'un texte : il n'est reformaté que quand elle change.
+#[derive(Component, Default)]
+struct Src(Option<[u64; 3]>);
+
+/// Clé d'un identifiant, pour la comparer sans le copier.
+fn str_key(s: &str) -> f64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::hash::DefaultHasher::new();
+    s.hash(&mut h);
+    f64::from_bits(h.finish())
+}
+
+/// Valeurs dont dépend le texte `t` (au plus trois).
+fn text_src(t: T, m: &Me, shield: f64) -> [f64; 3] {
     let st = m.st;
-    let buffs = m.e.buffs.as_deref().unwrap_or(&[]);
-    let shield = if m.e.dead == Some(true) {
+    let buff = |i: usize| m.e.buffs.as_deref().and_then(|b| b.get(i));
+    match t {
+        T::Hp => [m.e.hp.round(), m.e.max_hp.round(), shield.round()],
+        T::HpRegen => [st.stats.hp_regen, 0.0, 0.0],
+        T::Res => [
+            m.e.mana.unwrap_or(0.0).round(),
+            m.e.max_mana.unwrap_or(0.0).round(),
+            0.0,
+        ],
+        T::ResRegen => [st.stats.mana_regen, 0.0, 0.0],
+        T::Level => [f64::from(st.level), 0.0, 0.0],
+        T::Name => [str_key(&m.champ.id), 0.0, 0.0],
+        T::Points => [f64::from(st.skill_points), 0.0, 0.0],
+        T::Stat(i) => [stat_value(&st.stats, STAT_ROWS[i].0), 0.0, 0.0],
+        // au dixième : ce que montre `format_cooldown` sous la seconde
+        T::Cd(s) => [(cd_frac(m, s).0 * 10.0).ceil(), 0.0, 0.0],
+        T::Cost(i) => [cost(m, i), 0.0, 0.0],
+        T::Charges(s) => [charges(m, s).unwrap_or(-1.0), 0.0, 0.0],
+        T::Gold => [st.gold.floor(), 0.0, 0.0],
+        T::Recall => [st.recalling.map_or(-1.0, |r| (r * 10.0).round()), 0.0, 0.0],
+        T::BuffInit(i) => [buff(i).map_or(0.0, |b| str_key(&b.id)), 0.0, 0.0],
+        T::BuffStacks(i) => [
+            buff(i).and_then(|b| b.stacks).map_or(0.0, f64::from),
+            0.0,
+            0.0,
+        ],
+        T::BuffTime(i) => [buff(i).map_or(-1.0, |b| b.remaining.ceil()), 0.0, 0.0],
+    }
+}
+
+/// Charges affichées d'un objet ou de la balise.
+fn charges(m: &Me, s: Slot) -> Option<f64> {
+    match s {
+        Slot::Item(i) => {
+            m.st.item_charges
+                .as_ref()
+                .and_then(|v| v.get(i).copied().flatten())
+                .filter(|c| *c > 1.0)
+        }
+        Slot::Trinket => m.st.ward_charges.as_ref().map(|w| f64::from(w.charges)),
+        _ => None,
+    }
+}
+
+fn text(t: T, m: &Me, shield: f64, out: &mut String) {
+    use std::fmt::Write;
+    let st = m.st;
+    let buff = |i: usize| m.e.buffs.as_deref().and_then(|b| b.get(i));
+    out.clear();
+    // `write!` dans une `String` ne peut pas échouer
+    let _ = match t {
+        T::Hp if shield > 0.0 => write!(
+            out,
+            "{} / {} (+{})",
+            format_int(m.e.hp),
+            format_int(m.e.max_hp),
+            format_int(shield)
+        ),
+        T::Hp => write!(out, "{} / {}", format_int(m.e.hp), format_int(m.e.max_hp)),
+        T::HpRegen => write!(out, "+{}", decimal(st.stats.hp_regen / 5.0)),
+        T::Res => write!(
+            out,
+            "{} / {}",
+            format_int(m.e.mana.unwrap_or(0.0)),
+            format_int(m.e.max_mana.unwrap_or(0.0))
+        ),
+        T::ResRegen => write!(out, "+{}", decimal(st.stats.mana_regen / 5.0)),
+        T::Level => write!(out, "{}", st.level),
+        T::Name => write!(out, "{}", m.champ.name),
+        T::Points => write!(out, "+{}", st.skill_points),
+        T::Stat(i) => write!(out, "{}", stat_text(&st.stats, STAT_ROWS[i].0)),
+        T::Cd(s) => write!(out, "{}", format_cooldown(cd_frac(m, s).0)),
+        T::Cost(i) => {
+            let c = cost(m, i);
+            if c > 0.0 {
+                write!(out, "{}", c.round())
+            } else {
+                Ok(())
+            }
+        }
+        T::Charges(s) => match charges(m, s) {
+            Some(c) => write!(out, "{}", c.round()),
+            None => Ok(()),
+        },
+        T::Gold => write!(out, "{}", st.gold.floor()),
+        T::Recall => match st.recalling {
+            Some(r) => write!(out, "{}", decimal(r)),
+            None => Ok(()),
+        },
+        T::BuffInit(i) => match buff(i) {
+            Some(b) => write!(out, "{}", buff_initials(&b.id)),
+            None => Ok(()),
+        },
+        T::BuffStacks(i) => match buff(i).and_then(|b| b.stacks).filter(|s| *s > 1) {
+            Some(n) => write!(out, "{n}"),
+            None => Ok(()),
+        },
+        T::BuffTime(i) => match buff(i) {
+            Some(b) => write!(out, "{}", b.remaining.ceil()),
+            None => Ok(()),
+        },
+    };
+}
+
+fn shield_of(m: &Me) -> f64 {
+    if m.e.dead == Some(true) {
         0.0
     } else {
         m.e.shield.unwrap_or(0.0)
-    };
-    for (t, mut text) in &mut q {
-        let s = match *t {
-            T::Hp => {
-                if shield > 0.0 {
-                    format!(
-                        "{} / {} (+{})",
-                        format_int(m.e.hp),
-                        format_int(m.e.max_hp),
-                        format_int(shield)
-                    )
-                } else {
-                    format!("{} / {}", format_int(m.e.hp), format_int(m.e.max_hp))
-                }
-            }
-            T::HpRegen => format!("+{}", decimal(st.stats.hp_regen / 5.0)),
-            T::Res => format!(
-                "{} / {}",
-                format_int(m.e.mana.unwrap_or(0.0)),
-                format_int(m.e.max_mana.unwrap_or(0.0))
-            ),
-            T::ResRegen => format!("+{}", decimal(st.stats.mana_regen / 5.0)),
-            T::Level => st.level.to_string(),
-            T::Name => m.champ.name.clone(),
-            T::Points => format!("+{}", st.skill_points),
-            T::Stat(i) => stat_text(&st.stats, STAT_ROWS[i].0),
-            T::Cd(s) => {
-                let (cd, _) = cd_frac(&m, s);
-                if cd > 0.0 {
-                    format_cooldown(cd)
-                } else {
-                    String::new()
-                }
-            }
-            T::Cost(i) => {
-                let c = cost(&m, i);
-                if c > 0.0 {
-                    format!("{}", c.round())
-                } else {
-                    String::new()
-                }
-            }
-            T::Charges(s) => match s {
-                Slot::Item(i) => st
-                    .item_charges
-                    .as_ref()
-                    .and_then(|v| v.get(i).copied().flatten())
-                    .filter(|c| *c > 1.0)
-                    .map_or(String::new(), |c| format!("{}", c.round())),
-                Slot::Trinket => st
-                    .ward_charges
-                    .as_ref()
-                    .map_or(String::new(), |w| w.charges.to_string()),
-                _ => String::new(),
-            },
-            T::Gold => format!("{}", st.gold.floor()),
-            T::Recall => st.recalling.map_or(String::new(), decimal),
-            T::BuffInit(i) => buffs.get(i).map_or(String::new(), |b| buff_initials(&b.id)),
-            T::BuffStacks(i) => buffs
-                .get(i)
-                .and_then(|b| b.stacks)
-                .filter(|s| *s > 1)
-                .map_or(String::new(), |s| s.to_string()),
-            T::BuffTime(i) => buffs
-                .get(i)
-                .filter(|b| b.remaining < 99.0)
-                .map_or(String::new(), |b| format!("{}", b.remaining.ceil())),
-        };
-        set_text(&mut text, &s);
+    }
+}
+
+fn update_texts(
+    state: Res<GameState>,
+    mut q: Query<(&T, &mut Src, &mut Text)>,
+    mut buf: Local<String>,
+) {
+    let Some(m) = me(&state) else { return };
+    let shield = shield_of(&m);
+    for (t, mut src, mut txt) in &mut q {
+        let key = text_src(*t, &m, shield).map(f64::to_bits);
+        if src.0 == Some(key) {
+            continue;
+        }
+        src.0 = Some(key);
+        text(*t, &m, shield, &mut buf);
+        set_text(&mut txt, &buf);
+    }
+}
+
+/// Écrit `v` dans un champ du `Node` seulement s'il change (une écriture relance la mise en page).
+fn set_val(node: &mut Mut<Node>, field: fn(&mut Node) -> &mut Val, v: Val) {
+    if *field(node.bypass_change_detection()) != v {
+        *field(node.as_mut()) = v;
     }
 }
 
@@ -1088,16 +1207,12 @@ fn update_fills(
 ) {
     let Some(m) = me(&state) else { return };
     let max_hp = m.e.max_hp.max(1.0);
-    let shield = if m.e.dead == Some(true) {
-        0.0
-    } else {
-        m.e.shield.unwrap_or(0.0)
-    };
+    let shield = shield_of(&m);
     let denom = max_hp.max(m.e.hp + shield);
     let hp = (m.e.hp / denom * 100.0) as f32;
     let sh = (shield / denom * 100.0) as f32;
-    // la traînée rattrape les PV perdus en ~0,5 s
-    *trail = if *trail < hp {
+    // la traînée rattrape les PV perdus en ~0,5 s, puis s'arrête dessus
+    *trail = if *trail < hp || (*trail - hp).abs() < 0.05 {
         hp
     } else {
         *trail + (hp - *trail) * (time.delta_secs() * 4.0).min(1.0)
@@ -1117,16 +1232,38 @@ fn update_fills(
     });
     for (f, mut node) in &mut q {
         match f {
-            F::Hp => node.width = percent(hp),
-            F::HpTrail => node.width = percent(*trail),
+            F::Hp => set_val(&mut node, |n| &mut n.width, percent(hp)),
+            F::HpTrail => set_val(&mut node, |n| &mut n.width, percent(*trail)),
             F::Shield => {
-                node.left = percent(hp);
-                node.width = percent(sh);
+                set_val(&mut node, |n| &mut n.left, percent(hp));
+                set_val(&mut node, |n| &mut n.width, percent(sh));
             }
-            F::Res => node.width = percent(res),
-            F::Xp => node.height = percent(xp),
-            F::Recall => node.width = percent(recall),
+            F::Res => set_val(&mut node, |n| &mut n.width, percent(res)),
+            F::Xp => set_val(&mut node, |n| &mut n.height, percent(xp)),
+            F::Recall => set_val(&mut node, |n| &mut n.width, percent(recall)),
         }
+    }
+}
+
+/// Ce que montre une icône (clé sans copie) et sa teinte.
+fn icon_of<'a>(m: &'a Me<'a>, kind: Slot) -> (&'a str, Color) {
+    match kind {
+        Slot::Passive => (m.champ.passive.id.as_str(), Color::WHITE),
+        Slot::Ability(i) => {
+            let tint = match ab_state(m, i) {
+                AbState::Locked => Color::srgb(0.3, 0.3, 0.33),
+                AbState::Cd => Color::srgb(0.62, 0.62, 0.66),
+                AbState::NoMana => Color::srgb(0.45, 0.55, 1.0),
+                AbState::Ready => Color::WHITE,
+            };
+            (m.champ.abilities.get(SLOTS[i]).id.as_str(), tint)
+        }
+        Slot::Summoner(i) => (
+            summoner(*m.st.summoners.get(SUMS[i])).name.as_str(),
+            Color::WHITE,
+        ),
+        Slot::Item(i) => (item_id(m, i).unwrap_or(""), Color::WHITE),
+        Slot::Trinket => (trinket(m).map_or("", |d| d.id.as_str()), Color::WHITE),
     }
 }
 
@@ -1140,33 +1277,16 @@ fn update_images(
     for (mut img, mut node, mut vis) in &mut q {
         if img.sweep {
             let (cd, frac) = cd_frac(&m, img.kind);
-            if cd > 0.0 {
-                node.image = icons.sweep(&mut images, frac as f32);
+            // 64 crans, comme le cache des balayages
+            let step = (frac.clamp(0.0, 1.0) * 64.0).round() as u32;
+            if cd > 0.0 && img.step != Some(step) {
+                node.image = icons.sweep(&mut images, step as f32 / 64.0);
+                img.step = Some(step);
             }
             set_shown(&mut vis, cd > 0.0);
             continue;
         }
-        // icône : ce qu'elle doit montrer, et sa teinte selon l'état
-        let (key, tint) = match img.kind {
-            Slot::Ability(i) => {
-                let tint = match ab_state(&m, i) {
-                    AbState::Locked => Color::srgb(0.3, 0.3, 0.33),
-                    AbState::Cd => Color::srgb(0.62, 0.62, 0.66),
-                    AbState::NoMana => Color::srgb(0.45, 0.55, 1.0),
-                    AbState::Ready => Color::WHITE,
-                };
-                (m.champ.abilities.get(SLOTS[i]).id.clone(), tint)
-            }
-            Slot::Summoner(i) => (format!("{:?}", m.st.summoners.get(SUMS[i])), Color::WHITE),
-            Slot::Item(i) => (
-                items(&m).get(i).cloned().flatten().unwrap_or_default(),
-                Color::WHITE,
-            ),
-            Slot::Trinket => (
-                trinket(&m).map_or(String::new(), |d| d.id.clone()),
-                Color::WHITE,
-            ),
-        };
+        let (key, tint) = icon_of(&m, img.kind);
         if node.color != tint {
             node.color = tint;
         }
@@ -1175,16 +1295,17 @@ fn update_images(
             continue;
         }
         let handle = match img.kind {
+            Slot::Passive => Some(icons.ability(&mut images, &m.champ.passive, Some(m.champ))),
             Slot::Ability(i) => {
                 Some(icons.ability(&mut images, m.champ.abilities.get(SLOTS[i]), Some(m.champ)))
             }
             Slot::Summoner(i) => Some(icons.summoner(&mut images, *m.st.summoners.get(SUMS[i]))),
-            Slot::Item(_) | Slot::Trinket => item(&key).map(|d| icons.item(&mut images, d)),
+            Slot::Item(_) | Slot::Trinket => item(key).map(|d| icons.item(&mut images, d)),
         };
         if let Some(h) = handle {
             node.image = h;
         }
-        img.shown = key;
+        key.clone_into(&mut img.shown);
     }
 }
 
@@ -1203,22 +1324,14 @@ fn update_shown(state: Res<GameState>, mut q: Query<(&V, &mut Visibility), Witho
                 *m.st.ability_levels.get(SLOTS[i]),
                 m.st.skill_points,
             ),
+            V::Pip(i, j) => (j as u32) < m.champ.abilities.get(SLOTS[i]).max_rank,
             V::Points => m.st.skill_points > 0,
             V::ResBar => m.champ.resource != Resource::None,
-            V::Shield => m.e.dead != Some(true) && m.e.shield.unwrap_or(0.0) > 0.0,
+            V::Shield => shield_of(m) > 0.0,
             V::Cd(s) => cd_frac(m, s).0 > 0.0,
             V::Buff(i) => m.e.buffs.as_ref().is_some_and(|b| b.len() > i),
             V::Recall => m.st.recalling.is_some_and(|r| r > 0.0),
-            V::Charges(s) => match s {
-                Slot::Item(i) => {
-                    m.st.item_charges
-                        .as_ref()
-                        .and_then(|v| v.get(i).copied().flatten())
-                        .is_some_and(|c| c > 1.0)
-                }
-                Slot::Trinket => m.st.ward_charges.is_some(),
-                _ => false,
-            },
+            V::Charges(s) => charges(m, s).is_some(),
         };
         set_shown(&mut vis, on);
     }
@@ -1243,30 +1356,22 @@ fn update_colors(
                 Some(b) if is_debuff(&b.id) => hexa(0x4a1820, 0.92),
                 _ => hexa(0x163a26, 0.92),
             },
-            C::Hp => {
-                if m.e.hp / m.e.max_hp.max(1.0) < 0.3 {
-                    HP_LOW
-                } else {
-                    HP
-                }
-            }
         };
         set_bg(&mut bg, color);
     }
+    let resource_color = if m.champ.resource == Resource::Energy {
+        ENERGY
+    } else {
+        MANA
+    };
     for (Frame(s), mut border) in &mut frames {
         let Slot::Ability(i) = *s else { continue };
         let c = match ab_state(&m, i) {
-            AbState::NoMana => MANA,
+            AbState::NoMana => resource_color,
             AbState::Ready if SLOTS[i] == AbilitySlot::R => GOLD,
             AbState::Ready => GOLD_LO,
             _ => hexa(0x3a3f55, 1.0),
         };
-        let resource_color = if m.champ.resource == Resource::Energy {
-            ENERGY
-        } else {
-            MANA
-        };
-        let c = if c == MANA { resource_color } else { c };
         if border.top != c {
             *border = BorderColor::all(c);
         }
@@ -1283,9 +1388,13 @@ fn update_portrait(
     let Some(m) = me(&state) else { return };
     let dead = m.e.dead == Some(true);
     for (e, p) in &slots {
-        let want = ChampionPortrait::new(m.champ.id.clone(), PortraitKind::Square).gray(dead);
-        if p != Some(&want) {
-            commands.entity(e).insert(want);
+        let same = p.is_some_and(|p| {
+            p.id == m.champ.id && p.kind == PortraitKind::Square && p.grayscale == dead
+        });
+        if !same {
+            commands
+                .entity(e)
+                .insert(ChampionPortrait::new(m.champ.id.clone(), PortraitKind::Square).gray(dead));
         }
     }
     let color = if m.champ.resource == Resource::Energy {
@@ -1366,6 +1475,208 @@ impl Plugin for BottomBarPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lov_shared::types::{
+        AbilityMap, ChampSnapshot, Cooldowns, EntityKind, SummonerId, SummonerMap, TeamOrNeutral,
+        WardCharges,
+    };
+
+    /// Grondak niveau 6 (Q 2, W 1, E 0, R 1), 200 de mana.
+    fn grondak() -> (EntitySnapshot, SelfState) {
+        let champ = get_champion("grondak").unwrap();
+        let e = EntitySnapshot {
+            id: 1,
+            kind: EntityKind::Champion,
+            team: TeamOrNeutral::Blue,
+            x: 0.0,
+            y: 0.0,
+            facing: 0.0,
+            hp: 500.0,
+            max_hp: 1000.0,
+            mana: Some(200.0),
+            max_mana: Some(400.0),
+            shield: None,
+            dead: None,
+            subtype: Some("grondak".into()),
+            owner_id: None,
+            level: Some(6),
+            anim: None,
+            buffs: None,
+            champ: Some(ChampSnapshot {
+                player_id: "p".into(),
+                name: "P".into(),
+                kills: 0,
+                deaths: 0,
+                assists: 0,
+                cs: 0,
+                items: vec![
+                    Some("lame_des_rafales".into()),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some("stealth_ward".into()),
+                ],
+                respawn_in: None,
+            }),
+        };
+        let st = SelfState {
+            entity_id: 1,
+            gold: 500.0,
+            xp: 0.0,
+            xp_to_next: 100.0,
+            level: 6,
+            skill_points: 0,
+            ability_levels: AbilityMap {
+                q: 2,
+                w: 1,
+                e: 0,
+                r: 1,
+            },
+            cooldowns: Cooldowns {
+                q: 4.25,
+                w: 0.0,
+                e: 0.0,
+                r: 0.0,
+                d: 150.0,
+                f: 0.0,
+            },
+            summoners: SummonerMap {
+                d: SummonerId::Flash,
+                f: SummonerId::Ignite,
+            },
+            stats: champ.base_stats.clone(),
+            recalling: None,
+            can_shop: false,
+            ward_charges: Some(WardCharges {
+                charges: 0,
+                cooldown_remaining: 30.0,
+            }),
+            item_charges: None,
+            item_cooldowns: Some(vec![Some(15.0)]),
+        };
+        (e, st)
+    }
+
+    fn me_of<'a>(e: &'a EntitySnapshot, st: &'a SelfState) -> Me<'a> {
+        Me {
+            e,
+            st,
+            champ: get_champion("grondak").unwrap(),
+        }
+    }
+
+    #[test]
+    fn etat_et_cout_des_sorts() {
+        let (mut e, mut st) = grondak();
+        {
+            let m = me_of(&e, &st);
+            // Q rang 2 : coût 55, en recharge
+            assert_eq!(cost(&m, 0), 55.0);
+            assert_eq!(ab_state(&m, 0), AbState::Cd);
+            // W rang 1, prêt ; E non appris : verrouillé et sans coût
+            assert_eq!(ab_state(&m, 1), AbState::Ready);
+            assert_eq!(cost(&m, 2), 0.0);
+            assert_eq!(ab_state(&m, 2), AbState::Locked);
+            assert_eq!(ab_state(&m, 3), AbState::Ready);
+        }
+        // 50 de mana : le R (100) manque de mana, le W (60) aussi
+        e.mana = Some(50.0);
+        st.cooldowns.q = 0.0;
+        let m = me_of(&e, &st);
+        assert_eq!(ab_state(&m, 3), AbState::NoMana);
+        assert_eq!(ab_state(&m, 1), AbState::NoMana);
+        assert_eq!(ab_state(&m, 0), AbState::NoMana, "Q rang 2 coûte 55");
+        // 60 de mana : Q (55) prêt, W (60) prêt, R (100) toujours pas
+        e.mana = Some(60.0);
+        let m = me_of(&e, &st);
+        assert_eq!(ab_state(&m, 0), AbState::Ready);
+        assert_eq!(ab_state(&m, 1), AbState::Ready);
+        assert_eq!(ab_state(&m, 3), AbState::NoMana);
+    }
+
+    #[test]
+    fn fraction_des_recharges() {
+        let (e, st) = grondak();
+        let m = me_of(&e, &st);
+        // Q rang 2 : 8,5 s, il en reste 4,25 → moitié
+        let (rem, f) = cd_frac(&m, Slot::Ability(0));
+        assert_eq!(rem, 4.25);
+        assert!((f - 0.5).abs() < 1e-9, "{f}");
+        // Flash : recharge totale du sort d'invocateur
+        let (rem, f) = cd_frac(&m, Slot::Summoner(0));
+        assert_eq!(rem, 150.0);
+        let total = summoner(SummonerId::Flash).cooldown;
+        assert!((f - 150.0 / total).abs() < 1e-9);
+        // objet actif : 15 s sur 60
+        let (rem, f) = cd_frac(&m, Slot::Item(0));
+        assert_eq!(rem, 15.0);
+        assert!((f - 0.25).abs() < 1e-9);
+        // emplacement vide, passif : rien
+        assert_eq!(cd_frac(&m, Slot::Item(1)).0, 0.0);
+        assert_eq!(cd_frac(&m, Slot::Passive).0, 0.0);
+        // balise sans charge : sa recharge
+        assert_eq!(cd_frac(&m, Slot::Trinket).0, 30.0);
+    }
+
+    #[test]
+    fn balise_a_l_emplacement_7_sinon_dans_l_inventaire() {
+        let (mut e, st) = grondak();
+        assert_eq!(
+            trinket(&me_of(&e, &st)).map(|d| d.id.as_str()),
+            Some("stealth_ward")
+        );
+        let items = &mut e.champ.as_mut().unwrap().items;
+        items[6] = None;
+        items[3] = Some("stealth_ward".into());
+        assert_eq!(
+            trinket(&me_of(&e, &st)).map(|d| d.id.as_str()),
+            Some("stealth_ward")
+        );
+        e.champ.as_mut().unwrap().items[3] = None;
+        assert!(trinket(&me_of(&e, &st)).is_none());
+    }
+
+    #[test]
+    fn un_texte_n_est_reformate_que_si_sa_source_change() {
+        let mut app = App::new();
+        let (e, st) = grondak();
+        let mut state = GameState::default();
+        state.my_entity = Some(1);
+        state.buffer.entities.insert(1, e);
+        state.self_state = Some(st);
+        app.insert_resource(state);
+        app.add_systems(Update, update_texts);
+        let gold = app.world_mut().spawn((T::Gold, Text::default())).id();
+        let cd = app
+            .world_mut()
+            .spawn((T::Cd(Slot::Ability(0)), Text::default()))
+            .id();
+        app.update();
+        let text = |app: &App, e: Entity| app.world().get::<Text>(e).unwrap().0.clone();
+        assert_eq!(text(&app, gold), "500");
+        assert_eq!(text(&app, cd), "5");
+        // même source : le texte n'est pas réécrit (pas de changement signalé)
+        let tick = app.world().read_change_tick();
+        app.update();
+        assert!(
+            !app.world()
+                .entity(gold)
+                .get_ref::<Text>()
+                .unwrap()
+                .last_changed()
+                .is_newer_than(tick, app.world().read_change_tick())
+        );
+        // l'or change : le texte suit
+        app.world_mut()
+            .resource_mut::<GameState>()
+            .self_state
+            .as_mut()
+            .unwrap()
+            .gold = 612.7;
+        app.update();
+        assert_eq!(text(&app, gold), "612");
+    }
 
     #[test]
     fn formats_des_statistiques() {
