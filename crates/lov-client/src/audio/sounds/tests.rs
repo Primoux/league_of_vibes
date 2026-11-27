@@ -373,6 +373,9 @@ fn chaque_sort_de_chaque_champion_joue_sa_recette_procedurale() {
             AbilitySlot::E,
             AbilitySlot::R,
         ] {
+            if slot == AbilitySlot::R && recipes::custom(|k| k == c.abilities.r.fx_key).is_some() {
+                continue; // recette dédiée : voir `l_ult_joue_sa_recette_dediee`
+            }
             let fx = effects(&run(&cast(&c.id, slot)));
             // onde + souffle : la recette procédurale (le son générique n'a qu'une voix)
             assert_eq!(fx.len(), 1, "{} {slot:?}", c.id);
@@ -381,19 +384,28 @@ fn chaque_sort_de_chaque_champion_joue_sa_recette_procedurale() {
     }
 }
 
-/// Fidèle au web : la clé `grondak_R` ne trouve pas la recette dédiée `grondak_r`, l'ult joue la recette
-/// procédurale. Si on corrige un jour la recherche, ce test doit changer avec elle.
+/// #244 : l'ult d'un champion qui a une recette dédiée joue cette recette, et non la procédurale.
 #[test]
-fn comme_le_web_l_ult_joue_la_recette_procedurale_et_non_la_dediee() {
-    let fx = effects(&run(&cast("grondak", AbilitySlot::R)));
-    assert_eq!(fx[0].2, 2);
-    let (mut am, rx) = AudioManager::for_tests();
-    let dedicated = recipes::custom(|k| k == "grondak_r");
-    assert!(dedicated.is_some());
-    if let Some(r) = dedicated {
-        r.play(&mut am, None, Some(1.0));
+fn l_ult_joue_sa_recette_dediee() {
+    let dedicated = |id: &str| {
+        let (mut am, rx) = AudioManager::for_tests();
+        let r = recipes::custom(|k| k.strip_suffix("_r") == Some(id));
+        r.map(|r| {
+            r.play(&mut am, None, Some(1.0));
+            effects(&rx.try_iter().collect::<Vec<_>>())
+        })
+    };
+    let expected = dedicated("grondak").expect("grondak a une recette d'ult");
+    assert_eq!(expected[0].2, 8);
+    assert_eq!(effects(&run(&cast("grondak", AbilitySlot::R))), expected);
+    let mut n = 0;
+    for c in CHAMPIONS.iter() {
+        if let Some(fx) = dedicated(&c.id) {
+            assert_eq!(effects(&run(&cast(&c.id, AbilitySlot::R))), fx, "{}", c.id);
+            n += 1;
+        }
     }
-    assert_eq!(effects(&rx.try_iter().collect::<Vec<_>>())[0].2, 8);
+    assert_eq!(n, recipes::CUSTOM.len());
 }
 
 #[test]
