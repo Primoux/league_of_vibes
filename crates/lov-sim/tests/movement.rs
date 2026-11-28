@@ -8,7 +8,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use lov_shared::map::WALLS;
+use lov_shared::map::{WALLS, is_in_wall};
 use lov_shared::math::dist;
 use lov_shared::types::{
     EntityId, EntityKind, GameEvent, Stats, SummonerId, Team, TeamOrNeutral, Vec2,
@@ -203,4 +203,65 @@ fn les_structures_bloquent_les_champions() {
         min_d > tower_radius + champ_radius - 15.0,
         "min_d = {min_d}"
     );
+}
+
+/// #309 : au-delà du budget A* d'un tick, les unités attendent leur chemin au lieu de foncer en ligne
+/// droite à travers les murs.
+#[test]
+fn au_dela_du_budget_astar_aucune_unite_ne_traverse_un_mur() {
+    let mut s = Sim::new();
+    let nav = nav_grid();
+    let mut pairs = Vec::new();
+    let mut y = 1500.0;
+    while pairs.len() < 60 && y < 10500.0 {
+        let mut x = 1500.0;
+        while pairs.len() < 60 && x < 10500.0 {
+            let (a, b) = (v(x, y), v(x + 1200.0, y + 900.0));
+            if nav.walkable(a.x, a.y) && nav.walkable(b.x, b.y) && !nav.line_walkable(a, b) {
+                pairs.push((a, b));
+            }
+            x += 397.0;
+        }
+        y += 431.0;
+    }
+    assert_eq!(
+        pairs.len(),
+        60,
+        "plus de deux fois le budget de requêtes dans le même tick"
+    );
+    let ids: Vec<EntityId> = pairs
+        .iter()
+        .map(|&(a, b)| {
+            let mut e = Entity::new(
+                EntityKind::Monster,
+                TeamOrNeutral::Neutral,
+                a,
+                40.0,
+                100.0,
+                0.0,
+                stats(),
+            );
+            e.data.insert(Ghost);
+            e.move_target = Some(b);
+            s.world.spawn(e)
+        })
+        .collect();
+    for _ in 0..300 {
+        s.step();
+        for &id in &ids {
+            let p = s.pos(id);
+            assert!(
+                !is_in_wall(p),
+                "unité {id} dans un mur en ({:.0}, {:.0})",
+                p.x,
+                p.y
+            );
+        }
+    }
+    let arrived = ids
+        .iter()
+        .zip(&pairs)
+        .filter(|(id, (_, b))| dist(s.pos(**id), *b) < 60.0)
+        .count();
+    assert_eq!(arrived, 60, "toutes les unités finissent par arriver");
 }
