@@ -3,7 +3,8 @@
 //! - Filtrage par vision d'équipe (anti-triche) : structures toujours envoyées, ennemis invisibles jamais.
 //! - Delta : après le premier snapshot complet, seules les entités modifiées sont envoyées (complètes si
 //!   nouvelles, en `patches` sinon) avec `removed`.
-//! - Événements filtrés : rien sur une unité ennemie invisible ; or, achats et rappel privés à l'équipe.
+//! - Événements filtrés : rien sur une unité ennemie invisible ; or, achats, objets utilisés et rappel
+//!   privés à l'équipe (ou visibles si l'unité l'est).
 //!
 //! Différences avec le TypeScript :
 //! - `SnapshotFrame` emprunte le monde (`'w`) au lieu de le garder par référence ;
@@ -561,6 +562,8 @@ pub fn filter_events(world: &World, events: &[GameEvent], team: Team) -> Vec<Gam
             GameEvent::GoldGain { target, .. } => same_team(world, *target, team),
             GameEvent::ItemBought { target, .. }
             | GameEvent::ItemSold { target, .. }
+            // Un objet utilisé (balise posée…) ne trahit pas un ennemi hors vision (#317).
+            | GameEvent::ItemUsed { target, .. }
             | GameEvent::RecallStart { target }
             | GameEvent::RecallEnd { target, .. }
             | GameEvent::Respawn { target, .. } => same_team(world, *target, team) || vis(*target),
@@ -570,7 +573,7 @@ pub fn filter_events(world: &World, events: &[GameEvent], team: Team) -> Vec<Gam
                 team_only,
                 ..
             } => !*team_only || player_team(world, player_id) == Some(side(team)),
-            // structureDestroyed, objectiveSpawn/Taken, itemUsed, announcement : publics.
+            // structureDestroyed, objectiveSpawn/Taken, announcement : publics.
             _ => true,
         })
         .cloned()
