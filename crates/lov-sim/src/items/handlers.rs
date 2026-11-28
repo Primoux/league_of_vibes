@@ -19,7 +19,9 @@ use lov_shared::types::{
     Vec2,
 };
 
-use crate::combat::buffs::{Stasis, StatModifiers, merge_stats, register_stat_source};
+use crate::combat::buffs::{
+    Stasis, StatModifiers, merge_stats, register_stat_source, strongest_param,
+};
 use crate::combat::damage::{
     DamageOpts, HealOpts, ShieldOpts, apply_damage, apply_heal, apply_shield, credit_of,
 };
@@ -111,6 +113,9 @@ pub fn heal_item_max_hp_delta(e: &mut Entity, before: &PartialStats) {
     }
 }
 
+/// Réduction des soins de la Hache du bourreau.
+const ITEM_GRIEVOUS: f64 = 0.4;
+
 /// Enregistre les passifs d'objets. Appelé par l'`init` du système économie.
 pub fn register_item_hooks(world: &mut World) {
     // Dégâts bonus contre les monstres (machette) et exécution (griffe de l'ombre).
@@ -178,12 +183,16 @@ pub fn register_item_hooks(world: &mut World) {
 
     // Soins : anti-soin (blessure grave) et amplification (bénédiction de l'encensoir).
     world.hooks.before_heal.push(Box::new(|world, ctx| {
-        if world
-            .get(ctx.target)
-            .and_then(econ_ref)
-            .is_some_and(|st| st.grievous_until > world.time)
+        // Seul l'anti-soin le plus fort compte (#315). Le hook des buffs (`combat::buffs`, initialisé
+        // avant l'économie) a déjà appliqué le plus fort des buffs `grievous` ; l'objet ne complète que
+        // s'il est plus fort que lui.
+        if let Some(t) = world.get(ctx.target)
+            && econ_ref(t).is_some_and(|st| st.grievous_until > world.time)
         {
-            ctx.amount *= 0.6;
+            let from_buffs = strongest_param(t, "grievous").clamp(0.0, 1.0);
+            if from_buffs < ITEM_GRIEVOUS {
+                ctx.amount *= (1.0 - ITEM_GRIEVOUS) / (1.0 - from_buffs);
+            }
         }
         if champ_has_passive(world, ctx.source, "benediction") {
             ctx.amount *= 1.2;
