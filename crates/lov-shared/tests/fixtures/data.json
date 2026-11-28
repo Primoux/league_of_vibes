@@ -1971,6 +1971,22 @@
     },
     {
       "active": {
+        "cooldown": 90.0,
+        "description": "Révèle les balises ennemies proches pendant 10 s.",
+        "id": "revelation",
+        "name": "Révélation"
+      },
+      "buildsFrom": [],
+      "category": "trinket",
+      "cost": 0.0,
+      "description": "Trinket : révèle les balises ennemies dans un rayon de 600 u autour de vous pendant 10 s. Recharge 90 s.",
+      "icon": "lantern",
+      "id": "lanterne_revelatrice",
+      "name": "Lanterne révélatrice",
+      "stats": {}
+    },
+    {
+      "active": {
         "cooldown": 0.0,
         "description": "Invoque le Colosse du Rift.",
         "id": "colosse",
@@ -2088,6 +2104,7 @@
     "faux_du_revenant",
     "epee_de_l_infini",
     "stealth_ward",
+    "lanterne_revelatrice",
     "colossus_eye"
   ],
   "minions": [

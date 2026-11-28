@@ -49,6 +49,18 @@ pub struct ShopAction {
     pub consumed: Vec<ConsumedItem>,
     /// Charges du consommable avant l'action.
     pub charges: Option<u32>,
+    /// Trinket remplacé par cet achat de trinket : l'annulation le rend dans son état.
+    pub previous_trinket: Option<PreviousTrinket>,
+}
+
+/// État d'un trinket remplacé à la boutique (annulation d'un changement de trinket).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreviousTrinket {
+    pub id: String,
+    pub charges: u32,
+    pub recharge_at: f64,
+    /// Recharges des actifs avant le changement, pour l'actif du trinket choisi.
+    pub active_ready_at: Option<f64>,
 }
 
 /// Rappel en cours.
@@ -114,6 +126,8 @@ pub struct EconomyState {
     pub stase_until: f64,
     pub grievous_until: f64,
     pub spellblade_ready: bool,
+    /// Lanterne révélatrice : révèle les balises ennemies proches jusqu'à ce temps de jeu.
+    pub revelation_until: f64,
     /// L'auto-attaque en cours a consommé le sort-lame : ses dégâts magiques partent après l'impact.
     pub spellblade_hit: bool,
     /// Temps de jeu à partir duquel un sort peut réarmer le sort-lame (délai de 1,5 s).
@@ -142,6 +156,7 @@ impl Default for EconomyState {
             stase_until: f64::NEG_INFINITY,
             grievous_until: f64::NEG_INFINITY,
             spellblade_ready: false,
+            revelation_until: 0.0,
             spellblade_hit: false,
             spellblade_ready_at: 0.0,
             rafale_until: f64::NEG_INFINITY,
