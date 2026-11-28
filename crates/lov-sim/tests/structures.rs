@@ -354,3 +354,26 @@ fn protege_un_allie_agresse_meme_si_les_degats_sont_inferieurs_a_une_unite() {
     s.world.step(&mut s.systems);
     assert_eq!(s.world.get(tower).unwrap().attack_target, Some(attacker));
 }
+
+/// #313 : un champion invisible proche ne bloque plus la tour, qui tire sur le champion visible.
+#[test]
+fn une_tour_ignore_le_champion_invisible_et_tire_sur_le_visible() {
+    use lov_shared::map::TOWERS;
+    use lov_shared::types::TowerTier;
+    use lov_sim::combat::buffs::{BuffOptions, add_buff};
+    let mut sim = common::game_world(&["minions", "jungle", "objectives"]);
+    let t = TOWERS
+        .iter()
+        .find(|t| t.team == Team::Red && t.tier == TowerTier::Outer)
+        .unwrap();
+    let hidden = sim.champ(Team::Blue, v(t.pos.x + 250.0, t.pos.y));
+    let visible = sim.champ(Team::Blue, v(t.pos.x - 550.0, t.pos.y));
+    add_buff(&mut sim.world, hidden, "invisible", BuffOptions::new(30.0));
+    let (hp_hidden, hp_visible) = (sim.e(hidden).hp, sim.e(visible).hp);
+    sim.run(4.0);
+    assert!(
+        sim.e(visible).hp < hp_visible,
+        "la tour doit tirer sur le champion visible"
+    );
+    assert_eq!(sim.e(hidden).hp, hp_hidden, "ni sur l'invisible");
+}
