@@ -17,6 +17,7 @@ use bevy::ui_widgets::{Activate, TextInput};
 use lov_shared::data::champions::CHAMPIONS;
 use lov_shared::protocol::ClientMsg;
 
+use super::patch_notes::{NewBadge, PatchNotesUi, VERSION, patch_name};
 use super::rift::RiftBackground;
 use super::screen_root;
 use super::stage::{ChampionStage, StageView};
@@ -93,6 +94,8 @@ enum Act {
     Prev,
     Next,
     Pick(usize),
+    /// Ouvre les notes de patch (`patch_notes`).
+    PatchNotes,
 }
 
 #[derive(Component)]
@@ -470,14 +473,52 @@ fn on_enter(
                 },
                 BorderColor::all(hexa(0xffffff, 0.05)),
             ))
-            .with_child((
-                Text::new(format!(
-                    "{} CHAMPIONS  ◆  3 VOIES  ◆  DRAKES · COLOSSE · LÉVIATHAN  ◆  FAIT AUX VIBES, CE SOIR",
-                    CHAMPIONS.len()
-                )),
-                f.text(12.0, 600),
-                TextColor(hexa(0xece7da, 0.45)),
-            ));
+            .with_children(|foot| {
+                foot.spawn((
+                    Text::new(format!(
+                        "{} CHAMPIONS  ◆  3 VOIES  ◆  DRAKES · COLOSSE · LÉVIATHAN  ◆  FAIT AUX VIBES, CE SOIR",
+                        CHAMPIONS.len()
+                    )),
+                    f.text(12.0, 600),
+                    TextColor(hexa(0xece7da, 0.45)),
+                ));
+                // version et notes de patch, à droite
+                foot.spawn((
+                    button(
+                        ButtonLook::new(hexa(0xffffff, 0.03), hexa(0xffffff, 0.1)),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            right: px(16),
+                            align_self: AlignSelf::Center,
+                            align_items: AlignItems::Center,
+                            column_gap: px(8),
+                            padding: UiRect::axes(px(12), px(5)),
+                            border: UiRect::all(px(1)),
+                            border_radius: BorderRadius::all(px(8)),
+                            ..default()
+                        },
+                    ),
+                    BorderColor::all(hexa(0xd9b25f, 0.3)),
+                    Act::PatchNotes,
+                ))
+                .with_children(|b| {
+                    b.spawn((
+                        Text::new(format!("NOTES DE PATCH  ·  v{}", patch_name(VERSION))),
+                        f.text(12.0, 700),
+                        TextColor(GOLD),
+                    ));
+                    b.spawn((
+                        NewBadge,
+                        Node {
+                            padding: UiRect::axes(px(6), px(1)),
+                            border_radius: BorderRadius::all(px(6)),
+                            ..default()
+                        },
+                        BackgroundColor(GOLD),
+                    ))
+                    .with_child((Text::new("NOUVEAU"), f.text(10.0, 800), TextColor(Color::srgb_u8(0x1a, 0x10, 0x02))));
+                });
+            });
         });
 }
 
@@ -571,6 +612,7 @@ fn on_activate(
     conn: Res<Connection>,
     mut state: ResMut<GameState>,
     mut ui: ResMut<HomeUi>,
+    mut notes: ResMut<PatchNotesUi>,
 ) {
     let Ok(act) = acts.get(ev.entity) else { return };
     let n = CHAMPIONS.len();
@@ -578,6 +620,7 @@ fn on_activate(
     match *act {
         Act::Tab(mode) => ui.mode = mode,
         Act::Dev => ui.dev = !ui.dev,
+        Act::PatchNotes => notes.show(),
         Act::Create => {
             let dev = ui.dev;
             go(

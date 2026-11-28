@@ -14,6 +14,7 @@ pub mod end;
 pub mod home;
 pub mod loading;
 pub mod lobby;
+pub mod patch_notes;
 pub mod rift;
 pub mod stage;
 pub mod studio;
@@ -73,6 +74,7 @@ impl Plugin for ScreensPlugin {
             stage::StagePlugin,
             rift::RiftPlugin,
             studio::StudioPlugin,
+            patch_notes::PatchNotesPlugin,
         ));
     }
 }
