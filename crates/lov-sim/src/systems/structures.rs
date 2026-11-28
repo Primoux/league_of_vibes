@@ -29,6 +29,7 @@ use lov_shared::types::{
     TowerTier, Vec2, other_team,
 };
 
+use crate::systems::vision::is_visible_to;
 use crate::world::{Entity, EventKind, System, World};
 use crate::world_ai::runtime::{
     DamageRequest, PlateReward, PveCombat, Rewards, attack, in_range, is_structure, stats_with,
@@ -316,6 +317,9 @@ fn acquire_tower_target(world: &World, tower: &Entity) -> Option<EntityId> {
             || candidate.team == tower.team
             || candidate.team == TeamOrNeutral::Neutral
             || !matches!(candidate.kind, EntityKind::Minion | EntityKind::Champion)
+            // Une cible invisible pour la tour serait refusée par le combat : la tour ne tirerait sur
+            // personne (#313).
+            || !is_visible_to(candidate, tower.team, true)
         {
             continue;
         }
@@ -645,12 +649,18 @@ fn update_structure(world: &mut World, id: EntityId, core_combat: bool) {
     let mut target = aggressor
         .filter(|a| a.until > time)
         .and_then(|a| world.get(a.id))
-        .filter(|t| !t.dead && in_range(tower, t, STRUCTURES.range))
+        .filter(|t| {
+            !t.dead && in_range(tower, t, STRUCTURES.range) && is_visible_to(t, tower.team, true)
+        })
         .map(|t| t.id);
     if target.is_none() {
         target = current
             .and_then(|c| world.get(c))
-            .filter(|c| !c.dead && in_range(tower, c, STRUCTURES.range))
+            .filter(|c| {
+                !c.dead
+                    && in_range(tower, c, STRUCTURES.range)
+                    && is_visible_to(c, tower.team, true)
+            })
             .map(|c| c.id);
     }
     if target.is_none() {
