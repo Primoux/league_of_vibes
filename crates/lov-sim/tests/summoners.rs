@@ -154,6 +154,52 @@ fn teleportation_canalise_4_s_et_s_annule_sur_degats() {
     assert!(!g.e(s).data.contains::<Channeling>());
 }
 
+/// #318 : seuls les PV perdus interrompent la téléportation ; un coup absorbé par un bouclier, non.
+/// Les dégâts silencieux (brûlures) l'interrompent aussi.
+#[test]
+fn teleportation_interrompue_par_les_pv_perdus_pas_par_le_bouclier() {
+    use lov_sim::combat::damage::{ShieldOpts, apply_shield};
+    let setup = || {
+        let mut g = game("ilyra");
+        let tower = g.dummy(p(8000.0, 8000.0), |_| {});
+        let tw = g.e_mut(tower);
+        tw.kind = EntityKind::Tower;
+        tw.team = TeamOrNeutral::Blue;
+        (g, tower)
+    };
+    // Bouclier qui absorbe tout : la téléportation aboutit.
+    let (mut g, tower) = setup();
+    let (s, t) = (g.source, g.target);
+    apply_shield(&mut g.world, ShieldOpts::new(Some(s), s, 500.0));
+    assert!(cast(&mut g, SummonerId::Teleport, tower, p(1400.0, 1000.0)));
+    g.advance(1.0);
+    apply_damage(
+        &mut g.world,
+        DamageOpts::new(Some(t), s, 100.0, DamageType::Physical),
+    );
+    g.advance(0.1);
+    assert!(
+        g.e(s).data.contains::<Channeling>(),
+        "coup absorbé : canalisation maintenue"
+    );
+    g.advance(3.0);
+    assert!(g.e(s).pos.x > 7900.0, "téléportation aboutie");
+
+    // Dégât silencieux qui retire des PV : interrompue.
+    let (mut g, tower) = setup();
+    let (s, t) = (g.source, g.target);
+    assert!(cast(&mut g, SummonerId::Teleport, tower, p(1400.0, 1000.0)));
+    g.advance(1.0);
+    let mut o = DamageOpts::new(Some(t), s, 5.0, DamageType::True);
+    o.silent = true;
+    apply_damage(&mut g.world, o);
+    g.advance(0.1);
+    assert!(
+        !g.e(s).data.contains::<Channeling>(),
+        "brûlure : canalisation interrompue"
+    );
+}
+
 // Test ajouté : les recharges s'écoulent avec le temps de jeu.
 #[test]
 fn les_recharges_s_ecoulent_et_permettent_un_nouveau_lancer() {
