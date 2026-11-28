@@ -436,3 +436,31 @@ fn tick_et_snapshots_raisonnables_avec_8_champions_et_60_sbires() {
     // Pire cas (68 unités visibles en combat permanent) : < 30 Ko/s une fois compressé.
     assert!(zbytes < 30 * 1024, "{zbytes} o/s compressés");
 }
+
+/// #317 : `itemUsed` d'un ennemi hors vision n'est pas transmis ; celui d'un allié ou d'un ennemi vu, si.
+#[test]
+fn item_used_suit_la_vision() {
+    let mut w = Core::new();
+    let me = w.champ(Team::Blue, v(6000.0, 3000.0));
+    let ally = w.champ(Team::Blue, v(2000.0, 9000.0));
+    let near = w.champ(Team::Red, v(6000.0, 3500.0));
+    let far = w.champ(Team::Red, v(9000.0, 9000.0));
+    w.step();
+    w.world.events.drain();
+    for target in [far, ally, near] {
+        w.world.emit(GameEvent::ItemUsed {
+            target,
+            item_id: "stealth_ward".into(),
+        });
+    }
+    let events = w.world.events.drain();
+    let evs = build_snapshot(&w.world, &w.player(me), Team::Blue, events, None).events;
+    let targets: Vec<EntityId> = evs
+        .iter()
+        .filter_map(|e| match e {
+            GameEvent::ItemUsed { target, .. } => Some(*target),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(targets, [ally, near]);
+}
