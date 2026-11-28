@@ -10,8 +10,8 @@
 //! - P : boutique. Tab (maintenu) : scores. C : stats. Échap : annuler / fermer / réglages.
 //! - Alt + clic gauche : ping.
 //!
-//! Et ce que le navigateur ne permettait pas : curseur confiné à la fenêtre, plein écran (F11), vsync
-//! au choix (V). Échap libère aussi la souris quand le panneau de réglages s'ouvre. Ctrl+Q monte le
+//! Et ce que le navigateur ne permettait pas : curseur confiné à la fenêtre en plein écran (F11), vsync
+//! au choix (V). En fenêtré, hors partie, réglages ouverts (Échap) ou fenêtre inactive, la souris est libre. Ctrl+Q monte le
 //! sort Q : on quitte par la fermeture de la fenêtre (Alt+F4).
 //!
 //! La caméra (Espace, Y, flèches, molette) reste dans `render::camera`. Les champs que l'interface et
@@ -93,7 +93,7 @@ impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PlayerInput>()
             .init_resource::<markers::MarkerCursor>()
-            .add_systems(Startup, (confine_cursor, markers::spawn_markers))
+            .add_systems(Startup, markers::spawn_markers)
             .add_systems(
                 Update,
                 (
@@ -106,12 +106,40 @@ impl Plugin for InputPlugin {
                     .chain()
                     .after(crate::render::camera::drive_camera),
             )
-            .add_systems(Update, window_shortcuts);
+            .add_systems(Update, (window_shortcuts, grab_cursor));
     }
 }
 
-fn confine_cursor(mut cursor: Single<&mut CursorOptions>) {
-    cursor.grab_mode = CursorGrabMode::Confined;
+/// Confinement de la souris : seulement en partie, en plein écran, fenêtre active et réglages fermés.
+/// En fenêtré, la souris reste libre (on peut cliquer sur une autre fenêtre) ; un Alt+Tab la libère aussi.
+fn cursor_grab(
+    in_game: bool,
+    focused: bool,
+    settings_open: bool,
+    mode: WindowMode,
+) -> CursorGrabMode {
+    if in_game && focused && !settings_open && mode != WindowMode::Windowed {
+        CursorGrabMode::Confined
+    } else {
+        CursorGrabMode::None
+    }
+}
+
+fn grab_cursor(
+    state: Res<GameState>,
+    input: Res<PlayerInput>,
+    window: Single<(&Window, &mut CursorOptions)>,
+) {
+    let (window, mut cursor) = window.into_inner();
+    let want = cursor_grab(
+        in_game(&state),
+        window.focused,
+        input.settings_open,
+        window.mode,
+    );
+    if cursor.grab_mode != want {
+        cursor.grab_mode = want;
+    }
 }
 
 /// En partie (jusqu'à l'écran de fin).
@@ -379,7 +407,6 @@ pub(crate) fn key_orders(
     state: Res<GameState>,
     conn: Res<Connection>,
     mut input: ResMut<PlayerInput>,
-    mut cursor: Single<&mut CursorOptions>,
     focus: Option<Res<bevy::input_focus::InputFocus>>,
     fields: Query<(), With<bevy::text::EditableText>>,
 ) {
@@ -413,11 +440,6 @@ pub(crate) fn key_orders(
             } else {
                 // Panneau de réglages : la souris est rendue au système tant qu'il est ouvert.
                 input.settings_open = !input.settings_open;
-                cursor.grab_mode = if input.settings_open {
-                    CursorGrabMode::None
-                } else {
-                    CursorGrabMode::Confined
-                };
             }
             continue;
         }
@@ -528,14 +550,21 @@ fn update_cursor_icon(
     }
 }
 
-fn window_shortcuts(keys: Res<ButtonInput<KeyCode>>, mut window: Single<&mut Window>) {
+fn window_shortcuts(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut window: Single<&mut Window>,
+    focus: Option<Res<bevy::input_focus::InputFocus>>,
+    fields: Query<(), With<bevy::text::EditableText>>,
+) {
     if keys.just_pressed(KeyCode::F11) {
         window.mode = match window.mode {
             WindowMode::Windowed => WindowMode::BorderlessFullscreen(MonitorSelection::Current),
             _ => WindowMode::Windowed,
         };
     }
-    if keys.just_pressed(KeyCode::KeyV) {
+    // un « v » tapé dans un champ (nom, chat, recherche) ne bascule pas la synchro verticale
+    let typing = focus.is_some_and(|f| f.get().is_some_and(|e| fields.contains(e)));
+    if !typing && keys.just_pressed(KeyCode::KeyV) {
         window.present_mode = match window.present_mode {
             PresentMode::AutoVsync => PresentMode::AutoNoVsync,
             _ => PresentMode::AutoVsync,
@@ -549,6 +578,36 @@ mod tests {
     use lov_shared::protocol::{GameStart, GameStartPlayer};
     use lov_shared::types::{EntitySnapshot, SummonerId, Team, TeamOrNeutral};
     use std::sync::mpsc::Receiver;
+
+    /// La souris n'est confinée qu'en partie, en plein écran, fenêtre active et réglages fermés.
+    #[test]
+    fn souris_confinee_seulement_en_plein_ecran_en_partie() {
+        let full = WindowMode::BorderlessFullscreen(MonitorSelection::Current);
+        assert_eq!(
+            cursor_grab(true, true, false, full),
+            CursorGrabMode::Confined
+        );
+        assert_eq!(
+            cursor_grab(true, true, false, WindowMode::Windowed),
+            CursorGrabMode::None,
+            "fenêtré"
+        );
+        assert_eq!(
+            cursor_grab(true, false, false, full),
+            CursorGrabMode::None,
+            "Alt+Tab"
+        );
+        assert_eq!(
+            cursor_grab(true, true, true, full),
+            CursorGrabMode::None,
+            "réglages ouverts"
+        );
+        assert_eq!(
+            cursor_grab(false, true, false, full),
+            CursorGrabMode::None,
+            "menus"
+        );
+    }
 
     /// #274 : un clic au milieu de la rivière (sol creusé) vise le point du lit sous le curseur, pas
     /// celui du plan y = 0, décalé vers la caméra.
