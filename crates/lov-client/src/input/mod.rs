@@ -29,6 +29,7 @@ use bevy::window::{
     WindowMode,
 };
 use lov_shared::data::champions::get_champion;
+use lov_shared::data::items::item;
 use lov_shared::data::summoners::summoner;
 use lov_shared::protocol::ClientMsg;
 use lov_shared::schema::Targeting as SpellTargeting;
@@ -289,6 +290,23 @@ fn confirm(t: Targeting, state: &GameState, input: &mut PlayerInput, conn: &Conn
     set_targeting(input, None);
 }
 
+/// Touche 4 : la Sentinelle de vision passe en visée de balise ; un trinket actif (Lanterne
+/// révélatrice…) est utilisé aussitôt, comme au clic sur son emplacement du HUD (#336).
+fn trinket_key(state: &GameState, input: &mut PlayerInput, conn: &Connection) {
+    let trinket = state
+        .my_entity
+        .and_then(|id| state.entities().get(&id))
+        .and_then(|e| e.champ.as_ref())
+        .and_then(|c| c.items.get(6).cloned().flatten());
+    match trinket.as_deref().and_then(item) {
+        Some(d) if d.active.is_some() && d.id != "stealth_ward" => conn.send(ClientMsg::UseItem {
+            slot: -1,
+            target_pos: input.cursor,
+        }),
+        _ => set_targeting(input, Some(Targeting::Ward)),
+    }
+}
+
 fn set_targeting(input: &mut PlayerInput, t: Option<Targeting>) {
     if t.is_none() {
         input.cast_held = None;
@@ -448,7 +466,7 @@ pub(crate) fn key_orders(
         }
         if let Some(action) = digit_action(ev.key_code) {
             match action {
-                DigitAction::Ward => set_targeting(&mut input, Some(Targeting::Ward)),
+                DigitAction::Ward => trinket_key(&state, &mut input, &conn),
                 DigitAction::Item(slot) => conn.send(ClientMsg::UseItem {
                     slot,
                     target_pos: input.cursor,
@@ -869,6 +887,40 @@ mod tests {
             .advance_by(std::time::Duration::from_millis(460));
         assert!(world.run_system_once(markers::update_markers).is_ok());
         assert!(shown(&mut world).is_empty());
+    }
+
+    /// #336 : touche 4 = visée de balise avec la Sentinelle, utilisation immédiate d'un trinket actif.
+    #[test]
+    fn la_touche_4_utilise_le_trinket_equipe() {
+        let (mut state, mut input, conn, sent) = setup();
+        let equip = |state: &mut GameState, trinket: &str| {
+            let me = state.buffer.entities.get_mut(&1).unwrap();
+            let mut items = vec![None; 6];
+            items.push(Some(trinket.to_owned()));
+            me.champ = Some(lov_shared::types::ChampSnapshot {
+                player_id: "p".into(),
+                name: "P".into(),
+                kills: 0,
+                deaths: 0,
+                assists: 0,
+                cs: 0,
+                items,
+                respawn_in: None,
+            });
+        };
+        equip(&mut state, "stealth_ward");
+        trinket_key(&state, &mut input, &conn);
+        assert_eq!(input.targeting, Some(Targeting::Ward));
+        assert!(sent.try_recv().is_err());
+        set_targeting(&mut input, None);
+        // Trinket à actif (même chemin que la Lanterne révélatrice) : utilisé aussitôt.
+        equip(&mut state, "colossus_eye");
+        trinket_key(&state, &mut input, &conn);
+        assert_eq!(input.targeting, None);
+        assert!(matches!(
+            sent.try_recv(),
+            Ok(ClientMsg::UseItem { slot: -1, .. })
+        ));
     }
 
     #[test]
