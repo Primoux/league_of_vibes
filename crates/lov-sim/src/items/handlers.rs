@@ -74,9 +74,6 @@ pub fn item_stats_of(e: &Entity) -> PartialStats {
     out
 }
 
-/// Réduction des soins de la Hache du bourreau.
-const ITEM_GRIEVOUS: f64 = 0.4;
-
 static STAT_SOURCE: Once = Once::new();
 
 /// Source de stats de l'actif « rafale » (+40 % de vitesse). Le registre des sources est global au
@@ -111,6 +108,9 @@ pub fn heal_item_max_hp_delta(e: &mut Entity, before: &PartialStats) {
         e.hp += d;
     }
 }
+
+/// Réduction des soins de la Hache du bourreau.
+const ITEM_GRIEVOUS: f64 = 0.4;
 
 /// Enregistre les passifs d'objets. Appelé par l'`init` du système économie.
 pub fn register_item_hooks(world: &mut World) {
