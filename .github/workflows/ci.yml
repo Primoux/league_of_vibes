@@ -24,7 +24,8 @@ jobs:
       - name: Toolchain épinglé (rust-toolchain.toml)
         run: rustup toolchain install
       - run: cargo fmt --all --check
-      - run: node --test scripts/check-areas.test.ts
+      - run: node --test scripts/check-areas.test.ts scripts/patch-notes.test.ts
+      - run: node scripts/patch-notes.mjs check
       - run: node scripts/check-areas.mjs --audit
 
   rust:

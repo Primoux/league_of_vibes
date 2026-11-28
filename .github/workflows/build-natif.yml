@@ -67,6 +67,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Version et notes du patch
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cargo=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+          [ "$cargo" = "$version" ] || { echo "::error::étiquette $GITHUB_REF_NAME, mais Cargo.toml est en $cargo"; exit 1; }
+          node scripts/patch-notes.mjs extract "$version" > notes.md
       - uses: actions/download-artifact@v8
         with:
           path: dist
@@ -74,4 +84,4 @@ jobs:
       - name: Release GitHub
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "League of Vibes $GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "League of Vibes $GITHUB_REF_NAME" --notes-file notes.md --generate-notes
