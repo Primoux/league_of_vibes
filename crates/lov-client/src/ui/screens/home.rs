@@ -830,7 +830,22 @@ impl Plugin for HomePlugin {
                 Update,
                 (refresh, submit_on_enter, drive_stage).run_if(in_state(Screen::Home)),
             )
-            .add_observer(on_activate);
+            .add_observer(on_activate)
+            .add_observer(focus_on_press);
+    }
+}
+
+/// Cliquer dans un champ (nom, code de salle) lui donne le focus clavier : sans ça, `TextInput` ne
+/// reçoit aucune frappe (`DefaultPlugins` n'installe pas `PointerFocusPlugin`, et nos champs n'ont pas de
+/// `TabIndex`). Le clic remonte la hiérarchie : un clic sur un enfant du champ compte aussi.
+fn focus_on_press(
+    ev: On<PointerPress>,
+    fields: Query<(), InputField>,
+    mut focus: ResMut<InputFocus>,
+) {
+    let e = ev.event_target();
+    if fields.contains(e) && focus.get() != Some(e) {
+        focus.set(e, bevy::input_focus::FocusCause::Navigated);
     }
 }
 
