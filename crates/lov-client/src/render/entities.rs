@@ -23,7 +23,7 @@ use super::champions::{ChampionAssets, ChampionsPlugin};
 use super::healthbars::{BarWorld, HealthBarsPlugin, update_bars};
 use super::models::{Kit, ModelsPlugin, RigView, structures};
 use super::views::{EntityView, animate_views, phase_of, spawn_default_view};
-use super::{from_shared, to_world};
+use super::{from_shared, to_ground};
 use crate::net::{GameState, Pose, ServerEvent};
 
 /// Distance (unités de jeu) sous laquelle une entité serveur masque la structure statique de la carte.
@@ -109,7 +109,7 @@ fn spawn_static_structures(mut commands: Commands, mut kit: Kit) {
                     dead: false,
                     drake: None,
                 },
-                Transform::from_translation(to_world(Vec2::new(x as f32, y as f32), 0.0)),
+                Transform::from_translation(to_ground(Vec2::new(x as f32, y as f32), 0.0)),
                 Visibility::default(),
             ))
             .id();
@@ -242,14 +242,15 @@ fn hide_static_near(e: &EntitySnapshot, statics: &mut Query<(&StaticStructure, &
 }
 
 fn target(p: Pose, lift: f32) -> Transform {
-    Transform::from_translation(to_world(
+    Transform::from_translation(to_ground(
         from_shared(lov_shared::types::Vec2 { x: p.x, y: p.y }),
         lift,
     ))
     .with_rotation(Quat::from_rotation_y(p.facing as f32))
 }
 
-/// Place chaque vue à la position interpolée de son entité, au sol, tournée vers `facing`.
+/// Place chaque vue à la position interpolée de son entité, posée sur le relief du terrain, tournée
+/// vers `facing`.
 fn place_views(
     state: Res<GameState>,
     index: Res<ViewIndex>,
