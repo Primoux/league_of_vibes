@@ -999,6 +999,55 @@ fn lame_spectrale_dash_vers_la_position_visee() {
     );
 }
 
+/// #314 : l'AA renforcée reste physique, le bonus part en dégâts magiques séparés ; 1,5 s de délai.
+#[test]
+fn sort_lame_bonus_magique_separe_et_delai() {
+    let mut s = full_world();
+    let c = champ_as(&mut s.world, Team::Blue, fountain(Team::Blue), "ilyra");
+    set_gold(&mut s, c, 5000.0);
+    buy(&mut s, c, "sceptre_de_lorage");
+    s.step(); // stats de l'objet recalculées au tick suivant l'achat
+    let target = red_minion(&mut s, v(600.0, 600.0));
+    let cast = |s: &mut Sim| {
+        s.world.emit(GameEvent::AbilityCast {
+            source: c,
+            champion_id: "ilyra".into(),
+            slot: AbilitySlot::Q,
+            ability_id: "ilyra_q".into(),
+            target_pos: None,
+            target_id: None,
+            fx_key: None,
+        })
+    };
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let log = Arc::clone(&seen);
+    s.world.events.on(EventKind::Damage, move |_, ev| {
+        if let GameEvent::Damage {
+            damage_type,
+            ability,
+            ..
+        } = ev
+        {
+            log.lock().unwrap().push((*damage_type, ability.clone()));
+        }
+    });
+    cast(&mut s);
+    hit(&mut s.world, c, target, false);
+    let got = seen.lock().unwrap().clone();
+    assert_eq!(got[0].0, DamageType::Physical, "{got:?}");
+    assert_eq!(
+        got[1],
+        (DamageType::Magic, Some("item_spellblade".into())),
+        "{got:?}"
+    );
+    // Délai : un sort juste après ne réarme pas, un sort 1,5 s plus tard si.
+    cast(&mut s);
+    assert!(!st(&s, c).spellblade_ready);
+    s.run(1.6);
+    cast(&mut s);
+    assert!(st(&s, c).spellblade_ready);
+}
+
 #[test]
 fn sceptre_de_l_orage_sort_lame() {
     let mut s = full_world();

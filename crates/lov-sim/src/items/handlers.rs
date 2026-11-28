@@ -72,6 +72,10 @@ pub fn item_stats_of(e: &Entity) -> PartialStats {
     out
 }
 
+/// Sort-lame : part de l'AP infligée en dégâts magiques, et délai avant qu'un sort le réarme.
+const SPELLBLADE_AP_RATIO: f64 = 0.8;
+const SPELLBLADE_COOLDOWN: f64 = 1.5;
+
 static STAT_SOURCE: Once = Once::new();
 
 /// Source de stats de l'actif « rafale » (+40 % de vitesse). Le registre des sources est global au
@@ -204,14 +208,41 @@ pub fn register_item_hooks(world: &mut World) {
         let spellblade =
             econ_ref(a).is_some_and(|st| st.spellblade_ready) && has_passive(a, "spellblade");
         if spellblade {
-            ctx.bonus += a.stats.ap * 0.8;
-            ctx.damage_type = DamageType::Magic;
+            // L'attaque reste physique : le bonus magique part en instance séparée après l'impact
+            // (hook `after_attack_hit`), sinon l'AD serait réduite par la RM (#314).
+            let time = world.time;
             if let Some(a) = world.get_mut(ctx.attacker) {
-                econ(a).spellblade_ready = false;
+                let st = econ(a);
+                st.spellblade_ready = false;
+                st.spellblade_hit = true;
+                st.spellblade_ready_at = time + SPELLBLADE_COOLDOWN;
             }
         } else if has_passive(a, "etincelle") {
             ctx.bonus += 20.0;
         }
+    }));
+
+    // Sort-lame : dégâts magiques séparés de l'auto-attaque qui l'a consommé.
+    world.hooks.after_attack_hit.push(Box::new(|world, ctx, _| {
+        let Some(a) = world.get_mut(ctx.attacker) else {
+            return;
+        };
+        let Some(st) = a
+            .data
+            .get_mut::<EconomyState>()
+            .filter(|st| st.spellblade_hit)
+        else {
+            return;
+        };
+        st.spellblade_hit = false;
+        let amount = a.stats.ap * SPELLBLADE_AP_RATIO;
+        apply_damage(
+            world,
+            DamageOpts {
+                ability: Some("item_spellblade".into()),
+                ..DamageOpts::new(Some(ctx.attacker), ctx.target, amount, DamageType::Magic)
+            },
+        );
     }));
 
     // Rafale : source de stats. La stase (`Stasis`) est gérée nativement par `combat::buffs`.
@@ -222,10 +253,14 @@ pub fn register_item_hooks(world: &mut World) {
         let GameEvent::AbilityCast { source, .. } = ev else {
             return;
         };
+        let time = world.time;
         if champ_has_passive(world, Some(*source), "spellblade")
             && let Some(s) = world.get_mut(*source)
         {
-            econ(s).spellblade_ready = true;
+            let st = econ(s);
+            if time >= st.spellblade_ready_at {
+                st.spellblade_ready = true;
+            }
         }
     });
 
