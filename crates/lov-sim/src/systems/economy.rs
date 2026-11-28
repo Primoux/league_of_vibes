@@ -762,6 +762,19 @@ fn init_economy(world: &mut World) {
             cancel_recall(world, *target);
         }
     });
+
+    // Lancer un sort ou un sort d'invocateur (Flash, dash…) interrompt aussi le rappel (#311). Seuls
+    // les lancers réussis émettent ces événements : un sort refusé ne coupe rien.
+    world.events.on(EventKind::AbilityCast, |world, ev| {
+        if let GameEvent::AbilityCast { source, .. } = ev {
+            cancel_recall(world, *source);
+        }
+    });
+    world.events.on(EventKind::SummonerCast, |world, ev| {
+        if let GameEvent::SummonerCast { source, .. } = ev {
+            cancel_recall(world, *source);
+        }
+    });
 }
 
 /// Applique une commande de boutique en soignant le delta de PV max des objets.
