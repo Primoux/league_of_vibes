@@ -820,6 +820,29 @@ fn potion_soigne_sur_15_s() {
     );
 }
 
+/// #315 : anti-soin de l'objet et des buffs (Ignite) ne se cumulent pas, seul le plus fort compte.
+#[test]
+fn anti_soins_objet_et_buff_ne_se_cumulent_pas() {
+    use lov_sim::combat::buffs::{BuffOptions, add_buff};
+    let heal_with = |buff: Option<f64>| {
+        let mut s = econ_world();
+        let e = champ(&mut s.world, Team::Blue, v(5000.0, 5000.0));
+        s.e_mut(e).hp = 100.0;
+        let now = s.world.time;
+        econ(s.e_mut(e)).grievous_until = now + 3.0;
+        if let Some(g) = buff {
+            let mut o = BuffOptions::new(5.0);
+            o.params.grievous = Some(g);
+            add_buff(&mut s.world, e, "ignite", o);
+        }
+        apply_heal(&mut s.world, HealOpts::new(Some(e), e, 100.0))
+    };
+    close(heal_with(None), 60.0); // objet seul : 40 %
+    close(heal_with(Some(0.4)), 60.0); // Ignite 40 % + objet 40 % : 40 %
+    close(heal_with(Some(0.2)), 60.0); // objet plus fort
+    close(heal_with(Some(0.6)), 40.0); // buff plus fort
+}
+
 #[test]
 fn hache_du_bourreau_blessure_grave_reduit_les_soins_de_40_pourcent() {
     let mut s = full_world();
