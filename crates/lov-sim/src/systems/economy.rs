@@ -569,7 +569,10 @@ fn grant_kill_gold(
             && kteam != t_team
         {
             if let Some(k) = world.get_mut(kid) {
-                econ(k).kill_streak += 1;
+                let st = econ(k);
+                st.kill_streak += 1;
+                // Un kill efface la série de morts : la prime du tueur n'est plus réduite (#312).
+                st.death_streak = 0;
             }
             let mut gold = bounty.unwrap_or(KILL_GOLD);
             if !*first_blood {
