@@ -30,11 +30,11 @@ use lov_sim::items::{EconomyState, LeviathanBuff, econ, econ_ref};
 use lov_sim::systems::combat::hit;
 use lov_sim::systems::economy::{
     FIRST_BLOOD_GOLD, KILL_GOLD, PLATE_GOLD, RECALL_LEVIATHAN_SECONDS, STRUCTURE_TEAM_GOLD,
-    WARD_CAST_RANGE, WARD_HP, WARD_LIFETIME, WARD_MAX_CHARGES, WARD_RECHARGE, WARD_SIGHT,
-    objective_gold, structure_local_gold,
+    TRINKET_SWAP_COOLDOWN, WARD_CAST_RANGE, WARD_HP, WARD_LIFETIME, WARD_MAX_CHARGES,
+    WARD_RECHARGE, WARD_SIGHT, objective_gold, structure_local_gold,
 };
 use lov_sim::systems::movement::DashData;
-use lov_sim::systems::vision::{Invisible, RevealedUntil, SightRadius};
+use lov_sim::systems::vision::{Invisible, SightRadius, is_visible_to};
 use lov_sim::world_ai::runtime::Rewards;
 use lov_sim::{Entity, EventKind};
 
@@ -1246,8 +1246,10 @@ fn la_balise_expire_apres_90_s() {
     assert!(wards(&s).is_empty());
 }
 
+/// #310 : la balise donne la vision et reste furtive quand un ennemi approche (décision : seule la
+/// Lanterne révélatrice la montre, voir les tests suivants).
 #[test]
-fn donne_la_vision_et_se_revele_si_un_ennemi_approche() {
+fn donne_la_vision_et_reste_furtive_si_un_ennemi_approche() {
     let mut s = full_world();
     let c = at_fountain(&mut s);
     buy(&mut s, c, "stealth_ward");
@@ -1258,15 +1260,118 @@ fn donne_la_vision_et_se_revele_si_un_ennemi_approche() {
         s.e(ward).data.get::<SightRadius>().map(|r| r.0),
         Some(WARD_SIGHT)
     );
+    s.e_mut(c).pos = v(1000.0, 1000.0); // le poseur s'éloigne : seule la balise voit
     let enemy = champ(
         &mut s.world,
         Team::Red,
         v(3000.0 + WARD_SIGHT - 50.0, 3000.0),
     );
-    s.run(0.1);
-    let revealed = s.e(ward).data.get::<RevealedUntil>().map(|r| r.0);
-    assert!(revealed.is_some_and(|t| t > s.world.time - 1.0));
-    assert!(s.e(enemy).pos.x <= 3000.0 + WARD_SIGHT);
+    s.run(0.5);
+    assert!(
+        is_visible_to(s.e(enemy), TeamOrNeutral::Blue, false),
+        "la balise voit l'ennemi"
+    );
+    assert!(
+        !is_visible_to(s.e(ward), TeamOrNeutral::Red, false),
+        "l'ennemi ne voit pas la balise"
+    );
+}
+
+fn use_trinket(s: &mut Sim, id: EntityId) {
+    cmd(
+        s,
+        id,
+        ClientMsg::UseItem {
+            slot: -1,
+            target_pos: None,
+        },
+    );
+}
+
+/// #310 : la Lanterne révélatrice montre les balises ennemies à 600 u pendant 10 s ; révélée, une
+/// balise est attaquable.
+#[test]
+fn la_lanterne_revelatrice_montre_les_balises_ennemies_proches() {
+    let mut s = full_world();
+    let blue = at_fountain(&mut s);
+    buy(&mut s, blue, "stealth_ward");
+    s.e_mut(blue).pos = v(6000.0, 6000.0);
+    place(&mut s, blue, 6100.0, 6000.0); // proche
+    place(&mut s, blue, 6500.0, 6000.0); // à 1200 u de la lanterne
+    let (near, far) = (wards(&s)[0], wards(&s)[1]);
+    s.e_mut(blue).pos = v(1000.0, 1000.0);
+    let red = champ(&mut s.world, Team::Red, fountain(Team::Red));
+    buy(&mut s, red, "lanterne_revelatrice");
+    assert_eq!(st(&s, red).trinket.as_deref(), Some("lanterne_revelatrice"));
+    s.e_mut(red).pos = v(5700.0, 6000.0);
+    use_trinket(&mut s, red);
+    s.run(0.2);
+    assert!(
+        is_visible_to(s.e(near), TeamOrNeutral::Red, false),
+        "balise à 400 u révélée"
+    );
+    assert!(
+        !is_visible_to(s.e(far), TeamOrNeutral::Red, false),
+        "balise à 800 u cachée"
+    );
+    cmd(&mut s, red, ClientMsg::Attack { target_id: near });
+    s.run(6.5); // mêlée à 0,62 attaque/s : marcher 250 u puis 3 coups
+    assert!(
+        !s.world.contains(near) || s.e(near).dead,
+        "balise révélée détruite"
+    );
+    // Après 10 s, plus rien n'est révélé ; l'actif est en recharge.
+    s.run(4.0);
+    assert!(!is_visible_to(s.e(far), TeamOrNeutral::Red, false));
+    let charges = s
+        .e(red)
+        .data
+        .get::<EconomyState>()
+        .map(|st| st.revelation_until);
+    assert!(charges.is_some_and(|t| t < s.world.time));
+    let before = st(&s, red).revelation_until;
+    use_trinket(&mut s, red);
+    assert_eq!(st(&s, red).revelation_until, before, "recharge de 90 s");
+}
+
+/// #310 : changer de trinket à la fontaine ; le nouveau démarre en recharge (30 s), l'annulation rend
+/// l'ancien dans son état ; un trinket hors boutique n'est pas échangé.
+#[test]
+fn changer_de_trinket_a_la_fontaine() {
+    let mut s = full_world();
+    let c = at_fountain(&mut s);
+    buy(&mut s, c, "stealth_ward");
+    assert_eq!(st(&s, c).trinket_charges, WARD_MAX_CHARGES);
+    buy(&mut s, c, "lanterne_revelatrice");
+    assert_eq!(st(&s, c).trinket.as_deref(), Some("lanterne_revelatrice"));
+    use_trinket(&mut s, c);
+    assert_eq!(
+        st(&s, c).revelation_until,
+        0.0,
+        "en recharge juste après le changement"
+    );
+    // Annulation : la sentinelle revient avec ses 2 charges.
+    cmd(&mut s, c, ClientMsg::UndoShop);
+    assert_eq!(st(&s, c).trinket.as_deref(), Some("stealth_ward"));
+    assert_eq!(st(&s, c).trinket_charges, WARD_MAX_CHARGES);
+    // Aller-retour : la sentinelle repart sans charge, une revient après 30 s.
+    buy(&mut s, c, "lanterne_revelatrice");
+    buy(&mut s, c, "stealth_ward");
+    assert_eq!(st(&s, c).trinket_charges, 0);
+    s.run(TRINKET_SWAP_COOLDOWN + 0.5);
+    assert_eq!(st(&s, c).trinket_charges, 1);
+    // La lanterne est prête au bout de 30 s.
+    let mut s = full_world();
+    let c = at_fountain(&mut s);
+    buy(&mut s, c, "stealth_ward");
+    buy(&mut s, c, "lanterne_revelatrice");
+    s.run(TRINKET_SWAP_COOLDOWN + 0.5);
+    use_trinket(&mut s, c);
+    assert!(st(&s, c).revelation_until > s.world.time);
+    // Œil du colosse : pas d'échange.
+    econ(s.e_mut(c)).trinket = Some("colossus_eye".into());
+    buy(&mut s, c, "stealth_ward");
+    assert_eq!(st(&s, c).trinket.as_deref(), Some("colossus_eye"));
 }
 
 #[test]

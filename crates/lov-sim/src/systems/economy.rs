@@ -32,11 +32,11 @@ use lov_shared::types::{
 
 use crate::combat::damage::kill;
 use crate::items::{
-    ConsumedItem, EconomyState, LeviathanBuff, Recall, SLOTS, ShopAction, ShopActionKind,
-    TRINKET_SLOT, econ, econ_ref, heal_item_max_hp_delta, inventory_index, item_stats_of,
-    register_item_hooks, tick_items, use_item,
+    ConsumedItem, EconomyState, LeviathanBuff, PreviousTrinket, Recall, SLOTS, ShopAction,
+    ShopActionKind, TRINKET_SLOT, econ, econ_ref, heal_item_max_hp_delta, inventory_index,
+    item_stats_of, register_item_hooks, tick_items, use_item,
 };
-use crate::systems::vision::{Invisible, RevealedUntil, SightRadius};
+use crate::systems::vision::{Invisible, SightRadius};
 use crate::world::{ChampionState, Entity, EventKind, System, World};
 use crate::world_ai::runtime::{PlateReward, Rewards};
 
@@ -103,6 +103,8 @@ pub const WARD_SIGHT: f64 = 900.0;
 pub const WARD_CAST_RANGE: f64 = 600.0;
 pub const WARD_MAX_CHARGES: u32 = 2;
 pub const WARD_RECHARGE: f64 = 90.0;
+/// Recharge du nouveau trinket après un changement de trinket à la boutique.
+pub const TRINKET_SWAP_COOLDOWN: f64 = 30.0;
 /// Une balise meurt en 3 auto-attaques (1 dégât chacune, voir `items::handlers`).
 pub const WARD_HP: f64 = 3.0;
 /// Rappel renforcé par le buff du Léviathan.
@@ -206,14 +208,40 @@ fn buy_item(world: &mut World, id: EntityId, item_id: &str) {
     }
 
     if def.category == ItemCategory::Trinket {
+        let time = world.time;
+        let Some(e) = world.get_mut(id) else { return };
         let st = econ(e);
-        if st.trinket.is_some() {
+        // Déjà équipé, ou trinket hors boutique (Œil du colosse) qu'un échange ferait perdre.
+        let current = st.trinket.as_deref().and_then(item);
+        if st.trinket.as_deref() == Some(def.id.as_str())
+            || current.is_some_and(|c| c.shop == Some(false))
+        {
             return;
         }
+        let active = def.active.as_ref().map(|a| a.id.clone());
+        // Changement de trinket (#310) : l'ancien est gardé pour l'annulation, le nouveau démarre en
+        // recharge pour qu'un aller-retour ne rende pas les charges.
+        let previous = st.trinket.take().map(|old| PreviousTrinket {
+            id: old,
+            charges: st.trinket_charges,
+            recharge_at: st.trinket_recharge_at,
+            active_ready_at: active
+                .as_ref()
+                .and_then(|a| st.item_cooldowns.get(a).copied()),
+        });
+        let swap = previous.is_some();
         st.trinket = Some(def.id.clone());
         if def.id == "stealth_ward" {
-            st.trinket_charges = WARD_MAX_CHARGES;
-            st.trinket_recharge_at = 0.0;
+            if swap {
+                st.trinket_charges = 0;
+                st.trinket_recharge_at = time + TRINKET_SWAP_COOLDOWN;
+            } else {
+                st.trinket_charges = WARD_MAX_CHARGES;
+                st.trinket_recharge_at = 0.0;
+            }
+        } else if let Some(a) = active.filter(|_| swap) {
+            let ready = st.item_cooldowns.entry(a).or_insert(0.0);
+            *ready = ready.max(time + TRINKET_SWAP_COOLDOWN);
         }
         st.shop_history.push(ShopAction {
             kind: ShopActionKind::Buy,
@@ -223,6 +251,7 @@ fn buy_item(world: &mut World, id: EntityId, item_id: &str) {
             paid_price: 0.0,
             consumed: Vec::new(),
             charges: None,
+            previous_trinket: previous,
         });
         world.emit(GameEvent::ItemBought {
             target: id,
@@ -255,6 +284,7 @@ fn buy_item(world: &mut World, id: EntityId, item_id: &str) {
                 paid_price: paid,
                 consumed: Vec::new(),
                 charges: Some(ch),
+                previous_trinket: None,
             });
             if let Some(c) = e.champ.as_mut() {
                 c.gold -= def.cost;
@@ -329,6 +359,7 @@ fn buy_item(world: &mut World, id: EntityId, item_id: &str) {
         paid_price: paid,
         consumed,
         charges: Some(0),
+        previous_trinket: None,
     });
     world.emit(GameEvent::ItemBought {
         target: id,
@@ -366,6 +397,7 @@ fn sell_item(world: &mut World, id: EntityId, slot: i32) {
         paid_price: paid,
         consumed: Vec::new(),
         charges,
+        previous_trinket: None,
     });
     if let Some(c) = e.champ.as_mut() {
         c.gold += refund;
@@ -417,8 +449,24 @@ fn undo_shop(world: &mut World, id: EntityId) {
 
 fn undo_buy(c: &mut ChampionState, st: &mut EconomyState, act: &ShopAction) {
     if act.slot == TRINKET_SLOT {
-        st.trinket = None;
-        st.trinket_charges = 0;
+        match &act.previous_trinket {
+            // Annulation d'un changement : l'ancien trinket revient dans son état.
+            Some(p) => {
+                st.trinket = Some(p.id.clone());
+                st.trinket_charges = p.charges;
+                st.trinket_recharge_at = p.recharge_at;
+                if let Some(a) = item(&act.item_id).and_then(|d| d.active.as_ref()) {
+                    match p.active_ready_at {
+                        Some(t) => st.item_cooldowns.insert(a.id.clone(), t),
+                        None => st.item_cooldowns.remove(&a.id),
+                    };
+                }
+            }
+            None => {
+                st.trinket = None;
+                st.trinket_charges = 0;
+            }
+        }
         return;
     }
     let Some(s) = inventory_index(act.slot) else {
@@ -762,6 +810,24 @@ fn init_economy(world: &mut World) {
         if let Some(r) = st.recall {
             s.recalling = Some(r.remaining.max(0.0));
         }
+        // Lanterne révélatrice : sa recharge passe par le même champ que les charges de balise (une
+        // charge, prête ou non), que le HUD affiche déjà sur l'emplacement du trinket.
+        let active = st
+            .trinket
+            .as_deref()
+            .and_then(item)
+            .and_then(|d| d.active.as_ref())
+            .filter(|a| a.id == "revelation");
+        if let Some(a) = active {
+            let left = st
+                .item_cooldowns
+                .get(&a.id)
+                .map_or(0.0, |&t| (t - world.time).max(0.0));
+            s.ward_charges = Some(WardCharges {
+                charges: u32::from(left <= 0.0),
+                cooldown_remaining: left,
+            });
+        }
         if st.trinket.as_deref() == Some("stealth_ward") {
             s.ward_charges = Some(WardCharges {
                 charges: st.trinket_charges,
@@ -903,7 +969,8 @@ fn update_economy(world: &mut World, dt: f64, ids: &mut Vec<EntityId>) {
 
     tick_items(world, dt, ids);
 
-    // Balises : expiration, et révélation quand un ennemi entre dans leur rayon.
+    // Balises : expiration. Une balise furtive ne se révèle pas d'elle-même : seule la Lanterne
+    // révélatrice la montre à l'ennemi (#310, `items::handlers`).
     world.ids_into(Some(EntityKind::Ward), ids);
     for &wid in ids.iter() {
         let Some(w) = world.get(wid) else { continue };
@@ -913,13 +980,6 @@ fn update_economy(world: &mut World, dt: f64, ids: &mut Vec<EntityId>) {
         {
             kill(world, wid, None);
             continue;
-        }
-        let (wteam, wpos) = (w.team, w.pos);
-        let spotted = world
-            .query(Some(EntityKind::Champion))
-            .any(|c| c.team != wteam && !c.dead && dist(c.pos, wpos) <= WARD_SIGHT);
-        if spotted && let Some(w) = world.get_mut(wid) {
-            w.data.insert(RevealedUntil(time + 1.0));
         }
     }
 }

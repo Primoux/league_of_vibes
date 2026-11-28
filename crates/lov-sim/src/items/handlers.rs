@@ -32,6 +32,7 @@ use crate::items::state::{
 };
 use crate::nav::grid::nav_grid;
 use crate::systems::movement::DashData;
+use crate::systems::vision::RevealedUntil;
 use crate::world::{Entity, EventKind, World};
 
 /// Ids des objets possédés (6 emplacements, puis le trinket).
@@ -319,6 +320,7 @@ pub fn register_item_hooks(world: &mut World) {
 /// Effets périodiques des objets (potion, voile de la nuit, fin de stase). Appelé à chaque tick par
 /// le système économie ; `ids` est un tampon réutilisé.
 pub fn tick_items(world: &mut World, dt: f64, ids: &mut Vec<EntityId>) {
+    reveal_wards(world);
     world.ids_into(Some(EntityKind::Champion), ids);
     for &id in ids.iter() {
         let time = world.time;
@@ -543,6 +545,9 @@ pub fn use_item(world: &mut World, id: EntityId, slot: i32, target_pos: Option<V
                 apply_heal(world, HealOpts::new(Some(id), best, 150.0));
             }
         }
+        "revelation" => {
+            econ(e).revelation_until = time + REVELATION_SECONDS;
+        }
         "colosse" => {
             // L'invocation elle-même est résolue par les objectifs.
             econ(e).trinket = None;
@@ -559,6 +564,37 @@ pub fn use_item(world: &mut World, id: EntityId, slot: i32, target_pos: Option<V
         target: id,
         item_id,
     });
+}
+
+/// Lanterne révélatrice : durée de la révélation et rayon autour du porteur.
+pub const REVELATION_SECONDS: f64 = 10.0;
+pub const REVELATION_RADIUS: f64 = 600.0;
+
+/// Révèle (pour ce tick et le suivant) les balises ennemies proches des porteurs d'une Lanterne
+/// révélatrice active. Lu par la vision, qui tourne après l'économie : une balise révélée est visible et
+/// attaquable.
+fn reveal_wards(world: &mut World) {
+    let time = world.time;
+    let mut revealers: Vec<(TeamOrNeutral, Vec2)> = Vec::new();
+    for c in world.query(Some(EntityKind::Champion)) {
+        if !c.dead && econ_ref(c).is_some_and(|st| st.revelation_until > time) {
+            revealers.push((c.team, c.pos));
+        }
+    }
+    if revealers.is_empty() {
+        return;
+    }
+    for w in world.iter_mut() {
+        if w.kind != EntityKind::Ward || w.dead {
+            continue;
+        }
+        let near = revealers
+            .iter()
+            .any(|&(team, pos)| team != w.team && dist(pos, w.pos) <= REVELATION_RADIUS);
+        if near {
+            w.data.insert(RevealedUntil(time + 0.25));
+        }
+    }
 }
 
 /// Lecture de l'état économique pour les autres domaines (`None` si jamais créé).
