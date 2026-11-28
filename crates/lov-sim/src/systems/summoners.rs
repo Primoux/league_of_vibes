@@ -38,6 +38,9 @@ pub struct TeleportChannel {
     pub target: EntityId,
     pub from: Vec2,
     pub interrupted: bool,
+    /// PV du lanceur à la dernière vérification : un dégât qui les fait baisser interrompt la
+    /// canalisation, un dégât absorbé par un bouclier non (#318).
+    pub hp: f64,
 }
 
 /// `entity.data.summoners`.
@@ -241,11 +244,13 @@ pub fn cast_summoner(
             let channel = p("channelDuration");
             let until = world.time + channel;
             if let Some(e) = world.get_mut(id) {
+                let hp = e.hp;
                 e.data.get_or_insert_with(SummonerState::default).channel = Some(TeleportChannel {
                     until,
                     target: dest,
                     from,
                     interrupted: false,
+                    hp,
                 });
                 e.data.insert(Channeling);
                 e.move_target = None;
@@ -325,10 +330,16 @@ fn init_summoners(world: &mut World) {
         let GameEvent::Damage { target, .. } = ev else {
             return;
         };
-        if let Some(ch) = world
-            .get_mut(*target)
-            .and_then(|e| e.data.get_mut::<SummonerState>())
+        // Seuls les PV perdus comptent : un coup absorbé par un bouclier ne coupe rien (#318).
+        let Some(e) = world.get_mut(*target) else {
+            return;
+        };
+        let hp = e.hp;
+        if let Some(ch) = e
+            .data
+            .get_mut::<SummonerState>()
             .and_then(|s| s.channel.as_mut())
+            && hp < ch.hp - 1e-9
         {
             ch.interrupted = true;
         }
@@ -369,10 +380,21 @@ fn update_channel(world: &mut World, id: EntityId) {
         || dest.is_none()
         || moved_or_acted
         || dist2(e.pos, ch.from) > 1.0;
+    // Dégâts silencieux (brûlures…), qui n'émettent pas d'événement : PV en baisse depuis le tick
+    // précédent.
+    let interrupted = interrupted || e.hp < ch.hp - 1e-9;
     if !interrupted && time + 1e-8 < ch.until {
         if let Some(e) = world.get_mut(id) {
             e.move_target = None;
             e.path = None;
+            let hp = e.hp;
+            if let Some(ch) = e
+                .data
+                .get_mut::<SummonerState>()
+                .and_then(|s| s.channel.as_mut())
+            {
+                ch.hp = hp;
+            }
         }
         return;
     }
