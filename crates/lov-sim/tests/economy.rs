@@ -672,6 +672,36 @@ fn vente_a_70_pourcent_et_annulation_de_la_vente() {
     assert_eq!(items(&s, c)[0].as_deref(), Some("long_sword"));
 }
 
+/// #316 : la machette ajoute +15 aux auto-attaques et aux sorts contre un monstre, pas aux brûlures.
+#[test]
+fn machette_seulement_sur_auto_attaques_et_sorts() {
+    let mut s = econ_world();
+    let c = champ_as(&mut s.world, Team::Blue, v(5000.0, 5000.0), "ilyra");
+    s.e_mut(c).champ.as_mut().unwrap().items[0] = Some("hunter_machete".into());
+    let m = unit(
+        &mut s,
+        TeamOrNeutral::Neutral,
+        v(5100.0, 5000.0),
+        EntityKind::Monster,
+        "gromp",
+        100_000.0,
+    );
+    let deal = |s: &mut Sim, ability: Option<&str>, aa: bool| {
+        apply_damage(
+            &mut s.world,
+            DamageOpts {
+                ability: ability.map(Into::into),
+                is_auto_attack: aa,
+                ..DamageOpts::new(Some(c), m, 10.0, DamageType::True)
+            },
+        )
+    };
+    close(deal(&mut s, None, true), 25.0); // auto-attaque
+    close(deal(&mut s, Some("ilyra_q"), false), 25.0); // sort du champion
+    close(deal(&mut s, Some("sum_ignite"), false), 10.0); // brûlure
+    close(deal(&mut s, None, false), 10.0); // autre instance
+}
+
 #[test]
 fn objet_unique_pas_deux_paires_de_bottes() {
     let mut s = full_world();
@@ -818,36 +848,6 @@ fn potion_soigne_sur_15_s() {
         items(&s, c)[slot].is_none(),
         "plus de charges : emplacement vidé"
     );
-}
-
-/// #316 : la machette ajoute +15 aux auto-attaques et aux sorts contre un monstre, pas aux brûlures.
-#[test]
-fn machette_seulement_sur_auto_attaques_et_sorts() {
-    let mut s = econ_world();
-    let c = champ_as(&mut s.world, Team::Blue, v(5000.0, 5000.0), "ilyra");
-    s.e_mut(c).champ.as_mut().unwrap().items[0] = Some("hunter_machete".into());
-    let m = unit(
-        &mut s,
-        TeamOrNeutral::Neutral,
-        v(5100.0, 5000.0),
-        EntityKind::Monster,
-        "gromp",
-        100_000.0,
-    );
-    let deal = |s: &mut Sim, ability: Option<&str>, aa: bool| {
-        apply_damage(
-            &mut s.world,
-            DamageOpts {
-                ability: ability.map(Into::into),
-                is_auto_attack: aa,
-                ..DamageOpts::new(Some(c), m, 10.0, DamageType::True)
-            },
-        )
-    };
-    close(deal(&mut s, None, true), 25.0); // auto-attaque
-    close(deal(&mut s, Some("ilyra_q"), false), 25.0); // sort du champion
-    close(deal(&mut s, Some("sum_ignite"), false), 10.0); // brûlure
-    close(deal(&mut s, None, false), 10.0); // autre instance
 }
 
 #[test]
