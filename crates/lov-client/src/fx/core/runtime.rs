@@ -699,7 +699,13 @@ mod tests {
         let ground = crate::render::ground_height(500.0, 200.0);
         assert!((p - Vec3::new(5.0, ground + 1.0, -2.0)).length() < 1e-6);
         // au milieu de la rivière, le sol est creusé
-        let river = Fx::world_pos(GameVec2 { x: 6000.0, y: 6000.0 }, 0.0);
+        let river = Fx::world_pos(
+            GameVec2 {
+                x: 6000.0,
+                y: 6000.0,
+            },
+            0.0,
+        );
         assert!(river.y < -0.25, "{river}");
         assert!((Fx::scale(250.0) - 2.5).abs() < 1e-6);
     }
