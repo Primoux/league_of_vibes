@@ -115,6 +115,9 @@ gh pr create --fill                                           # remplis le templ
   commentaire qui le justifie, pas d'`unwrap()` sur une donnée venue du réseau.
 - Logique de jeu testée en headless dans `lov-sim` (`crates/lov-sim/tests/`) : crée un `World`, ajoute des
   entités, fais des `step()`, vérifie. Toute règle de jeu que tu ajoutes vient avec son test.
+- **Notes de patch** : une PR qui change quelque chose que le joueur peut remarquer (chiffre, sort, objet,
+  règle, écran, bug visible) ajoute **son propre fragment** `docs/patch-notes/next/<branche>.md`, en
+  français, du point de vue du joueur. Format et publication : `docs/patch-notes/README.md`.
 - **On n'affaiblit ni ne supprime jamais le test d'un autre** pour faire passer sa PR. Si un test d'autrui
   casse à cause de toi, c'est ton code ou le contrat qui doit changer — dis-le dans la PR.
 - **Instantanés de données** (`lov-shared/tests/fixtures/{champions,data,tables}.json`,

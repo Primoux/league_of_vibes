@@ -36,3 +36,4 @@ Aucun
 - [ ] Pas de nouvelle crate, ou justifiée ci-dessus
 - [ ] Aucun nom / visuel / son / texte de Riot ; assets générés ou CC0, listés dans `ASSETS.md`
 - [ ] Textes du jeu en français
+- [ ] Changement visible par le joueur : note dans `docs/patch-notes/next/<branche>.md` (voir `docs/patch-notes/README.md`)
