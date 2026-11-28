@@ -10,6 +10,7 @@ import bevy_pbr::render::{
     pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
     mesh_view_bindings::globals,
 };
+import super::fog::{fog_visibility, apply_fog};
 
 struct Terrain {
     fount_b: vec4<f32>,
@@ -35,6 +36,10 @@ struct Terrain {
 @group(constants::MATERIAL_BIND_GROUP) @binding(102) var masks_sampler: sampler;
 @group(constants::MATERIAL_BIND_GROUP) @binding(103) var noise: texture_2d<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(104) var noise_sampler: sampler;
+
+// Brouillard de guerre (`fog.wesl`).
+@group(constants::MATERIAL_BIND_GROUP) @binding(110) var fog_vis: texture_2d<f32>;
+@group(constants::MATERIAL_BIND_GROUP) @binding(111) var fog_sampler: sampler;
 
 fn n(uv: vec2<f32>) -> vec4<f32> {
     return textureSample(noise, noise_sampler, uv);
@@ -128,5 +133,7 @@ fn fragment(in: VertexOutput, @builtin(front_facing) is_front: bool) -> Fragment
     var out: FragmentOutput;
     out.color = apply_pbr_lighting(pbr_input);
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
+    let fog = fog_visibility(fog_vis, fog_sampler, in.world_position.xyz);
+    out.color = vec4(apply_fog(out.color.rgb, fog), out.color.a);
     return out;
 }

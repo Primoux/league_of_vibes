@@ -5,7 +5,7 @@
 //! dallage des bases, occlusion) ; le shader (`terrain.wesl`) compose herbe, terre, cailloux, sable
 //! humide, pavés et caustiques à partir de la texture de bruit échantillonnée en coordonnées monde.
 //!
-//! Écart avec le client web : le brouillard de guerre (`applyFog`) n'est pas encore porté (area `render`).
+//! Le brouillard de guerre (`applyFog` du web) assombrit et désature les zones non visibles (`fog.rs`).
 
 use bevy::asset::RenderAssetUsages;
 use bevy::light::NotShadowCaster;
@@ -94,6 +94,10 @@ pub struct TerrainExt {
     #[texture(103)]
     #[sampler(104)]
     noise: Handle<Image>,
+    /// Visibilité du brouillard de guerre ([`super::fog::FogOfWar`]).
+    #[texture(110)]
+    #[sampler(111)]
+    fog: Handle<Image>,
 }
 
 impl MaterialExtension for TerrainExt {
@@ -161,6 +165,7 @@ pub fn terrain_mesh(segments: u32) -> Mesh {
 pub(super) fn spawn_terrain(
     mut commands: Commands,
     noise: Res<NoiseTexture>,
+    fog: Res<super::fog::FogOfWar>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut images: ResMut<Assets<Image>>,
     mut materials: ResMut<Assets<TerrainMaterial>>,
@@ -177,6 +182,7 @@ pub(super) fn spawn_terrain(
             u: TerrainUniform::new(),
             masks,
             noise: noise.0.clone(),
+            fog: fog.texture.clone(),
         },
     });
     let half = (MAP_SIZE / 2.0) as f32 * RENDER_SCALE;

@@ -1,7 +1,7 @@
 //! Rivière animée (shader d'eau stylisé) : portage de `packages/client/src/render/map/water.ts`.
 //!
 //! Bande le long de x + y = MAP_SIZE, courant vers le bas-droite. Écarts avec le client web : l'horloge est
-//! `globals.time` de Bevy (`decorTime`), le brouillard de guerre (`applyFog`) n'est pas encore porté, et
+//! `globals.time` de Bevy (`decorTime`), le brouillard de guerre assombrit l'eau hors de vue (`fog.rs`) ; et
 //! la courbe de tons est appliquée par le post-traitement au lieu du shader.
 
 use std::f32::consts::{FRAC_PI_4, SQRT_2};
@@ -47,6 +47,10 @@ pub struct RiverMaterial {
     #[texture(1)]
     #[sampler(2)]
     noise: Handle<Image>,
+    /// Visibilité du brouillard de guerre ([`super::fog::FogOfWar`]).
+    #[texture(3)]
+    #[sampler(4)]
+    fog: Handle<Image>,
 }
 
 impl Material for RiverMaterial {
@@ -103,6 +107,7 @@ pub fn river_transform() -> Transform {
 pub(super) fn spawn_river(
     mut commands: Commands,
     noise: Res<NoiseTexture>,
+    fog: Res<super::fog::FogOfWar>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<RiverMaterial>>,
 ) {
@@ -119,6 +124,7 @@ pub(super) fn spawn_river(
             sun_dir: Vec3::new(14.0, 30.0, 9.0).normalize().extend(0.0),
         },
         noise: noise.0.clone(),
+        fog: fog.texture.clone(),
     });
     commands.spawn((
         Name::new("water"),

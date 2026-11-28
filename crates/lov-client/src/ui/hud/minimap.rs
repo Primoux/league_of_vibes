@@ -259,7 +259,9 @@ fn spawn(
     fonts: Res<UiFonts>,
     mut images: ResMut<Assets<Image>>,
     mut cached: Local<Option<(Handle<Image>, Shapes)>>,
+    fog: Option<Res<crate::render::map::fog::FogOfWar>>,
 ) {
+    let veil = fog.map(|f| f.minimap.clone());
     let f = &*fonts;
     let (bg, shapes) = cached
         .get_or_insert_with(|| (images.add(draw_static()), Shapes::new(&mut images)))
@@ -315,6 +317,20 @@ fn spawn(
                         BlocksWorld,
                     ))
                     .with_children(|map| {
+                        // brouillard de guerre (`drawFog` du web) : voile sur les zones non visibles,
+                        // sous les marqueurs
+                        if let Some(veil) = veil {
+                            map.spawn((
+                                Node {
+                                    position_type: PositionType::Absolute,
+                                    width: px(SIZE),
+                                    height: px(SIZE),
+                                    ..default()
+                                },
+                                ImageNode::new(veil),
+                                Pickable::IGNORE,
+                            ));
+                        }
                         let hidden = Visibility::Hidden;
                         for i in 0..STRUCTURES {
                             map.spawn((
