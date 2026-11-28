@@ -3,9 +3,9 @@
 //! Une texture de visibilité basse résolution (192², blanc = visible) couvre la carte. Elle est
 //! recalculée environ 12 fois par seconde à partir des entités alliées (rayons du `PLAN` §9) : la vision
 //! révélée apparaît aussitôt et s'estompe en douceur quand elle est perdue (×0,7 par mise à jour).
-//! Le sol, la végétation et l'eau la lisent (`apply_fog` dans `terrain.wesl`, `foliage.wesl`,
-//! `water.wesl`) pour assombrir et désaturer les zones non visibles ; la minicarte en superpose une
-//! version prête à afficher ([`FogOfWar::minimap`]).
+//! Le sol, la végétation, les falaises et l'eau la lisent pour assombrir et désaturer les zones non
+//! visibles : le code est commun, dans `fog.wesl`, importé par chaque shader du décor (`super::fog`) ;
+//! la minicarte en superpose une version prête à afficher ([`FogOfWar::minimap`]).
 //!
 //! Le serveur ne transmet pas les ennemis invisibles : le brouillard est purement visuel. Hors partie,
 //! la texture est blanche (brouillard désactivé, `uFowDark = 1` du web).
@@ -29,8 +29,26 @@ const PERIOD: f32 = 1.0 / 12.0;
 const KEEP: f32 = 0.7;
 /// Bord doux du pinceau : opaque jusqu'à 82 % du rayon, puis dégradé jusqu'au bord.
 const SOFT_FROM: f64 = 0.82;
-/// Opacité du voile de la minicarte sur une zone non visible (`globalAlpha = 0.62` en `multiply`).
-const MINIMAP_VEIL: f32 = 0.62;
+/// Opacité du voile de la minicarte sur une zone non visible. Le web peint `globalAlpha = 0.62` en
+/// `multiply` sur un canvas mélangé en sRGB ; l'UI Bevy mélange en linéaire, où le même noir paraît bien
+/// plus clair : 0,88 retrouve à l'œil l'assombrissement du web.
+const MINIMAP_VEIL: f32 = 0.88;
+/// Module de shader commun du brouillard, importé par les shaders du décor.
+const SHADER: &str = "embedded://lov_client/render/map/fog.wesl";
+
+/// Garde chargé `fog.wesl` : un module WESL n'est résolu à l'import que s'il est chargé.
+#[derive(Resource)]
+pub struct FogShader {
+    _handle: Handle<Shader>,
+}
+
+impl FromWorld for FogShader {
+    fn from_world(world: &mut World) -> Self {
+        Self {
+            _handle: world.resource::<AssetServer>().load(SHADER),
+        }
+    }
+}
 
 /// Rayon de vision (unités de jeu) d'une entité alliée, 0 si elle ne voit rien : `visionRadius` du web.
 pub fn vision_radius(kind: EntityKind) -> f64 {
@@ -118,7 +136,7 @@ impl FogVis {
 pub struct FogOfWar {
     /// Visibilité (R8, blanc = visible), lue par les shaders du décor.
     pub texture: Handle<Image>,
-    /// Voile de la minicarte (noir, opacité `0,62 × (1 − visibilité)`), ligne 0 en haut de la carte.
+    /// Voile de la minicarte (noir, opacité `MINIMAP_VEIL × (1 − visibilité)`), ligne 0 en haut de la carte.
     pub minimap: Handle<Image>,
     pub vis: FogVis,
     acc: f32,
@@ -340,14 +358,115 @@ mod tests {
         let m = mini.data.as_ref().expect("données");
         let row = RES - 1 - i;
         assert_eq!(m[(row * RES + i) * 4 + 3], 0);
-        let veil = (0.62f32 * 255.0).round() as u8;
+        let veil = (MINIMAP_VEIL * 255.0).round() as u8;
         assert_eq!(m[3], veil, "coin nord-ouest voilé");
         assert_eq!(m[(RES - 1) * 4 + 3], veil, "coin nord-est voilé");
     }
 
-    /// Les shaders divisent la position monde par 120 : la carte fait 12 000 unités de jeu à 0,01.
+    /// `fog.wesl` divise la position monde par `MAP_WORLD` : la carte fait 12 000 unités de jeu à 0,01.
     #[test]
-    fn la_carte_fait_120_unites_monde() {
-        assert!((MAP_SIZE * f64::from(crate::render::RENDER_SCALE) - 120.0).abs() < 1e-3);
+    fn la_taille_de_carte_du_shader_suit_les_constantes() {
+        let src = include_str!("fog.wesl");
+        let line = src
+            .lines()
+            .find(|l| l.starts_with("const MAP_WORLD: f32 = "))
+            .expect("MAP_WORLD dans fog.wesl");
+        let value: f64 = line["const MAP_WORLD: f32 = ".len()..]
+            .trim_end_matches(';')
+            .parse()
+            .expect("nombre");
+        assert!((MAP_SIZE * f64::from(crate::render::RENDER_SCALE) - value).abs() < 1e-3);
+    }
+
+    /// Les shaders du décor lisent tous le code commun, aucun ne garde sa copie.
+    #[test]
+    fn les_shaders_du_decor_importent_le_brouillard() {
+        for (name, src) in [
+            ("terrain", include_str!("terrain.wesl")),
+            ("foliage", include_str!("foliage.wesl")),
+            ("cliff", include_str!("cliff.wesl")),
+            ("water", include_str!("water.wesl")),
+        ] {
+            assert!(src.contains("import super::fog::"), "{name}.wesl");
+            assert!(!src.contains("fn apply_fog"), "{name}.wesl copie apply_fog");
+            assert!(!src.contains("120.0"), "{name}.wesl code la carte en dur");
+        }
+    }
+
+    fn app() -> App {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .init_asset::<Image>()
+            .init_resource::<GameState>()
+            .init_resource::<FogOfWar>()
+            .add_systems(Update, update_fog);
+        app
+    }
+
+    fn texel(app: &App, x: f64, y: f64) -> u8 {
+        let fog = app.world().resource::<FogOfWar>();
+        let tex = app.world().resource::<Assets<Image>>();
+        let data = tex.get(&fog.texture).and_then(|t| t.data.as_ref());
+        let i = ((x * K) as usize).min(RES - 1);
+        let j = ((y * K) as usize).min(RES - 1);
+        data.expect("texture du brouillard")[j * RES + i]
+    }
+
+    #[test]
+    fn entree_en_partie_au_noir_puis_sortie_au_blanc() {
+        use lov_shared::protocol::GameStart;
+        use lov_shared::types::Team;
+        let mut app = app();
+        app.update();
+        assert_eq!(
+            texel(&app, 6000.0, 6000.0),
+            255,
+            "hors partie : tout visible"
+        );
+
+        let mut me = ent(EntityKind::Champion, TeamOrNeutral::Blue, 2000.0, 2000.0);
+        me.id = 7;
+        {
+            let mut state = app.world_mut().resource_mut::<GameState>();
+            state.game = Some(GameStart {
+                you: "p".into(),
+                team: Team::Blue,
+                entity_id: 7,
+                players: Vec::new(),
+                server_time: 0.0,
+            });
+            state.buffer.entities.insert(7, me);
+        }
+        app.update();
+        assert_eq!(texel(&app, 2000.0, 2000.0), 255, "autour du champion");
+        assert_eq!(
+            texel(&app, 9000.0, 9000.0),
+            0,
+            "entrée en partie : le reste au noir"
+        );
+        let veil = {
+            let fog = app.world().resource::<FogOfWar>();
+            let images = app.world().resource::<Assets<Image>>();
+            images
+                .get(&fog.minimap)
+                .and_then(|m| m.data.as_ref())
+                .expect("voile")[3]
+        };
+        assert_eq!(
+            veil,
+            (MINIMAP_VEIL * 255.0).round() as u8,
+            "minicarte voilée"
+        );
+
+        app.world_mut().resource_mut::<GameState>().game = None;
+        app.update();
+        assert_eq!(
+            texel(&app, 9000.0, 9000.0),
+            255,
+            "sortie de partie : tout visible"
+        );
+        let fog = app.world().resource::<FogOfWar>();
+        assert!(!fog.enabled);
+        assert!(fog.vis.0.iter().all(|&v| v == 1.0));
     }
 }

@@ -533,6 +533,7 @@ pub(super) fn spawn_vegetation(
         extension: CliffExt {
             u: CliffUniform::new(),
             noise: noise.0.clone(),
+            fog: fog.texture.clone(),
         },
     });
     commands.spawn((

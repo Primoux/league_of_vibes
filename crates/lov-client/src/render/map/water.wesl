@@ -8,6 +8,7 @@
 import bevy_pbr::render::mesh_functions::{get_world_from_local, mesh_position_local_to_world};
 import bevy_pbr::render::mesh_view_bindings::{globals, view};
 import bevy_pbr::render::view_transformations::position_world_to_clip;
+import super::fog::{fog_visibility, dim_fog};
 
 struct River {
     // longueur, largeur (monde)
@@ -24,7 +25,7 @@ struct River {
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> u: River;
 @group(constants::MATERIAL_BIND_GROUP) @binding(1) var noise: texture_2d<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(2) var noise_sampler: sampler;
-// Brouillard de guerre (`FOG_GLSL` du web, voir `fog.rs`) : l'eau hors de vue est assombrie.
+// Brouillard de guerre (`fog.wesl`) : l'eau hors de vue est assombrie.
 @group(constants::MATERIAL_BIND_GROUP) @binding(3) var fog_vis: texture_2d<f32>;
 @group(constants::MATERIAL_BIND_GROUP) @binding(4) var fog_sampler: sampler;
 
@@ -89,7 +90,6 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     var alpha = mix(0.42, 0.86, smoothstep(0.0, 0.65, depth));
     alpha = max(alpha, foam * 0.85);
     alpha *= (1.0 - smoothstep(0.97, 1.0, across)) * smoothstep(0.0, 4.0, ends);
-    let fog = textureSampleLevel(fog_vis, fog_sampler, vec2(in.world.x, -in.world.z) / 120.0, 0.0).r;
-    col = mix(col * 0.42, col, fog);
+    col = dim_fog(col, fog_visibility(fog_vis, fog_sampler, in.world.xyz));
     return vec4(col, alpha);
 }

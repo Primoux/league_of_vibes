@@ -125,6 +125,10 @@ pub struct CliffExt {
     #[texture(101)]
     #[sampler(102)]
     pub noise: Handle<Image>,
+    /// Visibilité du brouillard de guerre ([`super::fog::FogOfWar`]).
+    #[texture(110)]
+    #[sampler(111)]
+    pub fog: Handle<Image>,
 }
 
 impl MaterialExtension for CliffExt {
