@@ -114,6 +114,10 @@ pub struct EconomyState {
     pub stase_until: f64,
     pub grievous_until: f64,
     pub spellblade_ready: bool,
+    /// L'auto-attaque en cours a consommé le sort-lame : ses dégâts magiques partent après l'impact.
+    pub spellblade_hit: bool,
+    /// Temps de jeu à partir duquel un sort peut réarmer le sort-lame (délai de 1,5 s).
+    pub spellblade_ready_at: f64,
     pub rafale_until: f64,
     pub voile_shield_at: f64,
     pub colossus_call: Option<ColossusCall>,
@@ -138,6 +142,8 @@ impl Default for EconomyState {
             stase_until: f64::NEG_INFINITY,
             grievous_until: f64::NEG_INFINITY,
             spellblade_ready: false,
+            spellblade_hit: false,
+            spellblade_ready_at: 0.0,
             rafale_until: f64::NEG_INFINITY,
             voile_shield_at: 0.0,
             colossus_call: None,
