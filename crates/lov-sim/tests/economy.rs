@@ -277,6 +277,23 @@ fn la_prime_suit_la_serie_de_la_victime_et_ses_morts() {
     close(gold(&s2, a2), 500.0 + (KILL_GOLD - 50.0) + FIRST_BLOOD_GOLD);
 }
 
+/// #312 : un kill remet à zéro la série de morts du tueur ; sa prime n'est plus réduite.
+#[test]
+fn un_kill_efface_la_serie_de_morts_du_tueur() {
+    let mut s = econ_world();
+    let a = champ(&mut s.world, Team::Blue, v(5000.0, 5000.0));
+    let b = champ(&mut s.world, Team::Red, v(5100.0, 5000.0));
+    econ(s.e_mut(a)).death_streak = 4;
+    true_damage(&mut s, a, b, 100_000.0);
+    assert_eq!(st(&s, a).death_streak, 0);
+    assert_eq!(st(&s, a).kill_streak, 1);
+    let before = gold(&s, b);
+    s.e_mut(b).dead = false;
+    s.e_mut(b).hp = s.e(b).stats.max_hp;
+    true_damage(&mut s, b, a, 100_000.0);
+    close(gold(&s, b), before + KILL_GOLD); // ni réduction, ni premier sang
+}
+
 #[test]
 fn donne_l_or_global_et_local_des_tours_et_des_plaques() {
     let mut s = econ_world();
