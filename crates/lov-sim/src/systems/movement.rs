@@ -185,7 +185,12 @@ fn update(world: &mut World, dt: f64, sc: &mut Scratch) {
                 nav.find_path_into(&mut sc.search, e.pos, target, &mut out);
                 e.path = Some(out);
             } else {
-                e.path = Some(vec![nav.nearest_walkable(target)]);
+                // Budget A* épuisé : l'unité attend le tick suivant sans bouger. Une ligne droite
+                // traverserait les murs, et le chemin ne serait plus jamais recalculé (#309).
+                if colliding {
+                    sc.movers.push(id);
+                }
+                continue;
             }
             e.data.get_or_insert_with(MoveData::default).path_for = Some(target);
         }
