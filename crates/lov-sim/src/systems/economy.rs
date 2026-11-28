@@ -286,7 +286,14 @@ fn buy_item(world: &mut World, id: EntityId, item_id: &str) {
     }
     let cost = (def.cost - reduction).max(0.0);
     let Some(c) = e.champ.as_mut() else { return };
-    let Some(slot) = c.items.iter().position(Option::is_none) else {
+    // Emplacement de l'objet : le premier libre, en comptant ceux que la recette libère (inventaire
+    // plein de composants).
+    let Some(slot) = c
+        .items
+        .iter()
+        .enumerate()
+        .position(|(i, s)| s.is_none() || consumed.iter().any(|u| u.slot == i))
+    else {
         return;
     };
     if c.gold < cost {

@@ -645,6 +645,39 @@ fn recette_consomme_les_composants_et_deduit_leur_cout() {
     close(s.e(c).stats.attack_speed, as_base + 0.35);
 }
 
+/// #308 : une recette s'achète avec un inventaire plein si elle consomme des composants.
+#[test]
+fn recette_avec_inventaire_plein_prend_l_emplacement_d_un_composant() {
+    let mut s = full_world();
+    let c = at_fountain(&mut s);
+    set_gold(&mut s, c, 5000.0);
+    for it in [
+        "boots",
+        "long_sword",
+        "dagger",
+        "cloth_armor",
+        "ruby_crystal",
+        "amplifying_tome",
+    ] {
+        buy(&mut s, c, it);
+    }
+    assert!(
+        items(&s, c).iter().take(6).all(Option::is_some),
+        "{:?}",
+        items(&s, c)
+    );
+    let before = gold(&s, c);
+    buy(&mut s, c, "berserker_greaves"); // 1100 - 300 (bottes)
+    assert!(has(&s, c, "berserker_greaves"), "{:?}", items(&s, c));
+    assert!(!has(&s, c, "boots"));
+    assert_eq!(gold(&s, c), before - 800.0);
+    // Toujours plein, sans composant : refusé.
+    let before = gold(&s, c);
+    buy(&mut s, c, "long_sword");
+    assert_eq!(count(&s, c, "long_sword"), 1);
+    assert_eq!(gold(&s, c), before);
+}
+
 #[test]
 fn annuler_rembourse_l_achat_et_rend_les_composants() {
     let mut s = full_world();
