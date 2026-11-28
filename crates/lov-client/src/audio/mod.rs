@@ -15,6 +15,7 @@ pub mod demo;
 pub mod kill_streaks;
 pub mod mixer;
 pub mod music;
+pub mod settings;
 pub mod sounds;
 pub mod synth;
 
@@ -108,6 +109,8 @@ pub struct AudioManager {
     seed: u32,
     /// Identifiant du prochain bus de musique.
     next_bus: u32,
+    /// Un réglage a changé depuis le dernier enregistrement ([`settings::save_volumes`]).
+    changed: bool,
 }
 
 impl AudioManager {
@@ -123,6 +126,7 @@ impl AudioManager {
             now: 0.0,
             seed: 0x5eed,
             next_bus: 1,
+            changed: false,
         }
     }
 
@@ -182,12 +186,12 @@ impl AudioManager {
     }
 }
 
-// Réglages du son (`setVolume`, `setMuted`) : l'écran des paramètres de l'interface les appellera ; la
-// persistance des volumes d'un lancement à l'autre reste à porter (#118). D'ici là, seuls les tests les appellent.
-#[allow(dead_code)]
+/// Réglages du son (`setVolume`, `setMuted`), appelés par le panneau des réglages et enregistrés d'un
+/// lancement à l'autre ([`settings`]).
 impl AudioManager {
     pub fn set_volume(&mut self, ch: Channel, v: f32) {
         self.volumes.set(ch, v);
+        self.changed = true;
         self.send(Command::Volumes(self.volumes));
     }
 
@@ -197,7 +201,24 @@ impl AudioManager {
 
     pub fn set_muted(&mut self, muted: bool) {
         self.volumes.muted = muted;
+        self.changed = true;
         self.send(Command::Volumes(self.volumes));
+    }
+
+    /// Tous les réglages, tels qu'enregistrés.
+    pub fn volumes(&self) -> Volumes {
+        self.volumes
+    }
+
+    /// Applique des réglages relus au démarrage (ce n'est pas un changement à réenregistrer).
+    pub fn restore(&mut self, v: Volumes) {
+        self.volumes = v;
+        self.send(Command::Volumes(self.volumes));
+    }
+
+    /// Vrai une fois après chaque changement de réglage.
+    pub fn take_changed(&mut self) -> bool {
+        std::mem::take(&mut self.changed)
     }
 
     pub fn muted(&self) -> bool {
@@ -299,11 +320,13 @@ impl Plugin for SoundPlugin {
         let (tx, rx) = sync_channel(COMMAND_QUEUE);
         app.add_audio_source::<SynthStream>()
             .insert_resource(AudioManager::new(tx))
+            .insert_resource(settings::SettingsDir(settings::config_dir()))
             .insert_resource(PendingStream(Some(SynthStream {
                 rx: Mutex::new(Some(rx)),
             })))
             .add_plugins((sounds::plugin, music::sequencer::MusicPlugin))
-            .add_systems(Startup, start_stream)
+            .add_systems(Startup, (settings::load_volumes, start_stream))
+            .add_systems(Last, settings::save_volumes)
             .add_systems(First, (tick_clock, follow_camera));
     }
 }

@@ -72,3 +72,36 @@ where
     assert_eq!(json_diff(&original, &reparsed, "$"), None);
     typed
 }
+
+/// Mode régénération des instantanés (`LOV_BLESS=1`) : voir [`check_snapshot`].
+pub fn bless() -> bool {
+    std::env::var_os("LOV_BLESS").is_some_and(|v| !v.is_empty() && v != "0")
+}
+
+/// Compare `actual` à l'instantané `fixtures/<name>`, ou le réécrit avec `text` en mode `LOV_BLESS=1`.
+///
+/// Les fixtures sont la référence des données depuis la bascule (#276) : une modification
+/// **volontaire** de données se fait en régénérant le fichier (`scripts/bless-fixtures.sh`) et le diff
+/// du fixture se relit dans la PR. Une modification involontaire fait échouer le test.
+pub fn check_snapshot(name: &str, text: &str, actual: &Value) {
+    let path = format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
+    if bless() {
+        std::fs::write(&path, text).unwrap_or_else(|e| panic!("{path}: {e}"));
+        return;
+    }
+    let expected: Value = serde_json::from_str(&fixture(name)).expect("fixture JSON valide");
+    if let Some(d) = json_diff(&expected, actual, name) {
+        panic!(
+            "{d}\n\nLa donnée ne correspond plus à l'instantané `tests/fixtures/{name}`.\n\
+             Changement voulu ? Régénère avec `scripts/bless-fixtures.sh` et relis le diff du \
+             fixture dans ta PR (AGENTS.md §5)."
+        );
+    }
+}
+
+/// JSON indenté, terminé par un saut de ligne : un diff de fixture se relit ligne à ligne.
+pub fn pretty(v: &Value) -> String {
+    let mut s = serde_json::to_string_pretty(v).expect("encodage");
+    s.push('\n');
+    s
+}

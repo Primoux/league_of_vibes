@@ -117,6 +117,14 @@ gh pr create --fill                                           # remplis le templ
   entités, fais des `step()`, vérifie. Toute règle de jeu que tu ajoutes vient avec son test.
 - **On n'affaiblit ni ne supprime jamais le test d'un autre** pour faire passer sa PR. Si un test d'autrui
   casse à cause de toi, c'est ton code ou le contrat qui doit changer — dis-le dans la PR.
+- **Instantanés de données** (`lov-shared/tests/fixtures/{champions,data,tables}.json`,
+  `lov-sim/tests/fixtures/nav_paths.json`) : d'abord générés depuis le TypeScript, ils sont depuis la
+  bascule **la référence** des données, des champions, de la carte et des chemins. Une modification
+  **volontaire** (rééquilibrage, nouvel objet, nouveau champion, mur déplacé) se livre avec les
+  instantanés régénérés par `scripts/bless-fixtures.sh` ; le diff du fixture, dans la PR, montre au
+  relecteur exactement ce qui change. On ne les édite pas à la main, et on ne régénère jamais pour faire
+  taire un test qu'on n'a pas compris. Les fixtures du protocole (`client.jsonl`, `server.jsonl`)
+  s'éditent à la main : un nouveau message y ajoute sa ligne.
 - `lov-sim` ne lit ni l'horloge ni un aléatoire non semé : le temps et le générateur sont injectés.
   On n'ajoute pas de champ à `Entity` sans PR `contract:`.
 - Côté client, ajoute une scène de démo quand c'est utile (`LOV_FXLAB`, `LOV_SPELLLAB`, `LOV_UILAB`,

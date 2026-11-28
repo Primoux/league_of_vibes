@@ -1,15 +1,14 @@
-//! Champions (`data/champions/`) comparés champ par champ aux valeurs du TypeScript.
+//! Champions (`data/champions/`) comparés champ par champ à l'instantané `fixtures/champions.json`.
 //!
-//! `fixtures/ts_champions.json` est un objet `id -> ChampionDef` dans l'ordre de `CHAMPION_LIST`,
-//! généré en important `packages/shared/src/data/champions/index.ts` avec Node (valeurs finales,
-//! après les aides `stats()` et `ability()` de `_helpers.ts`).
-//!
-//! Les champions sont portés un par un : le test vérifie tous ceux que le registre Rust contient
-//! (dans le même ordre relatif que le TS) et n'a pas à changer quand on en ajoute un.
+//! `fixtures/champions.json` est un objet `id -> ChampionDef` dans l'ordre du registre. Il a d'abord
+//! été généré en important `packages/shared/src/data/champions/index.ts` avec Node (valeurs finales,
+//! après les aides `stats()` et `ability()` de `_helpers.ts`) : le portage Rust lui est identique.
+//! Depuis la bascule, c'est lui la référence : un champion ajouté ou rééquilibré se livre avec
+//! l'instantané régénéré par `scripts/bless-fixtures.sh`, dont le diff se relit dans la PR (#276).
 
 mod common;
 
-use common::{fixture, json_diff};
+use common::{check_snapshot, fixture, json_diff};
 use lov_shared::data::champions::{CHAMPIONS, get_champion};
 use serde::de::{Deserializer, MapAccess, Visitor};
 use serde_json::Value;
@@ -40,15 +39,38 @@ impl<'de> serde::Deserialize<'de> for Ordered {
 }
 
 fn ts() -> Vec<(String, Value)> {
-    let Ordered(v) =
-        serde_json::from_str(&fixture("ts_champions.json")).expect("ts_champions.json");
+    let Ordered(v) = serde_json::from_str(&fixture("champions.json")).expect("champions.json");
     v
 }
 
+/// L'instantané : `id -> ChampionDef` dans l'ordre du registre, une clé par champion pour que le
+/// diff d'un rééquilibrage reste lisible (`serde_json::Map` trierait les ids).
 #[test]
-fn le_fixture_contient_les_13_champions() {
+fn instantane_des_champions() {
+    let defs: Vec<(String, Value)> = CHAMPIONS
+        .iter()
+        .map(|c| {
+            (
+                c.id.clone(),
+                serde_json::to_value(c).expect("sérialisation"),
+            )
+        })
+        .collect();
+    let mut text = String::from("{\n");
+    for (n, (id, def)) in defs.iter().enumerate() {
+        let body = serde_json::to_string_pretty(def).expect("encodage");
+        let sep = if n + 1 < defs.len() { "," } else { "" };
+        text.push_str(&format!("  {id:?}: {}{sep}\n", body.replace('\n', "\n  ")));
+    }
+    text.push_str("}\n");
+    let as_value = Value::Object(defs.into_iter().collect());
+    check_snapshot("champions.json", &text, &as_value);
+}
+
+#[test]
+fn le_fixture_contient_tous_les_champions_du_registre() {
     let ts = ts();
-    assert_eq!(ts.len(), 13);
+    assert_eq!(ts.len(), CHAMPIONS.len());
     for (id, def) in &ts {
         assert_eq!(def["id"], *id);
     }

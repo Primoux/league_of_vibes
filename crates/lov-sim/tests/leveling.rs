@@ -1,11 +1,9 @@
 //! Tests de l'expérience et des niveaux : port de `packages/server/test/leveling.test.ts`.
 //!
-//! Substitution : le TS crée l'allié du test de partage d'XP avec `ilyra`, pas encore enregistré en
-//! Rust ; le test n'utilise de lui que son équipe et sa position, `tharox` le remplace.
-//!
-//! Le dernier test du TS passe par `buildSnapshot` (`net/snapshot.ts`, non porté) : il est porté en
-//! appelant directement les hooks `selfState` et `entitySnapshot` que `buildSnapshot` exécute
-//! (`World::apply_self_state`, `World::apply_entity_snapshot`).
+//! Le dernier test du TS passe par `buildSnapshot`. Il est porté en appelant directement les hooks
+//! `selfState` et `entitySnapshot` que `buildSnapshot` exécute (`World::apply_self_state`,
+//! `World::apply_entity_snapshot`) : la construction des snapshots vit dans `lov-server`, dont
+//! `lov-sim` ne dépend pas.
 
 mod common;
 
@@ -90,7 +88,7 @@ fn enforces_basic_ability_ranks_and_reduces_cooldown_with_haste() {
 #[test]
 fn shares_nearby_minion_xp_once_and_excludes_dead_out_of_range_champions() {
     let (mut world, _s, e) = setup();
-    let ally = make(&mut world, "a", "tharox", v(1200.0, 1000.0));
+    let ally = make(&mut world, "a", "ilyra", v(1200.0, 1000.0));
     let mut m = Entity::new(
         EntityKind::Minion,
         TeamOrNeutral::Red,

@@ -3,7 +3,7 @@
 //!
 //! `getObjectiveState(world)` devient la poignée `Objectives` renvoyée par
 //! `objectives_system_with_state`. Le test de snapshot fusionne directement les hooks
-//! `objective_timers`, comme le fait `buildSnapshot` (pas encore porté).
+//! `objective_timers`, comme le fait `buildSnapshot` (dans `lov-server`, dont `lov-sim` ne dépend pas).
 
 mod common;
 

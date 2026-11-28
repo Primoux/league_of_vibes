@@ -1,6 +1,4 @@
 //! Tests des salles : port de `packages/server/test/room.test.ts`.
-//!
-//! Substitution : `sable` (données pas encore portées en Rust) est remplacé par `tharox`.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -230,7 +228,7 @@ fn ordre_1_2_2_2_1_et_picks_uniques() {
     // Champion déjà pris : refusé.
     lock(&s, &r1, "nyx");
     assert!(!locked(&r1));
-    lock(&s, &r1, "tharox");
+    lock(&s, &r1, "sable");
     assert_eq!(current(), 1);
     lock(&s, &r2, "ilyra");
     assert_eq!(current(), 2);
@@ -366,7 +364,7 @@ fn in_game() -> Setup {
     let turns = s.room.core().draft.as_ref().unwrap().turns.clone();
     for turn in turns {
         for id in turn {
-            lock(&s, &id, if id == "p0" { "grondak" } else { "tharox" });
+            lock(&s, &id, if id == "p0" { "grondak" } else { "sable" });
         }
     }
     s.advance(FINALIZE_SECONDS + 0.1);

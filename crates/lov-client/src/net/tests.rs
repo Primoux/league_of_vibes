@@ -441,3 +441,51 @@ fn adresse_du_serveur_lue_dans_le_fichier() {
     );
     assert_eq!(url_from_file("# rien\n"), None);
 }
+
+#[test]
+fn adresses_http_https_et_sans_chemin_normalisees() {
+    use super::{normalize_url, url_from_file};
+    let cases = [
+        ("https://lov.exemple.app", "wss://lov.exemple.app/ws"),
+        ("https://lov.exemple.app/", "wss://lov.exemple.app/ws"),
+        ("http://192.168.1.20:3000", "ws://192.168.1.20:3000/ws"),
+        ("HTTPS://lov.exemple.app/ws", "wss://lov.exemple.app/ws"),
+        ("wss://lov.exemple.app/ws", "wss://lov.exemple.app/ws"),
+        ("wss://lov.exemple.app", "wss://lov.exemple.app/ws"),
+        ("ws://localhost:3077/ws", "ws://localhost:3077/ws"),
+        ("ws://localhost:3077", "ws://localhost:3077/ws"),
+        ("localhost:3000", "ws://localhost:3000/ws"),
+        ("  ws://h/autre/route  ", "ws://h/autre/route"),
+    ];
+    for (raw, want) in cases {
+        assert_eq!(normalize_url(raw), want, "{raw}");
+    }
+    // plus de `ws://http://…/ws` (#272)
+    assert_eq!(
+        url_from_file("http://jeu.exemple:3000\n"),
+        Some("ws://jeu.exemple:3000/ws".into())
+    );
+}
+
+/// `wss://` passe par TLS : le client envoie un `ClientHello` (enregistrement TLS de type 0x16), au lieu
+/// d'échouer sur « TLS non compilé ». Le faux serveur coupe aussitôt, la connexion échoue ensuite.
+#[test]
+fn une_adresse_wss_ouvre_une_poignee_de_main_tls() {
+    use std::io::Read;
+    use std::net::TcpListener;
+    let listener = TcpListener::bind("127.0.0.1:0").expect("port local");
+    let port = listener.local_addr().expect("adresse").port();
+    let server = std::thread::spawn(move || {
+        let (mut sock, _) = listener.accept().expect("connexion");
+        let mut first = [0u8; 1];
+        sock.read_exact(&mut first).map(|()| first[0]).ok()
+    });
+    let Err(err) = tungstenite::connect(format!("wss://localhost:{port}/ws")) else {
+        panic!("le faux serveur ne parle pas TLS");
+    };
+    assert!(
+        !matches!(err, tungstenite::Error::Url(_)),
+        "TLS indisponible : {err}"
+    );
+    assert_eq!(server.join().ok().flatten(), Some(0x16));
+}
