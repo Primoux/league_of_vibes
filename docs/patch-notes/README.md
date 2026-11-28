@@ -44,8 +44,10 @@ Chaque PR crée **son propre fichier** dans [`next/`](next/), nommé d'après sa
 
 ```bash
 scripts/release.sh 0.2.0          # assemble next/ dans patchs.md, monte la version, ouvre la PR
-# … la PR est relue et mergée …
-scripts/release.sh --tag 0.2.0    # pose l'étiquette v0.2.0 sur main : la CI publie la release
+# … la PR est relue et mergée : la CI prépare toute seule un brouillon de release …
+scripts/release.sh --tag 0.2.0    # publie le brouillon (admin), ce qui pose l'étiquette v0.2.0
 ```
 
-La release GitHub reprend le texte du patch, suivi de la liste des PR.
+Chaque patch a donc toujours ses notes : la CI ne prépare la release que si `patchs.md` contient la
+section du patch, et le brouillon reprend ce texte, suivi de la liste des PR. Le bouton « Publish » du
+brouillon, sur GitHub, revient au même que `--tag`.

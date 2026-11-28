@@ -2,9 +2,11 @@
 # Publier un patch de League of Vibes (mainteneur). Voir docs/patch-notes/README.md.
 #
 #   scripts/release.sh 0.2.0         assemble docs/patch-notes/next/ dans patchs.md, monte la version du
-#                                    workspace, pousse la branche release/v0.2.0 et ouvre sa PR
-#   scripts/release.sh --tag 0.2.0   une fois la PR mergée : pose l'étiquette v0.2.0 sur origin/main ;
-#                                    build-natif.yml construit les archives et publie la release
+#                                    workspace, pousse la branche release/v0.2.0 et ouvre sa PR. Une fois
+#                                    mergée, build-natif.yml prépare tout seul un BROUILLON de release
+#                                    (notes du patch + archives Windows, Linux, macOS).
+#   scripts/release.sh --tag 0.2.0   publie ce brouillon (il faut être admin : l'étiquette v* est
+#                                    protégée), ce qui pose l'étiquette v0.2.0
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -27,9 +29,12 @@ if $tag; then
   fi
   git show origin/main:docs/patch-notes/patchs.md | grep -q "^# Patch ${version%.0} " \
     || { echo "Aucune note pour ce patch dans patchs.md (origin/main)." >&2; exit 1; }
-  git tag -a "v$version" origin/main -m "League of Vibes $version"
-  git push origin "v$version"
-  echo "✓ v$version poussée : la release se construit (onglet Actions, build-natif)."
+  if ! gh release view "v$version" --json isDraft --jq .isDraft 2>/dev/null | grep -qx true; then
+    echo "Pas de brouillon v$version : attends la fin de build-natif sur main (onglet Actions)." >&2
+    exit 1
+  fi
+  gh release edit "v$version" --draft=false --latest
+  echo "✓ Patch ${version%.0} publié : $(gh release view "v$version" --json url --jq .url)"
   exit 0
 fi
 
