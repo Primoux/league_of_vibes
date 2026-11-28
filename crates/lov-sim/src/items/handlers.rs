@@ -12,11 +12,12 @@
 use std::sync::Once;
 
 use lov_shared::constants::MAP_SIZE;
+use lov_shared::data::champions::get_champion;
 use lov_shared::data::items::item;
 use lov_shared::math::{clamp, dist};
 use lov_shared::types::{
-    DamageType, EntityId, EntityKind, GameEvent, ParamValue, PartialStats, Team, TeamOrNeutral,
-    Vec2,
+    AbilitySlot, DamageType, EntityId, EntityKind, GameEvent, ParamValue, PartialStats, Team,
+    TeamOrNeutral, Vec2,
 };
 
 use crate::combat::buffs::{Stasis, StatModifiers, merge_stats, register_stat_source};
@@ -59,6 +60,23 @@ fn champ_has_passive(world: &World, id: Option<EntityId>, passive_id: &str) -> b
     world
         .get_opt(id)
         .is_some_and(|e| e.champ.is_some() && has_passive(e, passive_id))
+}
+
+/// Vrai si `ability` est l'un des quatre sorts du champion `e` (Q, W, E, R).
+fn is_own_ability(e: &Entity, ability: Option<&str>) -> bool {
+    let (Some(ability), Some(c)) = (ability, &e.champ) else {
+        return false;
+    };
+    get_champion(&c.champion_id).is_some_and(|d| {
+        [
+            AbilitySlot::Q,
+            AbilitySlot::W,
+            AbilitySlot::E,
+            AbilitySlot::R,
+        ]
+        .into_iter()
+        .any(|slot| d.abilities.get(slot).id == ability)
+    })
 }
 
 /// Somme des stats plates des objets possédés.
@@ -117,7 +135,12 @@ pub fn register_item_hooks(world: &mut World) {
         let Some(target) = world.get(ctx.target) else {
             return;
         };
-        if has_passive(credit, "chasseur") && target.kind == EntityKind::Monster {
+        // Machette : sur les auto-attaques et les sorts du champion, pas sur chaque instance de dégâts
+        // (brûlures, renvois, objets…) (#316).
+        if has_passive(credit, "chasseur")
+            && target.kind == EntityKind::Monster
+            && (ctx.is_auto_attack || is_own_ability(credit, ctx.ability.as_deref()))
+        {
             ctx.amount += 15.0;
         }
         if has_passive(credit, "ombre")
