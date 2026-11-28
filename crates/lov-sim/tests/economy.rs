@@ -549,6 +549,45 @@ fn rappel_interrompu_par_un_ordre_de_deplacement() {
     assert!(st(&s, c).recall.is_none());
 }
 
+/// #311 : Flash ou un sort interrompt le rappel ; un sort refusé (pas de rang) ne l'interrompt pas.
+#[test]
+fn rappel_interrompu_par_flash_ou_un_sort() {
+    let mut s = full_world();
+    let c = champ(&mut s.world, Team::Blue, v(6000.0, 3000.0));
+    cmd(&mut s, c, ClientMsg::Recall);
+    s.run(1.0);
+    cmd(
+        &mut s,
+        c,
+        ClientMsg::Summoner {
+            slot: lov_shared::types::SummonerSlot::D,
+            target_pos: Some(v(6300.0, 3000.0)),
+            target_id: None,
+        },
+    );
+    assert!(st(&s, c).recall.is_none(), "Flash");
+    s.run(9.0);
+    assert!(dist(s.e(c).pos, fountain(Team::Blue)) > 2000.0);
+
+    let mut s = full_world();
+    let c = champ(&mut s.world, Team::Blue, v(6000.0, 3000.0));
+    s.e_mut(c).mana = 1000.0;
+    cmd(&mut s, c, ClientMsg::Recall);
+    let q = ClientMsg::Cast {
+        slot: AbilitySlot::Q,
+        target_pos: Some(v(6400.0, 3000.0)),
+        target_id: None,
+    };
+    cmd(&mut s, c, q.clone()); // Q au rang 0 : refusé
+    assert!(
+        st(&s, c).recall.is_some(),
+        "un sort refusé ne coupe pas le rappel"
+    );
+    s.e_mut(c).champ.as_mut().unwrap().ability_levels.q = 1;
+    cmd(&mut s, c, q);
+    assert!(st(&s, c).recall.is_none(), "sort lancé");
+}
+
 #[test]
 fn rappel_dure_4_s_avec_le_buff_du_leviathan() {
     let mut s = full_world();
