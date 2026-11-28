@@ -645,6 +645,34 @@ fn recette_consomme_les_composants_et_deduit_leur_cout() {
     close(s.e(c).stats.attack_speed, as_base + 0.35);
 }
 
+/// #307 : un composant demandé deux fois n'est déduit qu'autant de fois qu'il est possédé.
+#[test]
+fn recette_a_composant_double_ne_deduit_que_les_exemplaires_possedes() {
+    let mut s = full_world();
+    let c = at_fountain(&mut s);
+    set_gold(&mut s, c, 3000.0);
+    buy(&mut s, c, "long_sword"); // 3000 - 350
+    buy(&mut s, c, "grand_glaive"); // 1300 - 350 (une seule épée) = 950
+    assert_eq!(gold(&s, c), 3000.0 - 350.0 - 950.0);
+    assert!(has(&s, c, "grand_glaive"));
+    assert_eq!(count(&s, c, "long_sword"), 0);
+
+    let mut s = full_world();
+    let c = at_fountain(&mut s);
+    set_gold(&mut s, c, 3000.0);
+    buy(&mut s, c, "long_sword");
+    buy(&mut s, c, "long_sword");
+    buy(&mut s, c, "grand_glaive"); // 1300 - 2 × 350 = 600
+    assert_eq!(gold(&s, c), 3000.0 - 700.0 - 600.0);
+    assert_eq!(count(&s, c, "long_sword"), 0);
+    let slot = slot_of(&s, c, "grand_glaive");
+    assert_eq!(st(&s, c).paid_price[slot], Some(1300.0));
+    // L'annulation rend bien les deux épées.
+    cmd(&mut s, c, ClientMsg::UndoShop);
+    assert_eq!(count(&s, c, "long_sword"), 2);
+    assert_eq!(gold(&s, c), 3000.0 - 700.0);
+}
+
 #[test]
 fn annuler_rembourse_l_achat_et_rend_les_composants() {
     let mut s = full_world();

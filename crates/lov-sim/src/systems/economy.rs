@@ -267,11 +267,17 @@ fn buy_item(world: &mut World, id: EntityId, item_id: &str) {
         return;
     }
 
-    // Recette : les composants possédés sont consommés et leur coût est déduit.
+    // Recette : les composants possédés sont consommés et leur coût est déduit. Un composant demandé
+    // deux fois (`grand_glaive` = 2 × `long_sword`) prend deux emplacements distincts.
     let mut consumed: Vec<ConsumedItem> = Vec::new();
     let mut reduction = 0.0;
     for comp in &def.builds_from {
-        if let Some(cslot) = slot_of(e, comp) {
+        let free = e.champ.as_ref().and_then(|c| {
+            c.items.iter().enumerate().position(|(i, s)| {
+                s.as_deref() == Some(comp.as_str()) && !consumed.iter().any(|u| u.slot == i)
+            })
+        });
+        if let Some(cslot) = free {
             let comp_cost = item(comp).map_or(0.0, |d| d.cost);
             let paid = econ_ref(e)
                 .and_then(|st| st.paid_price[cslot])
